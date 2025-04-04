@@ -1,217 +1,110 @@
-import { createSlice, createAsyncThunk, PayloadAction, createAction } from '@reduxjs/toolkit';
-import { facilityService } from '@/services/facility.service';
-import { FacilityFormData, FieldGroupData } from '@/pages/Owner/FacilityManager/CreateFacility/interfaces/facility';
-import { INITIAL_FORM_DATA } from '@/pages/Owner/FacilityManager/CreateFacility/constants/sportTypes';
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { Facility, FacilityState } from '@/types/facility.type';
+import { facilityService, FacilityDropdownItem } from '@/services/facility.service';
+import { AxiosError } from 'axios';
 
-
-// Keep the Facility interface as is
-interface Facility {
-  id: string;
-  name: string;
-  description: string;
-  openTime: string;
-  closeTime: string;
-  location: string;
-  status: string;
-  avgRating: number;
-  quantityRating: number;
-  imageUrl: string[];
+// Interface for API error responses
+interface ApiError {
+  message: string;
+  statusCode?: number;
 }
 
-// Update the FacilityState to remove coverImage and use images array
-interface FacilityState {
-  facility: Facility | null;
-  loading: boolean;
-  error: string | null;
-  currentStep: number;
-  formData: FacilityFormData;
-  selectedSports: number[];
-  fieldGroups: { [key: string]: FieldGroupData[] };
-  // Instead of storing File objects, store file metadata
-  imageMetadata: { name: string; size: number; type: string }[];
-  imagesPreview: string[];
-  createdFacilityId: string | null;
-  facilityList: { id: string, name: string}[];
-  facilityListLoading: boolean;
+// Mở rộng FacilityState để thêm danh sách dropdown
+interface ExtendedFacilityState extends FacilityState {
+  dropdownItems: FacilityDropdownItem[];
 }
 
 // Initial state
-const initialState: FacilityState = {
-  facility: null,
-  loading: false,
+const initialState: ExtendedFacilityState = {
+  facility: {} as Facility,
+  isLoading: false,
   error: null,
-  currentStep: 1,
-  formData: INITIAL_FORM_DATA,
-  selectedSports: [],
-  fieldGroups: {},
-  imageMetadata: [], // Store metadata instead of File objects
-  imagesPreview: [],
-  createdFacilityId: null,
-  facilityList: [],
-  facilityListLoading: false
+  dropdownItems: []
 };
 
-
-export const addImageMetadata = createAction<{ 
-  name: string; 
-  size: number; 
-  type: string;
-  preview: string 
-}>('facility/addImageMetadata');
-
-// Update the createFacility thunk to accept the FormData directly
-export const createFacility = createAsyncThunk(
-  'facility/createFacility',
-  async (formData: FormData, { rejectWithValue }) => {
-    try {
-      const response = await facilityService.createFacility(formData);
-      return response;
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data || 'Failed to create facility');
-    }
-  }
-);
-
-// export const fetchFacilities = createAsyncThunk(
-//   'facility/fetchFacilities',
-//   async (filter: string = 'all', { rejectWithValue }) => {
-//     try {
-//       const response = await facilityService.getMyFacilities();
-//       return response;
-//     } catch (error: any) {
-//       return rejectWithValue(error.response?.data || 'Failed to fetch facilities');
-//     }
-//   }
-// );
-
-// Thêm action để lấy danh sách cơ sở
-export const fetchFacilityList = createAsyncThunk(
-  'facility/fetchFacilityList',
-  async (_, { rejectWithValue }) => {
+// Async thunks
+export const fetchOwnerFacilities = createAsyncThunk(
+  'facility/fetchOwnerFacilities',
+  async (ownerId: string, { rejectWithValue }) => {
     try {
       const response = await facilityService.getMyFacilities();
-      // Chỉ lấy id và name từ response
-      return response.map((facility: any) => ({
-        id: facility.id,
-        name: facility.name
-      }));
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data || 'Failed to fetch facility list');
+      return response.data;
+    } catch (error) {
+      const err = error as AxiosError<ApiError>;
+      return rejectWithValue(err.response?.data?.message || 'Failed to fetch facilities');
     }
   }
 );
 
-// Slice definition
+export const fetchFacilityById = createAsyncThunk(
+  'facility/fetchFacilityById',
+  async (facilityId: string, { rejectWithValue }) => {
+    try {
+      const response = await facilityService.getFacilityById(facilityId);
+      return response;
+    } catch (error) {
+      const err = error as AxiosError<ApiError>;
+      return rejectWithValue(err.response?.data?.message || 'Failed to fetch facility details');
+    }
+  }
+);
+
+export const fetchFacilityDropdown = createAsyncThunk(
+  'facility/fetchFacilityDropdown',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await facilityService.getFacilitiesDropdown();
+      return response;
+    } catch (error) {
+      const err = error as AxiosError<ApiError>;
+      return rejectWithValue(err.response?.data?.message || 'Failed to fetch facility dropdown');
+    }
+  }
+);
+
+// Slice
 const facilitySlice = createSlice({
   name: 'facility',
   initialState,
   reducers: {
-    addImageMetadata: (state, action: PayloadAction<{ name: string; size: number; type: string; preview: string }>) => {
-      state.imageMetadata.push({
-        name: action.payload.name,
-        size: action.payload.size,
-        type: action.payload.type
-      });
-      state.imagesPreview.push(action.payload.preview);
+    clearFacility: (state) => {
+      state.facility = {} as Facility;
     },
-    removeImageMetadata: (state, action: PayloadAction<number>) => {
-      state.imageMetadata = state.imageMetadata.filter((_, index) => index !== action.payload);
-      state.imagesPreview = state.imagesPreview.filter((_, index) => index !== action.payload);
+    clearError: (state) => {
+      state.error = null;
     },
-    setCurrentStep: (state, action: PayloadAction<number>) => {
-      state.currentStep = action.payload;
-    },
-    updateFormData: (state, action: PayloadAction<Partial<FacilityFormData>>) => {
-      state.formData = { ...state.formData, ...action.payload };
-    },
-    updateFacilityInfo: (state, action: PayloadAction<any>) => {
-      state.formData.facilityInfo = { ...state.formData.facilityInfo, ...action.payload };
-    },
-    setSelectedSports: (state, action: PayloadAction<number[]>) => {
-      state.selectedSports = action.payload;
-    },
-    updateFieldGroups: (state, action: PayloadAction<{ [key: string]: FieldGroupData[] }>) => {
-      state.fieldGroups = action.payload;
-    },
-    addFieldGroup: (state, action: PayloadAction<{ sportId: string, fieldGroup: FieldGroupData }>) => {
-      const { sportId, fieldGroup } = action.payload;
-      if (!state.fieldGroups[sportId]) {
-        state.fieldGroups[sportId] = [];
-      }
-      state.fieldGroups[sportId].push(fieldGroup);
-    },
-    updateFieldGroup: (state, action: PayloadAction<{ sportId: string, index: number, fieldGroup: FieldGroupData }>) => {
-      const { sportId, index, fieldGroup } = action.payload;
-      if (state.fieldGroups[sportId] && state.fieldGroups[sportId][index]) {
-        state.fieldGroups[sportId][index] = fieldGroup;
-      }
-    },
-    resetFacilityForm: (state) => {
-      state.currentStep = 1;
-      state.formData = INITIAL_FORM_DATA;
-      state.selectedSports = [];
-      state.fieldGroups = {};
-      state.imageMetadata = [];
-      state.imagesPreview = [];
-      state.createdFacilityId = null;
-    }
   },
   extraReducers: (builder) => {
     builder
-    .addCase(createFacility.pending, (state) => {
-      state.loading = true;
-      state.error = null;
-    })
-    .addCase(createFacility.fulfilled, (state, action) => {
-      state.loading = false;
-      state.createdFacilityId = action.payload.id;
-      // Reset form after successful creation
-      state.currentStep = 1;
-      state.formData = INITIAL_FORM_DATA;
-      state.selectedSports = [];
-      state.fieldGroups = {};
-      state.imageMetadata = [];
-      state.imagesPreview = [];
-    })
-    .addCase(createFacility.rejected, (state, action) => {
-      state.loading = false;
-      state.error = action.payload as string;
-    })
-    // .addCase(fetchFacilities.pending, (state) => {
-    //   state.loading = true;
-    //   state.error = null;
-    // })
-    // .addCase(fetchFacilities.fulfilled, (state, action) => {
-    //   state.loading = false;
-    //   state.facility = action.payload;
-    // })
-    // .addCase(fetchFacilities.rejected, (state, action) => {
-    //   state.loading = false;
-    //   state.error = action.payload as string;
-    // })
-    .addCase(fetchFacilityList.pending, (state) => {
-      state.facilityListLoading = true;
-    })
-    .addCase(fetchFacilityList.fulfilled, (state, action) => {
-      state.facilityListLoading = false;
-      state.facilityList = action.payload;
-    })
-    .addCase(fetchFacilityList.rejected, (state) => {
-      state.facilityListLoading = false;
-    });
-  }
+      // Fetch facility details
+      .addCase(fetchFacilityById.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchFacilityById.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.facility = action.payload;
+      })
+      .addCase(fetchFacilityById.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      })
+      
+      // Fetch facility dropdown
+      .addCase(fetchFacilityDropdown.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchFacilityDropdown.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.dropdownItems = action.payload;
+      })
+      .addCase(fetchFacilityDropdown.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      });
+  },
 });
 
-export const { 
-  setCurrentStep, 
-  updateFormData, 
-  updateFacilityInfo, 
-  removeImageMetadata,
-  setSelectedSports, 
-  updateFieldGroups,
-  addFieldGroup,
-  updateFieldGroup,
-  resetFacilityForm
-} = facilitySlice.actions;
-
+export const { clearFacility, clearError } = facilitySlice.actions;
 export default facilitySlice.reducer;

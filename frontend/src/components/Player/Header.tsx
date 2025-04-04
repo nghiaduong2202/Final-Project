@@ -1,9 +1,6 @@
-
-
-import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Select, Button } from 'antd';
-import TopbarProfile from '@/components/TopbarProfile';
+import { Select } from 'antd';
+import TopbarProfile from '@/components/LoginModal/TopbarProfile';
 import Logo from '@/assets/Logo.svg';
 
 const { Option } = Select;
@@ -38,10 +35,6 @@ const Header = () => {
 
   const handleHomeNavigate = () => {
     navigate('/');
-  };
-
-  const handleOwnerNavigate = () => {
-    navigate('/owner');
   };
 
   return (
@@ -88,14 +81,6 @@ const Header = () => {
           
           {/* Owner Link */}
           <div className="flex items-center space-x-6">
-            <Button 
-              type="link" 
-              className="text-blue-600 hover:text-blue-800 font-medium"
-              onClick={handleOwnerNavigate}
-            >
-              Dành cho chủ sân
-            </Button>
-            
             {/* User Profile */}
             <TopbarProfile />
           </div>

@@ -34,7 +34,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onMenuItemClick = () => {}, onToggle 
   const menuItems = [
     { id: 'calendar', label: 'Lịch đặt sân', icon: ICONS.CALENDAR, activeIcon: ICONS.CALENDAR, path: "/owner" },
     { id: 'facility', label: 'Quản lý cơ sở', icon: ICONS.FACILITY, activeIcon: ICONS.FACILITY, path: "/owner/facility-management" },
-    { id: 'field', label: 'Quản lý sân', icon: ICONS.FIELD, activeIcon: ICONS.FIELD, path: "/owner/field-management" },
+    { id: 'field', label: 'Quản lý nhóm sân', icon: ICONS.FIELD, activeIcon: ICONS.FIELD, path: "/owner/field-group-management" },
     { id: 'service', label: 'Quản lý dịch vụ', icon: ICONS.SERVICE, activeIcon: ICONS.SERVICE, path: "/owner/service-management" },
     { id: 'voucher', label: 'Quản lý voucher', icon: ICONS.VOUCHER, activeIcon: ICONS.VOUCHER, path: "/owner/voucher-management" },
     { id: 'ads', label: 'Quản lý sự kiện', icon: ICONS.EVENT, activeIcon: ICONS.EVENT, path: "/owner/event-management" },

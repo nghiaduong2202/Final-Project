@@ -1,296 +1,292 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAppDispatch, useAppSelector } from '@/hooks/reduxHooks';
-import { ICONS } from '@/constants/owner/Content/content';
-import { 
-  fetchVouchers, 
-  deleteVoucher, 
-  getVoucherStatus,
-  setSelectedFacilityId
-} from '@/store/slices/voucherSlice';
-import { fetchFacilityList } from '@/store/slices/facilitySlice';
+import { Button, Select, Card, Typography, Radio, Modal, Input } from 'antd';
+import { PlusOutlined, ArrowRightOutlined, SearchOutlined } from '@ant-design/icons';
+import { Voucher, VoucherFormData } from '@/types/voucher.type';
+import { mockVouchers } from '@/mocks/voucher/voucherData';
+import { mockFacilitiesDropdown } from '@/mocks/facility/mockFacilities';
+import { getVoucherStatus } from '@/utils/voucherUtils';
+import voucherImage from '@/assets/Owner/content/voucher.png';
+
+// Components
+import VoucherTable from './components/VoucherTable';
+import VoucherDetailModal from './components/VoucherDetailModal';
+import VoucherEditModal from './components/VoucherEditModal';
+
+const { Title, Text } = Typography;
+const { Option } = Select;
+
+// Local storage key
+const SELECTED_FACILITY_KEY = 'owner_selected_facility_id';
 
 const VoucherManagement: React.FC = () => {
   const navigate = useNavigate();
-  const dispatch = useAppDispatch();
-  
-  // Redux state
-  const { vouchers, loading, error } = useAppSelector(state => state.voucher);
-  const { facilityList } = useAppSelector(state => state.facility);
-  
+
   // States
-  const [selectedFacility, setSelectedFacility] = useState<string>('');
+  const [selectedFacilityId, setSelectedFacilityId] = useState<string>('');
+  const [vouchers, setVouchers] = useState<Voucher[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState<string>('all');
+  
+  // Modal states
+  const [detailModalVisible, setDetailModalVisible] = useState(false);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [currentVoucher, setCurrentVoucher] = useState<Voucher | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   // Filter options
   const filterOptions = [
-    { id: 'all', label: 'Tất cả' },
-    { id: 'active', label: 'Đang diễn ra' },
-    { id: 'upcoming', label: 'Sắp diễn ra' },
-    { id: 'expired', label: 'Đã kết thúc' }
+    { value: 'all', label: 'Tất cả' },
+    { value: 'active', label: 'Đang diễn ra' },
+    { value: 'upcoming', label: 'Sắp diễn ra' },
+    { value: 'expired', label: 'Đã kết thúc' }
   ];
 
+  // Load initial facility from localStorage
   useEffect(() => {
-    dispatch(fetchFacilityList());
-  }, [dispatch]);
-
-  useEffect(() => {
-    if (selectedFacility) {
-      dispatch(setSelectedFacilityId(selectedFacility));
-      dispatch(fetchVouchers(selectedFacility));
+    const savedFacilityId = localStorage.getItem(SELECTED_FACILITY_KEY);
+    const initialFacilityId = savedFacilityId || (mockFacilitiesDropdown.length > 0 ? mockFacilitiesDropdown[0].id : '');
+    
+    if (initialFacilityId) {
+      setSelectedFacilityId(initialFacilityId);
+      fetchVouchers();
     }
-  }, [dispatch, selectedFacility]);
+  }, []);
 
+  // Fetch vouchers (mock function)
+  const fetchVouchers = () => {
+    setLoading(true);
+    setError(null);
+    
+    // Simulate API call with setTimeout
+    setTimeout(() => {
+      try {
+        // In real implementation, this would be filtered by facilityId
+        setVouchers(mockVouchers);
+        setLoading(false);
+      } catch (error) {
+        setError('Có lỗi xảy ra khi tải dữ liệu. Vui lòng thử lại sau.');
+        setLoading(false);
+        console.error('Error fetching vouchers:', error);
+      }
+    }, 500);
+  };
+
+  // Handle facility change
+  const handleFacilityChange = (value: string) => {
+    setSelectedFacilityId(value);
+    localStorage.setItem(SELECTED_FACILITY_KEY, value);
+    fetchVouchers();
+  };
+
+  // Navigate to create voucher page
   const handleCreateVoucher = () => {
     navigate('/owner/create-voucher');
   };
 
-  const handleDeleteVoucher = async (voucherId: string) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa voucher này không?')) {
-      try {
-        await dispatch(deleteVoucher(voucherId)).unwrap();
-        // Refresh vouchers list
-        if (selectedFacility) {
-          dispatch(fetchVouchers(selectedFacility));
-        }
-      } catch (error) {
-        console.error('Error deleting voucher:', error);
-      }
-    }
-  };
-
-  // Format date for display
-  const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
-    return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')} ${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
-  };
-
-  // Format time range
-  const formatTimeRange = (startTime: string, endTime: string): string => {
-    return `${formatDate(startTime)} - ${formatDate(endTime)}`;
-  };
-
-  // Filter vouchers based on status
-  const filteredVouchers = vouchers.filter(voucher => {
-    if (activeFilter === 'all') return true;
+  // Handle delete voucher
+  const handleDeleteVoucher = (voucherId: number) => {
+    // Filter out the deleted voucher
+    setVouchers(prevVouchers => prevVouchers.filter(voucher => voucher.id !== voucherId));
     
-    const status = getVoucherStatus(voucher.startTime, voucher.endTime);
-    return status === activeFilter;
+    // Show success message
+    Modal.success({
+      title: 'Xóa voucher thành công',
+      content: 'Voucher đã được xóa khỏi hệ thống.'
+    });
+  };
+
+  // Handle view voucher details
+  const handleViewVoucher = (voucher: Voucher) => {
+    setCurrentVoucher(voucher);
+    setDetailModalVisible(true);
+  };
+
+  // Handle edit voucher
+  const handleEditVoucher = (voucher: Voucher) => {
+    setCurrentVoucher(voucher);
+    setEditModalVisible(true);
+  };
+
+  // Handle save voucher
+  const handleSaveVoucher = (values: VoucherFormData) => {
+    if (!currentVoucher) return;
+    
+    setSubmitting(true);
+    
+    // Simulate API call
+    setTimeout(() => {
+      // Create updated voucher
+      const updatedVoucher: Voucher = {
+        ...currentVoucher,
+        name: values.name,
+        code: values.code || currentVoucher.code,
+        startDate: values.startDate,
+        endDate: values.endDate,
+        voucherType: values.voucherType,
+        discount: values.discount,
+        minPrice: values.minPrice,
+        maxDiscount: values.maxDiscount,
+        amount: values.amount,
+        updatedAt: new Date().toISOString()
+      };
+      
+      // Update vouchers list
+      setVouchers(prevVouchers => 
+        prevVouchers.map(voucher => 
+          voucher.id === currentVoucher.id ? updatedVoucher : voucher
+        )
+      );
+      
+      setSubmitting(false);
+      setEditModalVisible(false);
+      
+      // Show success message
+      Modal.success({
+        title: 'Cập nhật thành công',
+        content: 'Thông tin voucher đã được cập nhật thành công.'
+      });
+    }, 1000);
+  };
+
+  // Filter and search vouchers
+  const filteredVouchers = vouchers.filter(voucher => {
+    // Filter by status
+    const status = getVoucherStatus(voucher.startDate, voucher.endDate);
+    const statusMatch = activeFilter === 'all' || status === activeFilter;
+    
+    // Filter by search term
+    const searchMatch = !searchTerm || 
+      voucher.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      voucher.code.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    return statusMatch && searchMatch;
   });
 
-  const getStatusColor = (status: string) => { 
-    const colors = {
-      active: 'text-green-500',
-      upcoming: 'text-yellow-500',
-      expired: 'text-red-500'
-    };
-    return colors[status as keyof typeof colors] || '';
-  };
-
-  // Format discount value based on voucher type
-  const formatDiscountValue = (voucher: any): string => {
-    return voucher.voucherType === 'cash' 
-      ? `${voucher.value.toLocaleString()}đ` 
-      : `${voucher.value}%`;
-  };
-
   return (
-    <div className="flex flex-col w-full min-h-screen p-8">
-      {/* Banner Section */}
-      <div className="bg-white p-5 rounded-lg mb-8 flex justify-between items-center flex-wrap gap-10">
-        <div className="flex-1 min-w-[300px] mb-4 lg:mb-0">
-          <h1 className="text-[26px] font-bold font-roboto tracking-wide mb-2">
-            Tạo ngay Voucher để tăng doanh thu cho cơ sở của bạn!!!
-          </h1>
-          <p className="text-base font-roboto tracking-wide mb-8 text-gray-600">
-            Cơ hội tăng đến 43% đơn đặt sân và 28% doanh thu khi tạo Voucher ưu đãi cho Khách hàng.
-          </p>
-          <button 
-            onClick={handleCreateVoucher}
-            className="bg-[#cc440a] text-white rounded-md px-6 py-3 text-xl font-semibold 
-                     flex items-center gap-3 hover:bg-[#b33a08] transition-colors"
-          >
-            Tạo Voucher ngay!
-            <img src={ICONS.ARROW_RIGHT} alt="arrow" className="w-6" />
-          </button>
+    <div className="p-6 md:p-8">
+      {/* Promotional Banner */}
+      <Card className="mb-8 overflow-hidden">
+        <div className="flex flex-col lg:flex-row justify-between gap-8">
+          <div className="flex-1">
+            <Title level={2} style={{ fontSize: 26 }} className="text-xl md:text-2xl lg:text-3xl">
+              Tạo ngay Voucher để tăng doanh thu cho cơ sở của bạn!!!
+            </Title>
+            <Text className="block mb-8 text-gray-600">
+              Cơ hội tăng đến 43% đơn đặt sân và 28% doanh thu khi tạo Voucher ưu đãi cho Khách hàng.
+            </Text>
+            <Button 
+              type="primary"
+              size="large"
+              icon={<PlusOutlined />}
+              onClick={handleCreateVoucher}
+              style={{ background: '#cc440a', display: 'flex', alignItems: 'center', width: 'fit-content' }}
+            >
+              Tạo Voucher ngay <ArrowRightOutlined style={{ marginLeft: 8 }} />
+            </Button>
+          </div>
+          <div className="max-w-md">
+            <img 
+              src={voucherImage} 
+              alt="Voucher illustration" 
+              className="w-full h-auto object-contain"
+            />
+          </div>
         </div>
-        <div className="flex-shrink-0">
-          <img src={ICONS.VOUCHER} alt="Voucher Promotion" className="w-full max-w-[500px] h-auto object-contain" />
-        </div>
-      </div>
+      </Card>
 
       {/* Voucher List Section */}
-      <div className="bg-white rounded-lg p-6">
-        <h2 className="text-xl font-bold font-roboto tracking-wide mb-6">Danh sách mã giảm giá</h2>
-        
-        {/* Facility Dropdown */}
-        <div className="relative mb-8">
-          <select 
-            value={selectedFacility}
-            onChange={(e) => setSelectedFacility(e.target.value)}
-            className="w-full appearance-none border border-black/70 rounded-xl px-5 py-2
-                     text-lg font-roboto bg-white cursor-pointer focus:outline-none"
+      <Card title="Danh sách mã giảm giá" className="mb-8">
+        {/* Facility selector */}
+        <div className="mb-6">
+          <Select
+            placeholder="Chọn cơ sở của bạn"
+            style={{ width: '100%' }}
+            value={selectedFacilityId || undefined}
+            onChange={handleFacilityChange}
+            popupMatchSelectWidth={false}
           >
-            <option value="">Chọn cơ sở của bạn</option>
-            {facilityList.map((facility) => (
-              <option key={facility.id} value={facility.id}>
+            {mockFacilitiesDropdown.map((facility) => (
+              <Option key={facility.id} value={facility.id}>
                 {facility.name}
-              </option>
+              </Option>
             ))}
-          </select>
-          <img 
-            src={ICONS.DROP_DOWN} 
-            alt="dropdown" 
-            className="absolute right-5 top-1/2 -translate-y-1/2 w-4 pointer-events-none rotate-180" 
+          </Select>
+        </div>
+
+        {/* Search and filters */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+          <div className="overflow-x-auto w-full md:w-auto pb-2 md:pb-0">
+            <Radio.Group 
+              options={filterOptions} 
+              onChange={e => setActiveFilter(e.target.value)} 
+              value={activeFilter}
+              optionType="button"
+              className="flex-nowrap"
+            />
+          </div>
+          
+          <Input
+            placeholder="Tìm kiếm voucher"
+            prefix={<SearchOutlined />}
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            style={{ maxWidth: 300, width: '100%' }}
           />
         </div>
 
-        {/* Filter Tabs */}
-        <div className="flex gap-6 mb-6 flex-wrap">
-          {filterOptions.map((filter) => (
-            <button
-              key={filter.id}
-              onClick={() => setActiveFilter(filter.id)}
-              className={`text-lg font-roboto transition-colors
-                ${activeFilter === filter.id 
-                  ? 'text-blue-500 font-medium' 
-                  : 'text-gray-600 hover:text-blue-500'}`}
-            >
-              {filter.label}
-            </button>
-          ))}
-        </div>  
-
-        {/* border */}
-        <div className="border-b border-black/70 mb-8"></div>
-
-        {/* Vouchers Table */}
-        {!selectedFacility ? (
+        {/* Conditional rendering based on state */}
+        {!selectedFacilityId ? (
           <div className="flex flex-col items-center justify-center h-64 bg-white rounded-lg p-6">
             <p className="text-lg text-gray-600 mb-4">Vui lòng chọn cơ sở để xem danh sách voucher</p>
-          </div>
-        ) : loading ? (
-          <div className="flex justify-center items-center h-64">
-            <p className="text-lg">Đang tải dữ liệu...</p>
           </div>
         ) : error ? (
           <div className="p-4 bg-red-100 text-red-700 rounded-lg">
             {error}
           </div>
+        ) : loading ? (
+          <div className="flex justify-center items-center h-64">
+            <p className="text-lg">Đang tải dữ liệu...</p>
+          </div>
         ) : filteredVouchers.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 bg-white rounded-lg p-6">
             <p className="text-lg text-gray-600 mb-4">Chưa có voucher nào</p>
-            <button
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
               onClick={handleCreateVoucher}
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
             >
-              + Thêm voucher mới
-            </button>
+              Tạo voucher mới
+            </Button>
           </div>
         ) : (
-          <div className="rounded-[15px] overflow-hidden mb-8 border border-[#d8d8d880]">
-            {/* Table Container with fixed width and horizontal scroll */}
-            <div className="max-w-full ">
-              <div className="relative" style={{ height: '500px' }}>
-                <div className="overflow-x-auto overflow-y-auto h-full">
-                  <table className="w-full table-fixed " style={{ minWidth: '1410px' }}>
-                    {/* Table Header */}
-                    <thead className="border-b border-[#d8d8d880] bg-[#fafbfd] sticky top-0 z-30 bg-opacity-100">
-                      <tr>
-                        {/* Sticky Left Column */}
-                        <th className="sticky left-0 z-10 w-[250px] font-bold font-opensans px-4 py-5 text-left" style={{ background: '#448ff033' }}>
-                          Tên Voucher / Mã Voucher
-                        </th>
-                        
-                        {/* Scrollable Middle Columns */}
-                        <th className="w-[200px] font-bold font-opensans px-4 py-5 text-left bg-[#448ff033]">
-                          Loại giảm giá | Giá giảm
-                        </th>
-                        <th className="w-[180px] font-bold font-opensans px-4 py-5 text-left bg-[#448ff033]">
-                          Tổng số mã giảm giá
-                        </th>
-                        <th className="w-[120px] font-bold font-opensans px-4 py-5 text-left bg-[#448ff033]">
-                          Đã dùng
-                        </th>
-                        <th className="w-[300px] font-bold font-opensans px-4 py-5 text-left bg-[#448ff033]">
-                          Trạng thái | Thời gian dùng mã giảm giá
-                        </th>
-                        <th className="w-[120px] font-bold font-opensans px-4 py-5 text-left bg-[#448ff033]">
-                          Đơn hàng tối thiểu
-                        </th>
-                        <th className="w-[120px] font-bold font-opensans px-4 py-5 text-left bg-[#448ff033]">
-                          Giảm tối đa
-                        </th>
-
-                        {/* Sticky Right Column */}
-                        <th className="sticky right-0 z-10 bg-[#448ff033] w-[120px] font-bold font-opensans px-4 py-5 text-left">
-                          Thao tác
-                        </th>
-                      </tr>
-                    </thead>
-
-                    {/* Table Body */}
-                    <tbody>
-                      {filteredVouchers.map((voucher) => {
-                        const status = getVoucherStatus(voucher.startTime, voucher.endTime);
-                        const usedCount = voucher.amount - voucher.remain;
-                        
-                        return (
-                          <tr key={voucher.id} className="hover:bg-gray-50 border-b border-[#9a9a9a]/50">
-                            {/* Sticky Left Column */}
-                            <td className="sticky left-0 z-10 bg-[#fafbfd] w-[250px]">
-                              <div className="p-5">
-                                <div className="font-medium">{voucher.name}</div>
-                                <div className="text-gray-500">{voucher.code}</div>
-                              </div>
-                            </td>
-
-                            {/* Scrollable Middle Columns */}
-                            <td className="w-[200px] p-5 whitespace-nowrap">
-                              <div>{voucher.voucherType === 'percent' ? 'Giảm theo %' : 'Giảm theo số tiền'}</div>
-                              <div>{formatDiscountValue(voucher)}</div>
-                            </td>
-                            <td className="w-[180px] p-5 font-semibold whitespace-nowrap">{voucher.amount}</td>
-                            <td className="w-[120px] p-5 font-semibold whitespace-nowrap">{usedCount}</td>
-                            <td className="w-[300px] p-5 whitespace-nowrap">
-                              <span className={`font-medium ${getStatusColor(status)}`}>
-                                {filterOptions.find(f => f.id === status)?.label}
-                              </span>
-                              <div className="text-gray-500">{formatTimeRange(voucher.startTime, voucher.endTime)}</div>
-                            </td>
-                            <td className="w-[120px] p-5 font-semibold whitespace-nowrap">{voucher.minPrice.toLocaleString()}đ</td>
-                            <td className="w-[120px] p-5 font-semibold whitespace-nowrap">{voucher.maxDiscount.toLocaleString()}đ</td>
-
-                            {/* Sticky Right Column */}
-                            <td className="sticky right-0 z-10 bg-[#fafbfd] w-[120px]">
-                              <div className="p-5">
-                                <div className="flex items-center gap-2 bg-[#fafbfd] border-[0.6px] border-[#d5d5d5] rounded-lg px-2">
-                                  <button>
-                                    <img src={ICONS.DETAIL} alt="Detail" className="w-[20px] h-[20px] hover:bg-[#f0f0f0]" />
-                                  </button>
-                                  <div className="w-[1px] h-8 bg-[#d8d8d880] opacity-70"></div>
-                                  <button onClick={() => navigate(`/owner/voucher-management/edit/${voucher.id}`)}>
-                                    <img src={ICONS.EDIT} alt="Edit" className="w-[20px] h-[20px] hover:bg-[#f0f0f0]" />
-                                  </button>
-                                  <div className="w-[1px] h-8 bg-[#d8d8d880] opacity-70"></div>
-                                  <button onClick={() => handleDeleteVoucher(voucher.id.toString())}>
-                                    <img src={ICONS.BIN} alt="Delete" className="w-[20px] h-[20px] hover:bg-[#f0f0f0]" />
-                                  </button>
-                                </div>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          </div>
+          <VoucherTable
+            vouchers={filteredVouchers}
+            loading={loading}
+            onView={handleViewVoucher}
+            onEdit={handleEditVoucher}
+            onDelete={handleDeleteVoucher}
+          />
         )}
-      </div>
-    </div>        
+      </Card>
+
+      {/* Modals */}
+      <VoucherDetailModal
+        visible={detailModalVisible}
+        voucher={currentVoucher}
+        onClose={() => setDetailModalVisible(false)}
+      />
+      
+      <VoucherEditModal
+        visible={editModalVisible}
+        voucher={currentVoucher}
+        onClose={() => setEditModalVisible(false)}
+        onSave={handleSaveVoucher}
+        submitting={submitting}
+      />
+    </div>
   );
 };
 

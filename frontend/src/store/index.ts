@@ -1,17 +1,21 @@
 import { configureStore } from '@reduxjs/toolkit';
 import userReducer from './slices/userSlice';
-import facilityReducer from './slices/facilitySlice';
-import fieldReducer from './slices/fieldSlice';
+import fieldGroupReducer from './slices/fieldSlice';
 import serviceReducer from './slices/serviceSlice';
 import voucherReducer from './slices/voucherSlice';
+import eventReducer from './slices/eventSlice';
+import facilityReducer from './slices/facilitySlice';
+import notificationReducer from './slices/notificationSlice';
 
 export const store = configureStore({
   reducer: {
-    user: userReducer,
-    facility: facilityReducer,    
-    field: fieldReducer,
+    user: userReducer,  
+    fieldGroup: fieldGroupReducer,
     service: serviceReducer,
     voucher: voucherReducer,
+    event: eventReducer,
+    facility: facilityReducer,
+    notification: notificationReducer,
   },
 });
 

@@ -1,28 +1,7 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { authService } from '@/services/auth.service';
-
-// Define user interface based on your requirements
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  phoneNumber: string;
-  gender: 'male' | 'female' | 'other';
-  dob: string;
-  bankAccount: string;
-  role: 'player' | 'owner';
-  avatarUrl?: string;
-}
-
-interface UserState {
-  user: User | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  error: string | null;
-  loginModalVisible: boolean;
-  redirectPath: string | null; // Store the path user tried to access before authentication
-  justLoggedOut: boolean;
-}
+import { ApiError } from '@/types/errors';
+import { LoginParams, RegisterData, UserState } from '@/types/user.type';
 
 const initialState: UserState = {
   user: null,
@@ -31,98 +10,66 @@ const initialState: UserState = {
   error: null,
   loginModalVisible: false,
   redirectPath: null,
-  justLoggedOut: false,
+  roleModalVisible: false,
+  selectedRole: null,
+  playerRoleModalVisible: false,
+  ownerRoleModalVisible: false,
+  resetAuthChecksFlag: false,
 };
-
-// Function to format phone numbers to international format
-const formatPhoneNumber = (phoneNumber: string): string => {
-    // Remove any non-digit characters
-    const digits = phoneNumber.replace(/\D/g, '');
-    
-    // Check if it's already in international format
-    if (digits.startsWith('84')) {
-      return `+${digits}`;
-    }
-    
-    // If it starts with 0, replace it with +84
-    if (digits.startsWith('0')) {
-      return `+84${digits.substring(1)}`;
-    }
-    
-    // Otherwise, assume it's a local number without the leading 0
-    return `+84${digits}`;
-  };
 
 // Async thunks for authentication
 export const login = createAsyncThunk(
   'user/login',
-  async ({ email, password, fromToken= false }: { email: string; password: string, fromToken: boolean }, { rejectWithValue }) => {
+  async ({ email, password, requiredRole, fromToken= false  }: LoginParams, { rejectWithValue }) => {
     try {
+      let user;
       if (fromToken) {
-        // Kiểm tra token và lấy thông tin người dùng
         const token = localStorage.getItem('access_token');
         if (!token) {
-          return rejectWithValue('No token found');
+          return rejectWithValue('Không tìm thấy token');
         }
-        const userInfo = await authService.getMyInfo();
-        return userInfo;
+        user = await authService.getMyInfo();
       } else {
-        const authData = await authService.login(email, password);      
-        // Store tokens
+        const authData = await authService.login(email, password);     
         localStorage.setItem('access_token', authData.accessToken);
-        localStorage.setItem('refresh_token', authData.refreshToken);     
+        localStorage.setItem('refresh_token', authData.refreshToken);
+        user = await authService.getMyInfo();
+      }      
+       // Kiểm tra vai trò nếu được yêu cầu
+       if (requiredRole && user.role !== requiredRole) {
+        // Xóa token nếu vai trò không phù hợp
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        return rejectWithValue(`Tài khoản này không có quyền truy cập với vai trò ${requiredRole === 'owner' ? 'Chủ sân' : 'Người chơi'}`);
+      }
       
-      // After login, fetch user info
-      const userInfo = await authService.getMyInfo();
-      console.log(userInfo);
-      return userInfo;
-    }
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Login failed');
+      return user;
+    } catch (error: unknown) {
+      const apiError = error as ApiError;
+      return rejectWithValue(apiError.response?.data?.message || 'Email hoặc mật khẩu không chính xác. Vui lòng thử lại.');
     }
   }
 );
 
 export const register = createAsyncThunk(
   'user/register',
-  async (userData: any, { rejectWithValue }) => {
-    try {
-        // Format the phone number if it exists
-      const formattedUserData = {
-        ...userData,
-        phoneNumber: userData.phoneNumber ? formatPhoneNumber(userData.phoneNumber) : userData.phoneNumber
-      };      
+  async (userData: RegisterData, { rejectWithValue }) => {
+    try {            
       await authService.register(userData);
       return true;
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Registration failed');
+    } catch (error: unknown) {
+      const apiError = error as ApiError;
+      return rejectWithValue(apiError.response?.data?.message || 'Đăng ký tài khoản thất bại. Vui lòng thử lại.');
     }
   }
 );
-
-// export const getUserInfo = createAsyncThunk(
-//   'user/getUserInfo',
-//   async (_, { rejectWithValue }) => {
-//     try {
-//       // Check if user has token stored
-//       const token = localStorage.getItem('access_token');
-//       if (!token) {
-//         return rejectWithValue('No token found');
-//       }
-//       console.log(token);
-//       const userInfo = await authService.getMyInfo();
-//       return userInfo;
-//     } catch (error: any) {
-//       return rejectWithValue(error.response?.data?.message || 'Failed to get user info');
-//     }
-//   }
-// );
 
 export const logout = createAsyncThunk(
   'user/logout',
   async () => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
+    localStorage.removeItem('userId');
     return null;
   }
 );
@@ -131,19 +78,42 @@ const userSlice = createSlice({
   name: 'user',
   initialState,
   reducers: {
-    showLoginModal: (state) => {
+    showLoginModal: (state, action: PayloadAction<{ path: string, role?: 'player' | 'owner' }>) => {
       state.loginModalVisible = true;
-      // state.redirectPath = action.payload;
+      state.redirectPath = action.payload.path;
+      if (action.payload.role) {
+        state.selectedRole = action.payload.role;
+      }
     },
     hideLoginModal: (state) => {
-      state.loginModalVisible = false;
+      state.loginModalVisible = false;  
     },
-    clearError: (state) => {
-      state.error = null;
+    showRoleModal: (state, action: PayloadAction<string>) => {
+      state.roleModalVisible = true;
+      state.redirectPath = action.payload;
+      state.selectedRole = null;
     },
-    resetLogoutFlag: (state) => {
-      state.justLoggedOut = false;
+    hideRoleModal: (state) => {
+      state.roleModalVisible = false;
     },
+    showPlayerRoleModal: (state, action: PayloadAction<string>) => {
+      state.playerRoleModalVisible = true;
+      state.redirectPath = action.payload;
+    },
+    hidePlayerRoleModal: (state) => {
+      state.playerRoleModalVisible = false;
+    },
+    showOwnerRoleModal: (state, action: PayloadAction<string>) => {
+      state.ownerRoleModalVisible = true;
+      state.redirectPath = action.payload;
+    },
+    hideOwnerRoleModal: (state) => {
+      state.ownerRoleModalVisible = false;
+    },
+    resetAuthChecks: (state) => {
+      // Đảo ngược giá trị flag để tạo ra sự thay đổi và trigger useEffect
+      state.resetAuthChecksFlag = !state.resetAuthChecksFlag;
+    }
   },
   extraReducers: (builder) => {
     // Login cases
@@ -156,12 +126,16 @@ const userSlice = createSlice({
       state.isAuthenticated = true;
       state.user = action.payload;
       state.loginModalVisible = false;
+      
+      // Lưu userId vào localStorage
+      if (action.payload && action.payload.id) {
+        localStorage.setItem('userId', action.payload.id);
+      }
     });
     builder.addCase(login.rejected, (state, action) => {
       state.isLoading = false;
       state.error = action.payload as string;
-    });
-    
+    });    
     // Register cases
     builder.addCase(register.pending, (state) => {
       state.isLoading = true;
@@ -169,40 +143,23 @@ const userSlice = createSlice({
     });
     builder.addCase(register.fulfilled, (state) => {
       state.isLoading = false;
-      // We don't authenticate yet, as registration just creates the account
-      // User still needs to login
     });
     builder.addCase(register.rejected, (state, action) => {
       state.isLoading = false;
       state.error = action.payload as string;
     });
-    
-    // Get user info cases
-    // builder.addCase(getUserInfo.pending, (state) => {
-    //   state.isLoading = true;
-    // });
-    // builder.addCase(getUserInfo.fulfilled, (state, action) => {
-    //   state.isLoading = false;
-    //   state.isAuthenticated = true;
-    //   state.user = action.payload;
-    // });
-    // builder.addCase(getUserInfo.rejected, (state) => {
-    //   state.isLoading = false;
-    //   state.isAuthenticated = false;
-    //   state.user = null;
-    // });
-    
-    // Logout case
+    // Logout cases
     builder.addCase(logout.fulfilled, (state) => {
       state.user = null;
       state.isAuthenticated = false;
       state.redirectPath = null;
-      state.justLoggedOut = true;
       state.loginModalVisible = false;
+      state.roleModalVisible = false;
+      state.selectedRole = null;
     });
   },
 });
 
-export const { showLoginModal, hideLoginModal, clearError, resetLogoutFlag } = userSlice.actions;
+export const { showLoginModal, hideLoginModal, showRoleModal, hideRoleModal, showPlayerRoleModal, hidePlayerRoleModal, showOwnerRoleModal, hideOwnerRoleModal, resetAuthChecks } = userSlice.actions;
 
 export default userSlice.reducer;

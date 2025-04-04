@@ -18,3 +18,43 @@
     ::-webkit-scrollbar-thumb:hover {
       background: #555;
     }
+    
+    :root {
+      --primary-color: #1677ff;
+      --secondary-color: #52c41a;
+      --danger-color: #ff4d4f;
+      --warning-color: #faad14;
+    }
+    
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    }
+    
+    .logo {
+      height: 40px;
+      margin: 16px;
+      text-align: center;
+      color: white;
+      font-size: 18px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .site-layout-content {
+      min-height: 280px;
+      padding: 24px;
+      background: #fff;
+    }
+    
+    .ant-layout-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .ant-layout-sider {
+      box-shadow: 2px 0 6px rgba(0, 21, 41, 0.35);
+    }

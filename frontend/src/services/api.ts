@@ -45,8 +45,6 @@ api.interceptors.request.use(
 
 /**
  * Response Interceptor
- * - Xử lý lỗi từ backend
- * - Tự động refresh token khi token hết hạn
  */
 api.interceptors.response.use(
   (response) => response,

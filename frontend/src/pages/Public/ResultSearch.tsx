@@ -12,39 +12,43 @@ import {
   Rate, 
   Button, 
   Typography, 
-  Divider, 
-  Space,
+  Divider,
   Tag,
   Pagination,
-  Empty
+  Empty,
+  Spin
 } from 'antd';
 import { 
   SearchOutlined, 
   EnvironmentOutlined, 
-  ClockCircleOutlined, 
+  ClockCircleOutlined,
+  UserOutlined
 } from '@ant-design/icons';
-import { IMAGE } from '@/constants/user/Home/Image';
+import { mockFacilities } from '@/mocks/facility/mockFacilities';
 
 const { Title, Text } = Typography;
 
-// Interface cho facility data (giống như trong Home.tsx)
+// Interface for facility data based on mock data
 interface FacilityData {
   id: string;
   name: string;
-  thumbnail: string;
-  operatingHours: {
-    start: string;
-    end: string;
-  };
-  sports: string[];
-  address: string;
-  rating: number;
-  priceRange: {
-    min: number;
-    max: number;
-  };
-  hasPromotion?: boolean;
-  hasEvent?: boolean;
+  description: string;
+  location: string;
+  openTime1: string;
+  closeTime1: string;
+  openTime2: string;
+  closeTime2: string;
+  openTime3: string;
+  closeTime3: string;
+  numberOfShifts: number;
+  status: string;
+  avgRating: number;
+  numberOfRatings: number;
+  imagesUrl: string[];
+  sports: {
+    id: number;
+    name: string;
+  }[];
 }
 
 const ResultSearch: React.FC = () => {
@@ -73,83 +77,31 @@ const ResultSearch: React.FC = () => {
   const [sortBy, setSortBy] = useState('relevance');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(12);
+  
+  // Add states for mock data
+  const [facilities, setFacilities] = useState<FacilityData[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock data - sau này sẽ được thay thế bằng API calls
-  const searchResults: FacilityData[] = [
-    {
-      id: '1',
-      name: 'Thể thao 247 - Thủ Đức',
-      thumbnail: IMAGE.THUMBNAIL_2,
-      operatingHours: { start: '05:00', end: '22:00' },
-      sports: ['football', 'basketball', 'badminton'],
-      address: 'Phường Linh Trung, Thủ Đức, TP.HCM',
-      rating: 4.8,
-      priceRange: { min: 200000, max: 500000 },
-      hasPromotion: true,
-      hasEvent: false,
-    },
-    {
-      id: '2',
-      name: 'Sân Bóng Đá Mini Thống Nhất',
-      thumbnail: IMAGE.THUMBNAIL_2,
-      operatingHours: { start: '06:00', end: '23:00' },
-      sports: ['football'],
-      address: 'Quận 7, TP.HCM',
-      rating: 4.5,
-      priceRange: { min: 180000, max: 350000 },
-      hasPromotion: false,
-      hasEvent: true,
-    },
-    {
-      id: '3',
-      name: 'Cầu Lông Phú Nhuận',
-      thumbnail: IMAGE.THUMBNAIL_2,
-      operatingHours: { start: '07:00', end: '21:00' },
-      sports: ['badminton'],
-      address: 'Quận Phú Nhuận, TP.HCM',
-      rating: 4.2,
-      priceRange: { min: 100000, max: 150000 },
-      hasPromotion: true,
-      hasEvent: true,
-    },
-    {
-      id: '4',
-      name: 'Sân Bóng Rổ Tân Bình',
-      thumbnail: IMAGE.THUMBNAIL_2,
-      operatingHours: { start: '08:00', end: '22:00' },
-      sports: ['basketball'],
-      address: 'Quận Tân Bình, TP.HCM',
-      rating: 4.6,
-      priceRange: { min: 220000, max: 400000 },
-      hasPromotion: false,
-      hasEvent: false,
-    },
-    {
-      id: '5',
-      name: 'Trung Tâm Thể Thao Quận 1',
-      thumbnail: IMAGE.THUMBNAIL_2,
-      operatingHours: { start: '06:00', end: '22:00' },
-      sports: ['football', 'basketball', 'badminton', 'tennis'],
-      address: 'Quận 1, TP.HCM',
-      rating: 4.9,
-      priceRange: { min: 250000, max: 600000 },
-      hasPromotion: true,
-      hasEvent: true,
-    },
-    {
-      id: '6',
-      name: 'Sân Tennis Bình Thạnh',
-      thumbnail: IMAGE.THUMBNAIL_2,
-      operatingHours: { start: '05:30', end: '21:30' },
-      sports: ['tennis'],
-      address: 'Quận Bình Thạnh, TP.HCM',
-      rating: 4.3,
-      priceRange: { min: 180000, max: 300000 },
-      hasPromotion: false,
-      hasEvent: false,
-    },
-    // Thêm các kết quả khác...
-  ];
+  // Fetch facilities on component mount
+  useEffect(() => {
+    const fetchFacilities = async () => {
+      setLoading(true);
+      try {
+        // Simulate API call delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        setFacilities(mockFacilities);
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching facilities:', err);
+        setError('Failed to load facilities. Please try again later.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchFacilities();
+  }, []);
 
   // Danh sách các môn thể thao để filter
   const sportOptions = [
@@ -158,6 +110,9 @@ const ResultSearch: React.FC = () => {
     { label: 'Cầu lông', value: 'badminton' },
     { label: 'Tennis', value: 'tennis' },
     { label: 'Bơi lội', value: 'swimming' },
+    { label: 'Bóng chuyền', value: 'volleyball' },
+    { label: 'Futsal', value: 'futsal' },
+    { label: 'Golf', value: 'golf' }
   ];
 
   // Danh sách các tiện ích để filter
@@ -194,39 +149,109 @@ const ResultSearch: React.FC = () => {
     navigate(`/facility/${facilityId}`);
   };
 
-  // Facility Card component (tương tự như trong Home.tsx)
+  // Apply filters and sorting to facilities
+  const getFilteredFacilities = () => {
+    if (!facilities.length) return [];
+    
+    let filtered = [...facilities];
+    
+    // Apply keyword search
+    if (searchParams.keyword) {
+      const keyword = searchParams.keyword.toLowerCase();
+      filtered = filtered.filter(facility => 
+        facility.name.toLowerCase().includes(keyword) ||
+        facility.description.toLowerCase().includes(keyword) ||
+        facility.location.toLowerCase().includes(keyword)
+      );
+    }
+    
+    // Apply sport filter
+    if (filters.sports.length > 0) {
+      filtered = filtered.filter(facility => 
+        facility.sports.some(sport => filters.sports.includes(sport.name))
+      );
+    }
+    
+    // Apply rating filter
+    if (filters.rating > 0) {
+      filtered = filtered.filter(facility => facility.avgRating >= filters.rating);
+    }
+    
+    // Apply open now filter
+    if (filters.openNow) {
+      const now = new Date();
+      const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:00`;
+      
+      filtered = filtered.filter(facility => {
+        return (facility.openTime1 <= currentTime && facility.closeTime1 >= currentTime) ||
+               (facility.openTime2 && facility.openTime2 <= currentTime && facility.closeTime2 >= currentTime) ||
+               (facility.openTime3 && facility.openTime3 <= currentTime && facility.closeTime3 >= currentTime);
+      });
+    }
+    
+    // Apply sorting
+    switch (sortBy) {
+      case 'rating':
+        filtered.sort((a, b) => b.avgRating - a.avgRating);
+        break;
+      case 'priceAsc':
+        // Add price sorting logic when price data is available
+        break;
+      case 'priceDesc':
+        // Add price sorting logic when price data is available
+        break;
+      default:
+        // Default sorting (relevance)
+        break;
+    }
+    
+    return filtered;
+  };
+
+  // Get paginated facilities
+  const getPaginatedFacilities = () => {
+    const filtered = getFilteredFacilities();
+    const startIndex = (currentPage - 1) * pageSize;
+    return filtered.slice(startIndex, startIndex + pageSize);
+  };
+
+  // Facility Card component
   const FacilityCard = ({ facility }: { facility: FacilityData }) => (
     <Card 
       hoverable 
       className="w-full mb-4"
       onClick={() => handleFacilityClick(facility.id)}
-      cover={<img alt={facility.name} src={facility.thumbnail} className="h-48 object-cover" />}
+      cover={<img alt={facility.name} src={facility.imagesUrl[0] || 'https://via.placeholder.com/300'} className="h-48 object-cover" />}
     >
       <div className="flex justify-between items-center mb-2">
         <span className="text-gray-600">
           <ClockCircleOutlined className="mr-1" />
-          {facility.operatingHours.start} - {facility.operatingHours.end}
+          {facility.openTime1.substring(0, 5)} - {facility.closeTime1.substring(0, 5)}
         </span>
-        <Rate disabled defaultValue={facility.rating} className="text-sm" />
+        <div className="flex items-center">
+          <Rate disabled defaultValue={facility.avgRating} className="text-sm" />
+          <span className="ml-2 text-gray-500">
+            <UserOutlined className="mr-1" />
+            {facility.numberOfRatings}
+          </span>
+        </div>
       </div>
       <h3 className="text-lg font-semibold mb-2">{facility.name}</h3>
-      <div className="flex gap-2 mb-2">
+      <div className="flex gap-2 mb-2 flex-wrap">
         {facility.sports.map(sport => (
-          <Tag key={sport} color="blue">{sport}</Tag>
+          <Tag key={sport.id} color="blue">{sport.name}</Tag>
         ))}
       </div>
       <p className="text-gray-600 mb-2">
         <EnvironmentOutlined className="mr-1" />
-        {facility.address}
+        {facility.location}
       </p>
       <div className="flex justify-between items-center">
-        <p className="text-blue-600 font-semibold">
-          {facility.priceRange.min.toLocaleString()}đ - {facility.priceRange.max.toLocaleString()}đ
-        </p>
-        <Space>
-          {facility.hasPromotion && <Tag color="red">Ưu đãi</Tag>}
-          {facility.hasEvent && <Tag color="green">Sự kiện</Tag>}
-        </Space>
+        <div>
+          <Tag color={facility.status === 'active' ? 'success' : facility.status === 'pending' ? 'warning' : 'error'}>
+            {facility.status === 'active' ? 'Hoạt động' : facility.status === 'pending' ? 'Đang chờ' : 'Bảo trì'}
+          </Tag>
+        </div>
       </div>
     </Card>
   );
@@ -241,12 +266,13 @@ const ResultSearch: React.FC = () => {
     },
   ];
 
+  const filteredFacilities = getFilteredFacilities();
+
   return (
     <div className="container mx-auto px-4 py-6">
       {/* Breadcrumb */}
       <Breadcrumb items={breadcrumbItems} className="mb-6" />
     
-
       {/* Title */}
       <Title level={2} className="mb-6">Kết quả tìm kiếm</Title>
      
@@ -299,7 +325,7 @@ const ResultSearch: React.FC = () => {
       <Row gutter={24}>
         {/* Left sidebar - Filters */}
         <Col xs={24} md={8} lg={6}>
-        <div className="bg-white p-4 rounded-lg shadow-md sticky top-4">
+          <div className="bg-white p-4 rounded-lg shadow-md sticky top-4">
             <div className="flex justify-between items-center mb-4">
               <Title level={4} className="m-0">Bộ lọc</Title>
               <Button 
@@ -319,7 +345,6 @@ const ResultSearch: React.FC = () => {
                 Đặt lại
               </Button>
             </div>
-            
             
             <Divider className="my-3" />
 
@@ -345,7 +370,7 @@ const ResultSearch: React.FC = () => {
                 step={50000}
                 value={filters.priceRange}
                 onChange={(value) => handleFilterChange('priceRange', value)}
-                tooltip={{ formatter: (value) => `${value.toLocaleString()}đ` }}
+                tooltip={{ formatter: (value) => `${value?.toLocaleString()}đ` }}
               />
               <div className="flex justify-between text-gray-500 mt-2">
                 <span>{filters.priceRange[0].toLocaleString()}đ</span>
@@ -363,27 +388,6 @@ const ResultSearch: React.FC = () => {
                 value={filters.rating} 
                 onChange={(value) => handleFilterChange('rating', value)} 
               />
-            </div>
-
-            <Divider className="my-3" />
-
-            {/* Ưu đãi & Sự kiện */}
-            <div className="mb-4">
-              <Title level={5}>Ưu đãi & Sự kiện</Title>
-              <div className="flex flex-col gap-2">
-                <Checkbox 
-                  checked={filters.hasPromotion}
-                  onChange={(e) => handleFilterChange('hasPromotion', e.target.checked)}
-                >
-                  Có ưu đãi
-                </Checkbox>
-                <Checkbox 
-                  checked={filters.hasEvent}
-                  onChange={(e) => handleFilterChange('hasEvent', e.target.checked)}
-                >
-                  Có sự kiện
-                </Checkbox>
-              </div>
             </div>
 
             <Divider className="my-3" />
@@ -410,15 +414,14 @@ const ResultSearch: React.FC = () => {
                 onChange={(values) => handleFilterChange('facilities', values)}
               />
             </div>
-        </div> 
+          </div> 
         </Col>
         
-
         {/* Right content - Search results */}
         <Col xs={24} md={16} lg={18}>
           {/* Sort options */}
           <div className="bg-white p-4 rounded-lg shadow-md mb-6 flex justify-between items-center">
-            <Text>Tìm thấy {searchResults.length} kết quả</Text>
+            <Text>Tìm thấy {filteredFacilities.length} kết quả</Text>
             <div className="flex items-center">
               <Text className="mr-2">Sắp xếp theo:</Text>
               <Select
@@ -436,10 +439,25 @@ const ResultSearch: React.FC = () => {
           </div>
 
           {/* Results */}
-          {searchResults.length > 0 ? (
+          {loading ? (
+            <div className="flex justify-center items-center py-12">
+              <Spin size="large" />
+            </div>
+          ) : error ? (
+            <div className="bg-white p-6 rounded-lg shadow-md text-center">
+              <Text type="danger">{error}</Text>
+              <Button 
+                type="primary" 
+                className="mt-4"
+                onClick={() => window.location.reload()}
+              >
+                Thử lại
+              </Button>
+            </div>
+          ) : filteredFacilities.length > 0 ? (
             <>
               <Row gutter={[16, 16]}>
-                {searchResults.map(facility => (
+                {getPaginatedFacilities().map(facility => (
                   <Col key={facility.id} xs={24} sm={12} lg={8} xl={6}>
                     <FacilityCard facility={facility} />
                   </Col>
@@ -451,7 +469,7 @@ const ResultSearch: React.FC = () => {
                 <Pagination
                   current={currentPage}
                   pageSize={pageSize}
-                  total={searchResults.length}
+                  total={filteredFacilities.length}
                   onChange={handlePageChange}
                   showSizeChanger
                   showQuickJumper
@@ -469,8 +487,6 @@ const ResultSearch: React.FC = () => {
       </Row>
     </div>
   );
-
-
 };
 
 export default ResultSearch;

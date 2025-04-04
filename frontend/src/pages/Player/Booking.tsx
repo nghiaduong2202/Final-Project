@@ -1,393 +1,362 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
-import { 
-  Breadcrumb, Steps, Card, Form, Select, DatePicker, TimePicker, Button, Typography, Divider, List, 
-  Radio, Checkbox, InputNumber, Space, Row, Col,Tag,Alert,Collapse,Tooltip, Modal, Result
-} from 'antd';
-import { 
-  ClockCircleOutlined, 
-  CalendarOutlined, 
-  EnvironmentOutlined, 
-  InfoCircleOutlined,
-  CheckCircleOutlined,
-  CreditCardOutlined,
-  BankOutlined,
-  WalletOutlined,
-  ShoppingOutlined,
-  ArrowLeftOutlined,
-  ArrowRightOutlined
-} from '@ant-design/icons';
+import { useNavigate, useParams } from 'react-router-dom';
+import { Form, Steps, Card, Row, Col, Select, DatePicker, TimePicker, Radio, Button, InputNumber, Alert, Modal, Divider, Typography, Space, Switch, Calendar, Tag, Tooltip, Checkbox } from 'antd';
+import { ArrowLeftOutlined, ArrowRightOutlined, CheckCircleOutlined, ClockCircleOutlined, BankOutlined, WalletOutlined, CreditCardOutlined, CalendarOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import type { Dayjs } from 'dayjs';
+import { BookingFormData, BookingStatus, RecurringType, RecurringConfig, FieldGroupAvailability } from '@/types/booking.type';
 
-const { Title, Text, Paragraph } = Typography;
+const { Title, Text } = Typography;
 const { Option } = Select;
-const { Panel } = Collapse;
 const { RangePicker } = TimePicker;
 
-// Interface cho dữ liệu đặt sân
-interface BookingFormData {
-  sportType: string;
-  date: Dayjs | null;
-  timeRange: [Dayjs, Dayjs] | null;
-  fieldGroupId: string;
-  fieldId: string;
-  services: {
-    id: string;
-    name: string;
-    price: number;
-    quantity: number;
-  }[];
-  paymentMethod: string;
-  useVoucher: boolean;
-  voucherId: string;
-  totalPrice: number;
-}
-
-// Interface cho Field Group
-interface FieldGroup {
-  id: string;
-  name: string;
-  dimension: string;
-  surface: string;
-  basePrice: number;
-  peakStartTime?: string;
-  peakEndTime?: string;
-  priceIncrease?: number;
-  fields: Field[];
-}
-
-// Interface cho Field
-interface Field {
-  id: string;
-  name: string;
-  status: 'available' | 'booked' | 'maintenance';
-}
-
-// Interface cho Service
-interface Service {
-  id: string;
-  name: string;
-  price: number;
-  description?: string;
-}
-
-// Interface cho Voucher
-interface Voucher {
-  id: string;
-  code: string;
-  discount: number;
-  discountType: 'percentage' | 'fixed';
-  minOrderValue: number;
-  description: string;
-  expiryDate: string;
-}
+const WEEKDAYS = [
+  { value: 0, label: 'Chủ nhật' },
+  { value: 1, label: 'Thứ 2' },
+  { value: 2, label: 'Thứ 3' },
+  { value: 3, label: 'Thứ 4' },
+  { value: 4, label: 'Thứ 5' },
+  { value: 5, label: 'Thứ 6' },
+  { value: 6, label: 'Thứ 7' }
+];
 
 const BookingPage: React.FC = () => {
   const navigate = useNavigate();
-  const { facilityId } = useParams<{ facilityId: string }>();
+  const { facilityId } = useParams();
   const [form] = Form.useForm();
-  
-  // State
   const [currentStep, setCurrentStep] = useState(0);
-  const [bookingData, setBookingData] = useState<BookingFormData>({
-    sportType: '',
-    date: null,
-    timeRange: null,
-    fieldGroupId: '',
-    fieldId: '',
-    services: [],
-    paymentMethod: 'banking',
-    useVoucher: false,
-    voucherId: '',
-    totalPrice: 0
-  });
-  
-  // Mock data - sẽ được thay thế bằng API calls sau này
-  const [facilityData, setFacilityData] = useState({
-    id: facilityId || '1',
-    name: 'Sân Bóng Đá Mini Thống Nhất',
-    sports: ['football', 'basketball', 'badminton'],
-    fieldGroups: [] as FieldGroup[],
-    services: [] as Service[],
-    vouchers: [] as Voucher[]
-  });
-  
   const [loading, setLoading] = useState(false);
-  const [availableFieldGroups, setAvailableFieldGroups] = useState<FieldGroup[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [bookingSuccess, setBookingSuccess] = useState(false);
-  
-  // Fetch facility data
+  const [timeRemaining, setTimeRemaining] = useState(900); // 15 minutes in seconds
+  const [formData, setFormData] = useState<Partial<BookingFormData>>({});
+  const [showRecurringModal, setShowRecurringModal] = useState(false);
+  const [selectedDates, setSelectedDates] = useState<dayjs.Dayjs[]>([]);
+  const [fieldGroupAvailability, setFieldGroupAvailability] = useState<FieldGroupAvailability[]>([]);
+  const [recurringSelectionMode, setRecurringSelectionMode] = useState<'auto' | 'manual'>('auto');
+  const [recurringType, setRecurringType] = useState<RecurringType>(RecurringType.DAILY);
+  const [selectedWeekday, setSelectedWeekday] = useState<string>('');
+  const [additionalWeekdays, setAdditionalWeekdays] = useState<number[]>([]);
+  const [isDateSelected, setIsDateSelected] = useState<boolean>(false);
+
+  // Maximum date constraints - 1 month from today
+  const maxBookingDate = dayjs().add(1, 'month');
+
+  // Mock data - replace with actual API calls
+  const sports = [
+    { id: 1, name: 'Football' },
+    { id: 2, name: 'Badminton' },
+    { id: 3, name: 'Tennis' }
+  ];
+
+  const fieldGroups = [
+    {
+      id: 1,
+      name: 'Sân 7 người',
+      dimension: '50m x 30m',
+      surface: 'Cỏ nhân tạo',
+      basePrice: 200000,
+      peakStartTime: '17:00',
+      peakEndTime: '22:00',
+      priceIncrease: 50000
+    },
+    {
+      id: 2,
+      name: 'Sân cầu lông',
+      dimension: '13.4m x 6.1m',
+      surface: 'Sàn gỗ',
+      basePrice: 250000,
+      peakStartTime: '18:00',
+      peakEndTime: '22:00',
+      priceIncrease: 50000
+    }
+  ];
+
+  const services = [
+    {
+      id: 1,
+      name: 'Nước uống',
+      price: 15000,
+      description: 'Nước suối 500ml',
+      remain: 50
+    },
+    {
+      id: 2,
+      name: 'Khăn lạnh',
+      price: 5000,
+      description: 'Khăn lạnh ướt',
+      remain: 100
+    }
+  ];
+
   useEffect(() => {
-    const fetchFacilityData = async () => {
-      setLoading(true);
-      try {
-        // Giả lập API call
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Mock data
-        const mockFieldGroups: FieldGroup[] = [
-          {
-            id: 'fg1',
-            name: 'Sân bóng đá 5 người',
-            dimension: '25m x 15m',
-            surface: 'Cỏ nhân tạo',
-            basePrice: 200000,
-            peakStartTime: '17:00',
-            peakEndTime: '21:00',
-            priceIncrease: 50000,
-            fields: [
-              { id: 'f1', name: 'Sân số 1', status: 'available' },
-              { id: 'f2', name: 'Sân số 2', status: 'booked' }
-            ]
-          },
-          {
-            id: 'fg2',
-            name: 'Sân bóng đá 7 người',
-            dimension: '40m x 20m',
-            surface: 'Cỏ nhân tạo',
-            basePrice: 300000,
-            peakStartTime: '17:00',
-            peakEndTime: '21:00',
-            priceIncrease: 70000,
-            fields: [
-              { id: 'f3', name: 'Sân số 3', status: 'available' },
-              { id: 'f4', name: 'Sân số 4', status: 'available' }
-            ]
-          },
-          {
-            id: 'fg3',
-            name: 'Sân cầu lông',
-            dimension: '13.4m x 6.1m',
-            surface: 'Gỗ',
-            basePrice: 100000,
-            fields: [
-              { id: 'f5', name: 'Sân cầu lông 1', status: 'available' },
-              { id: 'f6', name: 'Sân cầu lông 2', status: 'available' }
-            ]
+    if (currentStep > 0) {
+      const timer = setInterval(() => {
+        setTimeRemaining(prev => {
+          if (prev <= 0) {
+            clearInterval(timer);
+            return 0;
           }
-        ];
-        
-        const mockServices: Service[] = [
-          { id: 's1', name: 'Cho thuê giày', price: 30000, description: 'Giày thể thao chất lượng cao' },
-          { id: 's2', name: 'Cho thuê áo', price: 20000, description: 'Áo thể thao thoáng mát' },
-          { id: 's3', name: 'Nước uống', price: 15000, description: 'Nước khoáng, nước ngọt các loại' },
-          { id: 's4', name: 'Dụng cụ thể thao', price: 50000, description: 'Bóng, vợt và các dụng cụ khác' }
-        ];
-        
-        const mockVouchers: Voucher[] = [
-          { 
-            id: 'v1', 
-            code: 'NEWPLAYER20', 
-            discount: 20, 
-            discountType: 'percentage', 
-            minOrderValue: 200000, 
-            description: 'Giảm 20% cho người chơi mới', 
-            expiryDate: '2023-12-31' 
-          },
-          { 
-            id: 'v2', 
-            code: 'WEEKEND50K', 
-            discount: 50000, 
-            discountType: 'fixed', 
-            minOrderValue: 300000, 
-            description: 'Giảm 50,000đ cho đặt sân cuối tuần', 
-            expiryDate: '2023-12-31' 
-          }
-        ];
-        
-        setFacilityData(prev => ({
-          ...prev,
-          fieldGroups: mockFieldGroups,
-          services: mockServices,
-          vouchers: mockVouchers
-        }));
-      } catch (error) {
-        console.error('Error fetching facility data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => clearInterval(timer);
+    }
+  }, [currentStep]);
+
+  // Auto-generate recurring dates based on selected date and recurring type
+  const generateRecurringDates = (baseDate: dayjs.Dayjs, type: RecurringType) => {
+    if (!baseDate) return [];
     
-    fetchFacilityData();
-  }, [facilityId]);
-  
-  // Filter available field groups based on sport type
-  useEffect(() => {
-    if (bookingData.sportType) {
-      const filteredGroups = facilityData.fieldGroups.filter(group => {
-        // Giả sử có mapping giữa sport type và field group
-        if (bookingData.sportType === 'football') {
-          return group.id === 'fg1' || group.id === 'fg2';
-        } else if (bookingData.sportType === 'badminton') {
-          return group.id === 'fg3';
-        }
-        return false;
-      });
+    const dates: dayjs.Dayjs[] = [baseDate];
+    const endDate = dayjs().add(1, 'month'); // Max 1 month from today
+    
+    if (type === RecurringType.DAILY) {
+      // Generate daily dates for the rest of the week
+      let currentDate = baseDate.add(1, 'day');
       
-      setAvailableFieldGroups(filteredGroups);
-    } else {
-      setAvailableFieldGroups([]);
-    }
-  }, [bookingData.sportType, facilityData.fieldGroups]);
-  
-  // Calculate total price
-  useEffect(() => {
-    let total = 0;
-    
-    // Add field price
-    if (bookingData.fieldGroupId && bookingData.timeRange) {
-      const fieldGroup = facilityData.fieldGroups.find(group => group.id === bookingData.fieldGroupId);
-      if (fieldGroup) {
-        const startTime = bookingData.timeRange[0];
-        const endTime = bookingData.timeRange[1];
-        const durationHours = endTime.diff(startTime, 'hour', true);
-        
-        let hourlyRate = fieldGroup.basePrice;
-        
-        // Check if booking time is during peak hours
-        if (fieldGroup.peakStartTime && fieldGroup.peakEndTime && fieldGroup.priceIncrease) {
-          const peakStart = dayjs(fieldGroup.peakStartTime, 'HH:mm');
-          const peakEnd = dayjs(fieldGroup.peakEndTime, 'HH:mm');
-          
-          const bookingStartHour = startTime.hour() + startTime.minute() / 60;
-          const bookingEndHour = endTime.hour() + endTime.minute() / 60;
-          const peakStartHour = peakStart.hour() + peakStart.minute() / 60;
-          const peakEndHour = peakEnd.hour() + peakEnd.minute() / 60;
-          
-          // Simple overlap check (can be improved for more accurate calculation)
-          if (
-            (bookingStartHour <= peakEndHour && bookingStartHour >= peakStartHour) ||
-            (bookingEndHour <= peakEndHour && bookingEndHour >= peakStartHour) ||
-            (bookingStartHour <= peakStartHour && bookingEndHour >= peakEndHour)
-          ) {
-            hourlyRate += fieldGroup.priceIncrease;
+      // Add remaining days of the week after selected date
+      while (currentDate.isBefore(endDate) && currentDate.day() !== baseDate.day()) {
+        dates.push(currentDate);
+        currentDate = currentDate.add(1, 'day');
+      }
+    } else if (type === RecurringType.WEEKLY) {
+      // Generate weekly dates for 1 month
+      let currentDate = baseDate.add(1, 'week');
+      while (currentDate.isBefore(endDate)) {
+        dates.push(currentDate);
+        currentDate = currentDate.add(1, 'week');
+      }
+
+      // Add additional weekdays if selected
+      if (additionalWeekdays.length > 0) {
+        const baseDayOfWeek = baseDate.day();
+        additionalWeekdays.forEach(weekday => {
+          if (weekday !== baseDayOfWeek) {
+            let additionalDate = baseDate.day(weekday);
+            
+            // If we've gone backwards in time, go forward a week
+            if (additionalDate.isBefore(baseDate)) {
+              additionalDate = additionalDate.add(1, 'week');
+            }
+            
+            // Add recurring instances of this additional weekday
+            while (additionalDate.isBefore(endDate)) {
+              dates.push(additionalDate);
+              additionalDate = additionalDate.add(1, 'week');
+            }
           }
-        }
-        
-        total += hourlyRate * durationHours;
+        });
+
+        // Sort dates chronologically
+        dates.sort((a, b) => a.valueOf() - b.valueOf());
       }
     }
     
-    // Add services price
-    bookingData.services.forEach(service => {
-      total += service.price * service.quantity;
-    });
-    
-    // Apply voucher if selected
-    if (bookingData.useVoucher && bookingData.voucherId) {
-      const voucher = facilityData.vouchers.find(v => v.id === bookingData.voucherId);
-      if (voucher && total >= voucher.minOrderValue) {
-        if (voucher.discountType === 'percentage') {
-          total = total * (1 - voucher.discount / 100);
-        } else {
-          total = total - voucher.discount;
-        }
-      }
-    }
-    
-    setBookingData(prev => ({
-      ...prev,
-      totalPrice: Math.max(0, Math.round(total))
-    }));
-  }, [
-    bookingData.fieldGroupId, 
-    bookingData.timeRange, 
-    bookingData.services, 
-    bookingData.useVoucher, 
-    bookingData.voucherId,
-    facilityData.fieldGroups,
-    facilityData.vouchers
-  ]);
-  
-  // Handle next step
-  const handleNext = () => {
-    form.validateFields()
-      .then(() => {
-        setCurrentStep(prev => prev + 1);
-      })
-      .catch(error => {
-        console.log('Validation failed:', error);
-      });
+    return dates;
   };
-  
-  // Handle previous step
+
+  // Handle date change in the main form
+  const handleDateChange = (date: dayjs.Dayjs | null) => {
+    if (date) {
+      form.setFieldsValue({ date });
+      setIsDateSelected(true);
+      setSelectedWeekday(getWeekdayName(date));
+      
+      // If recurring is already set, update the dates
+      if (formData.isRecurring && recurringSelectionMode === 'auto') {
+        const newDates = generateRecurringDates(date, recurringType);
+        setSelectedDates(newDates);
+      }
+    } else {
+      setIsDateSelected(false);
+      setSelectedWeekday('');
+    }
+  };
+
+  const handleNext = async () => {
+    try {
+      const values = await form.validateFields();
+      setFormData(prev => ({ ...prev, ...values }));
+      setCurrentStep(prev => prev + 1);
+    } catch (error) {
+      console.error('Validation failed:', error);
+    }
+  };
+
   const handlePrev = () => {
     setCurrentStep(prev => prev - 1);
   };
-  
-  // Handle form changes
-  const handleFormChange = (changedValues: any, allValues: any) => {
-    setBookingData(prev => ({
-      ...prev,
-      ...changedValues
-    }));
+
+  const handleSubmitBooking = async () => {
+    setLoading(true);
+    try {
+      // TODO: Implement API call to create booking
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      navigate('/booking/history');
+    } catch {
+      setError('Có lỗi xảy ra khi đặt sân. Vui lòng thử lại.');
+    } finally {
+      setLoading(false);
+      setShowConfirmModal(false);
+    }
   };
-  
-  // Handle service selection
-  const handleServiceChange = (serviceId: string, quantity: number) => {
-    setBookingData(prev => {
-      const updatedServices = [...prev.services];
-      const serviceIndex = updatedServices.findIndex(s => s.id === serviceId);
-      
-      if (quantity === 0 && serviceIndex !== -1) {
-        // Remove service if quantity is 0
-        updatedServices.splice(serviceIndex, 1);
-      } else if (serviceIndex !== -1) {
-        // Update quantity if service already exists
-        updatedServices[serviceIndex].quantity = quantity;
-      } else if (quantity > 0) {
-        // Add new service
-        const service = facilityData.services.find(s => s.id === serviceId);
-        if (service) {
-          updatedServices.push({
-            id: service.id,
-            name: service.name,
-            price: service.price,
-            quantity
-          });
-        }
+
+  const handleRecurringChange = (checked: boolean) => {
+    if (!isDateSelected && checked) {
+      // If no date is selected, show an error and don't proceed
+      setError('Vui lòng chọn ngày đặt sân trước khi đặt định kỳ');
+      form.setFieldsValue({ isRecurring: false });
+      return;
+    } else if (error === 'Vui lòng chọn ngày đặt sân trước khi đặt định kỳ') {
+      // Clear the error if it's the date selection error
+      setError(null);
+    }
+
+    form.setFieldsValue({ isRecurring: checked });
+    if (checked) {
+      // When turning on recurring, auto-populate based on the already selected date
+      const selectedDate = form.getFieldValue('date');
+      if (selectedDate && recurringSelectionMode === 'auto') {
+        const dates = generateRecurringDates(selectedDate, recurringType);
+        setSelectedDates(dates);
       }
-      
-      return {
-        ...prev,
-        services: updatedServices
-      };
+      setShowRecurringModal(true);
+    } else {
+      // Clear selected dates when turning off recurring
+      setSelectedDates([]);
+    }
+  };
+
+  const handleRecurringConfigChange = (config: Partial<RecurringConfig>) => {
+    form.setFieldsValue({ recurringConfig: config });
+  };
+
+  const handleDateSelect = (date: dayjs.Dayjs) => {
+    // Only allow dates within 1 month from now
+    if (date.isAfter(maxBookingDate)) {
+      return;
+    }
+    
+    setSelectedDates(prev => {
+      const exists = prev.some(d => d.isSame(date, 'day'));
+      if (exists) {
+        return prev.filter(d => !d.isSame(date, 'day'));
+      }
+      return [...prev, date];
     });
   };
-  
-  // Handle booking submission
-  const handleSubmitBooking = () => {
-    setLoading(true);
+
+  const handleRemoveDate = (dateToRemove: dayjs.Dayjs) => {
+    setSelectedDates(prev => prev.filter(date => !date.isSame(dateToRemove, 'day')));
+  };
+
+  const handleRecurringTypeChange = (type: RecurringType) => {
+    setRecurringType(type);
     
-    // Simulate API call
-    setTimeout(() => {
-      setLoading(false);
-      setBookingSuccess(true);
-      setShowConfirmModal(false);
-    }, 1500);
+    // Reset additional weekdays when changing type
+    setAdditionalWeekdays([]);
+    
+    if (recurringSelectionMode === 'auto') {
+      const selectedDate = form.getFieldValue('date');
+      if (selectedDate) {
+        const dates = generateRecurringDates(selectedDate, type);
+        setSelectedDates(dates);
+      }
+    }
+    
+    handleRecurringConfigChange({ type });
   };
-  
-  // Format currency
-  const formatCurrency = (amount: number) => {
-    return amount.toLocaleString('vi-VN') + 'đ';
+
+  const handleRecurringModeChange = (mode: 'auto' | 'manual') => {
+    setRecurringSelectionMode(mode);
+    
+    if (mode === 'auto') {
+      // Reset any manually selected dates
+      const selectedDate = form.getFieldValue('date');
+      if (selectedDate) {
+        const dates = generateRecurringDates(selectedDate, recurringType);
+        setSelectedDates(dates);
+      }
+    } else {
+      // If switching to manual, start with the base date
+      const selectedDate = form.getFieldValue('date');
+      if (selectedDate) {
+        setSelectedDates([selectedDate]);
+      } else {
+        setSelectedDates([]);
+      }
+    }
   };
-  
-  // Get sport name from type
-  const getSportName = (type: string) => {
-    const sportMap: Record<string, string> = {
-      'football': 'Bóng đá',
-      'basketball': 'Bóng rổ',
-      'badminton': 'Cầu lông',
-      'tennis': 'Tennis',
-      'volleyball': 'Bóng chuyền'
+
+  const handleAdditionalWeekdayChange = (weekdayValues: number[]) => {
+    // Limit to at most 2 additional weekdays
+    if (weekdayValues.length > 2) {
+      weekdayValues = weekdayValues.slice(0, 2);
+    }
+    
+    setAdditionalWeekdays(weekdayValues);
+    
+    // Regenerate dates with the new weekdays
+    if (recurringSelectionMode === 'auto') {
+      const selectedDate = form.getFieldValue('date');
+      if (selectedDate) {
+        // First update the state, then regenerate
+        setTimeout(() => {
+          const dates = generateRecurringDates(selectedDate, recurringType);
+          setSelectedDates(dates);
+        }, 0);
+      }
+    }
+  };
+
+  const handleRecurringModalOk = () => {
+    const config: RecurringConfig = {
+      type: recurringType,
+      startDate: selectedDates[0],
+      endDate: selectedDates[selectedDates.length - 1],
+      daysOfWeek: selectedDates.map(d => d.day()),
+      daysOfMonth: [] // No longer needed as per requirements
     };
-    
-    return sportMap[type] || type;
+    handleRecurringConfigChange(config);
+    setShowRecurringModal(false);
   };
-  
-  // Define steps
+
+  const formatTime = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND'
+    }).format(amount);
+  };
+
+  // Get weekday name from date
+  const getWeekdayName = (date: dayjs.Dayjs | null): string => {
+    if (!date) return '';
+    const weekdayIndex = date.day();
+    return WEEKDAYS.find(day => day.value === weekdayIndex)?.label || '';
+  };
+
+  const calculateTotalPrice = () => {
+    const fieldPrice = formData.fieldGroupId ? 
+      fieldGroups.find(g => g.id === formData.fieldGroupId)?.basePrice || 0 : 0;
+    
+    const servicePrice = formData.services?.reduce((total, service) => {
+      const serviceInfo = services.find(s => s.id === service.serviceId);
+      return total + (serviceInfo?.price || 0) * service.quantity;
+    }, 0) || 0;
+
+    const recurringMultiplier = formData.isRecurring && selectedDates.length > 0 ? 
+      selectedDates.length : 1;
+
+    return (fieldPrice + servicePrice) * recurringMultiplier;
+  };
+
   const steps = [
     {
       title: 'Thông tin đặt sân',
@@ -396,19 +365,18 @@ const BookingPage: React.FC = () => {
           <Form
             form={form}
             layout="vertical"
-            onValuesChange={handleFormChange}
-            initialValues={bookingData}
+            initialValues={formData}
           >
             <Row gutter={16}>
               <Col xs={24} md={12}>
                 <Form.Item
-                  name="sportType"
+                  name="sportId"
                   label="Loại hình thể thao"
                   rules={[{ required: true, message: 'Vui lòng chọn loại hình thể thao' }]}
                 >
                   <Select placeholder="Chọn loại hình thể thao">
-                    {facilityData.sports.map(sport => (
-                      <Option key={sport} value={sport}>{getSportName(sport)}</Option>
+                    {sports.map(sport => (
+                      <Option key={sport.id} value={sport.id}>{sport.name}</Option>
                     ))}
                   </Select>
                 </Form.Item>
@@ -420,12 +388,23 @@ const BookingPage: React.FC = () => {
                   label="Ngày đặt sân"
                   rules={[{ required: true, message: 'Vui lòng chọn ngày đặt sân' }]}
                 >
-                  <DatePicker 
-                    className="w-full" 
-                    format="DD/MM/YYYY"
-                    disabledDate={current => current && current < dayjs().startOf('day')}
-                    placeholder="Chọn ngày"
-                  />
+                  <div className="flex flex-col">
+                    <DatePicker 
+                      className="w-full" 
+                      format="DD/MM/YYYY"
+                      disabledDate={current => {
+                        // Disable dates before today or after 1 month from now
+                        return (current && current < dayjs().startOf('day')) || 
+                               (current && current > maxBookingDate);
+                      }}
+                      onChange={handleDateChange}
+                    />
+                    {selectedWeekday && (
+                      <div className="mt-1 text-blue-600 text-sm font-semibold">
+                        {selectedWeekday}
+                      </div>
+                    )}
+                  </div>
                 </Form.Item>
               </Col>
               
@@ -439,10 +418,62 @@ const BookingPage: React.FC = () => {
                     className="w-full" 
                     format="HH:mm"
                     minuteStep={30}
-                    placeholder={['Giờ bắt đầu', 'Giờ kết thúc']}
                   />
                 </Form.Item>
               </Col>
+
+              <Col xs={24}>
+                <Form.Item
+                  name="isRecurring"
+                  label={
+                    <div className="flex items-center">
+                      <span>Đặt sân định kỳ</span>
+                      <Tooltip title="Đặt sân định kỳ cho nhiều ngày trong vòng 1 tháng">
+                        <InfoCircleOutlined className="ml-2 text-gray-400" />
+                      </Tooltip>
+                    </div>
+                  }
+                  valuePropName="checked"
+                  tooltip={!isDateSelected ? "Vui lòng chọn ngày đặt sân trước" : ""}
+                >
+                  <Switch 
+                    checkedChildren="Có" 
+                    unCheckedChildren="Không"
+                    onChange={handleRecurringChange}
+                    disabled={!isDateSelected}
+                  />
+                </Form.Item>
+              </Col>
+
+              {formData.isRecurring && (
+                <Col xs={24}>
+                  <Button
+                    type="dashed"
+                    icon={<CalendarOutlined />}
+                    onClick={() => setShowRecurringModal(true)}
+                    className="w-full"
+                  >
+                    Chọn ngày định kỳ
+                  </Button>
+                  {selectedDates.length > 0 && (
+                    <div className="mt-2">
+                      <Text type="secondary">Đã chọn {selectedDates.length} ngày:</Text>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {selectedDates.map(date => (
+                          <Tag 
+                            key={date.format('YYYY-MM-DD')} 
+                            color="blue"
+                            closable
+                            onClose={() => handleRemoveDate(date)}
+                          >
+                            {date.format('DD/MM/YYYY')} ({getWeekdayName(date)})
+                          </Tag>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </Col>
+              )}
             </Row>
           </Form>
         </Card>
@@ -452,102 +483,48 @@ const BookingPage: React.FC = () => {
       title: 'Chọn sân',
       content: (
         <Card className="shadow-md">
-          {availableFieldGroups.length > 0 ? (
-            <Form
-              form={form}
-              layout="vertical"
-              onValuesChange={handleFormChange}
-              initialValues={bookingData}
+          <Form
+            form={form}
+            layout="vertical"
+            initialValues={formData}
+          >
+            <Form.Item
+              name="fieldGroupId"
+              label="Loại sân"
+              rules={[{ required: true, message: 'Vui lòng chọn loại sân' }]}
             >
-              <Form.Item
-                name="fieldGroupId"
-                label="Loại sân"
-                rules={[{ required: true, message: 'Vui lòng chọn loại sân' }]}
-              >
-                <Radio.Group className="w-full">
-                  <Space direction="vertical" className="w-full">
-                    {availableFieldGroups.map(group => (
-                      <Radio key={group.id} value={group.id} className="w-full">
-                        <Card className="w-full mb-2 cursor-pointer hover:bg-gray-50">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <Text strong>{group.name}</Text>
-                              <div className="text-sm text-gray-500">
-                                <div>Kích thước: {group.dimension}</div>
-                                <div>Bề mặt: {group.surface}</div>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <Text className="text-lg text-blue-600 font-semibold">
-                                {formatCurrency(group.basePrice)}/giờ
-                              </Text>
-                              {group.peakStartTime && group.peakEndTime && group.priceIncrease && (
-                                <div className="text-xs text-gray-500">
-                                  Giờ cao điểm ({group.peakStartTime} - {group.peakEndTime}): 
-                                  {formatCurrency(group.basePrice + group.priceIncrease)}/giờ
-                                </div>
-                              )}
+              <Radio.Group className="w-full">
+                <Space direction="vertical" className="w-full">
+                  {fieldGroups.map(group => (
+                    <Radio key={group.id} value={group.id} className="w-full">
+                      <Card className="w-full mb-2 cursor-pointer hover:bg-gray-50">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <Text strong>{group.name}</Text>
+                            <div className="text-sm text-gray-500">
+                              <div>Kích thước: {group.dimension}</div>
+                              <div>Bề mặt: {group.surface}</div>
                             </div>
                           </div>
-                        </Card>
-                      </Radio>
-                    ))}
-                  </Space>
-                </Radio.Group>
-              </Form.Item>
-              
-              {bookingData.fieldGroupId && (
-                <Form.Item
-                  name="fieldId"
-                  label="Chọn sân"
-                  rules={[{ required: true, message: 'Vui lòng chọn sân' }]}
-                >
-                  <Radio.Group className="w-full">
-                    <Row gutter={[16, 16]}>
-                      {availableFieldGroups
-                        .find(group => group.id === bookingData.fieldGroupId)
-                        ?.fields.map(field => (
-                          <Col key={field.id} xs={24} sm={12} md={8}>
-                            <Radio 
-                              value={field.id} 
-                              disabled={field.status !== 'available'}
-                              className="w-full"
-                            >
-                              <Card 
-                                className={`w-full text-center ${
-                                  field.status === 'available' 
-                                    ? 'cursor-pointer hover:bg-blue-50' 
-                                    : 'bg-gray-100 cursor-not-allowed'
-                                }`}
-                              >
-                                <div className="font-medium">{field.name}</div>
-                                <Tag 
-                                  color={
-                                    field.status === 'available' ? 'success' : 
-                                    field.status === 'booked' ? 'error' : 'warning'
-                                  }
-                                >
-                                  {field.status === 'available' ? 'Có sẵn' : 
-                                   field.status === 'booked' ? 'Đã đặt' : 'Bảo trì'}
-                                </Tag>
-                              </Card>
-                            </Radio>
-                          </Col>
-                        ))
-                      }
-                    </Row>
-                  </Radio.Group>
-                </Form.Item>
-              )}
-            </Form>
-          ) : (
-            <Alert
-              message="Không có sân phù hợp"
-              description="Không tìm thấy sân phù hợp với loại hình thể thao đã chọn. Vui lòng quay lại và chọn loại hình thể thao khác."
-              type="info"
-              showIcon
-            />
-          )}
+                          <div className="text-right">
+                            <Text className="text-lg text-blue-600 font-semibold">
+                              {formatCurrency(group.basePrice)}/giờ
+                            </Text>
+                            {group.peakStartTime && group.peakEndTime && group.priceIncrease && (
+                              <div className="text-xs text-gray-500">
+                                Giờ cao điểm ({group.peakStartTime} - {group.peakEndTime}): 
+                                {formatCurrency(group.basePrice + group.priceIncrease)}/giờ
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </Card>
+                    </Radio>
+                  ))}
+                </Space>
+              </Radio.Group>
+            </Form.Item>
+          </Form>
         </Card>
       )
     },
@@ -557,103 +534,40 @@ const BookingPage: React.FC = () => {
         <Card className="shadow-md">
           <Title level={5} className="mb-4">Dịch vụ đi kèm</Title>
           
-          <List
-            itemLayout="horizontal"
-            dataSource={facilityData.services}
-            renderItem={service => (
-              <List.Item
-                actions={[
-                  <div className="flex items-center">
-                    <Button 
-                      size="small"
-                      onClick={() => {
-                        const currentService = bookingData.services.find(s => s.id === service.id);
-                        const currentQuantity = currentService ? currentService.quantity : 0;
-                        handleServiceChange(service.id, Math.max(0, currentQuantity - 1));
-                      }}
-                      disabled={!bookingData.services.find(s => s.id === service.id)}
-                    >
-                      -
-                    </Button>
-                    <InputNumber
-                      min={0}
-                      max={10}
-                      value={bookingData.services.find(s => s.id === service.id)?.quantity || 0}
-                      onChange={value => handleServiceChange(service.id, value || 0)}
-                      className="w-16 mx-2"
-                    />
-                    <Button 
-                      size="small"
-                      onClick={() => {
-                        const currentService = bookingData.services.find(s => s.id === service.id);
-                        const currentQuantity = currentService ? currentService.quantity : 0;
-                        handleServiceChange(service.id, currentQuantity + 1);
-                      }}
-                    >
-                      +
-                    </Button>
-                  </div>
-                ]}
-              >
-                <List.Item.Meta
-                  title={service.name}
-                  description={service.description}
-                />
-                <div className="text-blue-600 font-medium">{formatCurrency(service.price)}</div>
-              </List.Item>
-            )}
-          />
-          
-          {facilityData.vouchers.length > 0 && (
-            <>
-              <Divider />
-              
-              <Form
-                form={form}
-                layout="vertical"
-                onValuesChange={handleFormChange}
-                initialValues={bookingData}
-              >
-                <Form.Item name="useVoucher" valuePropName="checked">
-                  <Checkbox>Sử dụng voucher</Checkbox>
-                </Form.Item>
-                
-                {bookingData.useVoucher && (
-                  <Form.Item name="voucherId" label="Chọn voucher">
-                    <Radio.Group className="w-full">
-                      <Space direction="vertical" className="w-full">
-                        {facilityData.vouchers.map(voucher => (
-                          <Radio key={voucher.id} value={voucher.id} className="w-full">
-                            <Card className="w-full mb-2 cursor-pointer hover:bg-gray-50">
-                              <div className="flex justify-between items-start">
-                                <div>
-                                  <Text strong>{voucher.code}</Text>
-                                  <div className="text-sm text-gray-500">
-                                    <div>{voucher.description}</div>
-                                    <div>Đơn tối thiểu: {formatCurrency(voucher.minOrderValue)}</div>
-                                  </div>
-                                </div>
-                                <div className="text-right">
-                                  <Text className="text-lg text-red-600 font-semibold">
-                                    {voucher.discountType === 'percentage' 
-                                      ? `-${voucher.discount}%` 
-                                      : `-${formatCurrency(voucher.discount)}`}
-                                  </Text>
-                                  <div className="text-xs text-gray-500">
-                                    Hết hạn: {dayjs(voucher.expiryDate).format('DD/MM/YYYY')}
-                                  </div>
-                                </div>
-                              </div>
-                            </Card>
-                          </Radio>
-                        ))}
-                      </Space>
-                    </Radio.Group>
-                  </Form.Item>
-                )}
-              </Form>
-            </>
-          )}
+          <Form
+            form={form}
+            layout="vertical"
+            initialValues={formData}
+          >
+            <Form.Item name="services" label="Chọn dịch vụ">
+              <div className="space-y-4">
+                {services.map(service => (
+                  <Card key={service.id} className="w-full">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <Text strong>{service.name}</Text>
+                        <div className="text-sm text-gray-500">{service.description}</div>
+                        <div className="text-sm text-gray-500">Còn lại: {service.remain}</div>
+                      </div>
+                      <InputNumber
+                        min={0}
+                        max={service.remain}
+                        defaultValue={0}
+                        onChange={value => {
+                          const currentServices = form.getFieldValue('services') || [];
+                          const updatedServices = currentServices.filter((s: { serviceId: number }) => s.serviceId !== service.id);
+                          if (value && value > 0) {
+                            updatedServices.push({ serviceId: service.id, quantity: value });
+                          }
+                          form.setFieldsValue({ services: updatedServices });
+                        }}
+                      />
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </Form.Item>
+          </Form>
         </Card>
       )
     },
@@ -664,8 +578,7 @@ const BookingPage: React.FC = () => {
           <Form
             form={form}
             layout="vertical"
-            onValuesChange={handleFormChange}
-            initialValues={bookingData}
+            initialValues={formData}
           >
             <Form.Item
               name="paymentMethod"
@@ -732,6 +645,17 @@ const BookingPage: React.FC = () => {
                 </Space>
               </Radio.Group>
             </Form.Item>
+            
+            <Form.Item label="Mã giảm giá (nếu có)">
+              <div className="flex">
+                <InputNumber
+                  className="flex-1 mr-2"
+                  placeholder="Nhập mã giảm giá"
+                  onChange={value => form.setFieldsValue({ voucherCode: value })}
+                />
+                <Button type="primary">Áp dụng</Button>
+              </div>
+            </Form.Item>
           </Form>
           
           <Divider />
@@ -742,24 +666,31 @@ const BookingPage: React.FC = () => {
             <Row gutter={[16, 16]}>
               <Col xs={24} md={12}>
                 <div className="mb-2">
-                  <Text type="secondary">Cơ sở:</Text>
-                  <div>{facilityData.name}</div>
-                </div>                
-                <div className="mb-2">
                   <Text type="secondary">Loại hình thể thao:</Text>
-                  <div>{bookingData.sportType ? getSportName(bookingData.sportType) : '-'}</div>
+                  <div>{sports.find(s => s.id === formData.sportId)?.name || '-'}</div>
                 </div>
                 
                 <div className="mb-2">
                   <Text type="secondary">Ngày đặt sân:</Text>
-                  <div>{bookingData.date ? bookingData.date.format('DD/MM/YYYY') : '-'}</div>
+                  <div>
+                    {formData.isRecurring ? (
+                      <div>
+                        <div>Đặt sân định kỳ</div>
+                        <div className="text-sm text-gray-500">
+                          {selectedDates.length} ngày đã chọn
+                        </div>
+                      </div>
+                    ) : (
+                      formData.date ? dayjs(formData.date).format('DD/MM/YYYY') : '-'
+                    )}
+                  </div>
                 </div>
                 
                 <div className="mb-2">
                   <Text type="secondary">Thời gian:</Text>
                   <div>
-                    {bookingData.timeRange 
-                      ? `${bookingData.timeRange[0].format('HH:mm')} - ${bookingData.timeRange[1].format('HH:mm')}`
+                    {formData.timeRange ? 
+                      `${dayjs(formData.timeRange[0]).format('HH:mm')} - ${dayjs(formData.timeRange[1]).format('HH:mm')}` 
                       : '-'
                     }
                   </div>
@@ -770,33 +701,17 @@ const BookingPage: React.FC = () => {
                 <div className="mb-2">
                   <Text type="secondary">Loại sân:</Text>
                   <div>
-                    {bookingData.fieldGroupId 
-                      ? facilityData.fieldGroups.find(g => g.id === bookingData.fieldGroupId)?.name || '-'
-                      : '-'
-                    }
-                  </div>
-                </div>
-                
-                <div className="mb-2">
-                  <Text type="secondary">Sân:</Text>
-                  <div>
-                    {bookingData.fieldId && bookingData.fieldGroupId
-                      ? facilityData.fieldGroups
-                          .find(g => g.id === bookingData.fieldGroupId)
-                          ?.fields.find(f => f.id === bookingData.fieldId)
-                          ?.name || '-'
-                      : '-'
-                    }
+                    {fieldGroups.find(g => g.id === formData.fieldGroupId)?.name || '-'}
                   </div>
                 </div>
                 
                 <div className="mb-2">
                   <Text type="secondary">Phương thức thanh toán:</Text>
                   <div>
-                    {bookingData.paymentMethod === 'banking' ? 'Chuyển khoản ngân hàng' :
-                     bookingData.paymentMethod === 'momo' ? 'Ví MoMo' :
-                     bookingData.paymentMethod === 'vnpay' ? 'VNPay' :
-                     bookingData.paymentMethod === 'cash' ? 'Tiền mặt' : '-'}
+                    {formData.paymentMethod === 'banking' ? 'Chuyển khoản ngân hàng' :
+                     formData.paymentMethod === 'momo' ? 'Ví MoMo' :
+                     formData.paymentMethod === 'vnpay' ? 'VNPay' :
+                     formData.paymentMethod === 'cash' ? 'Tiền mặt' : '-'}
                   </div>
                 </div>
               </Col>
@@ -810,71 +725,31 @@ const BookingPage: React.FC = () => {
               <div className="flex justify-between mb-2">
                 <Text>Giá sân:</Text>
                 <Text>
-                  {bookingData.fieldGroupId && bookingData.timeRange
-                    ? (() => {
-                        const fieldGroup = facilityData.fieldGroups.find(group => group.id === bookingData.fieldGroupId);
-                        if (fieldGroup) {
-                          const startTime = bookingData.timeRange[0];
-                          const endTime = bookingData.timeRange[1];
-                          const durationHours = endTime.diff(startTime, 'hour', true);
-                          
-                          let hourlyRate = fieldGroup.basePrice;
-                          
-                          // Check if booking time is during peak hours
-                          if (fieldGroup.peakStartTime && fieldGroup.peakEndTime && fieldGroup.priceIncrease) {
-                            const peakStart = dayjs(fieldGroup.peakStartTime, 'HH:mm');
-                            const peakEnd = dayjs(fieldGroup.peakEndTime, 'HH:mm');
-                            
-                            const bookingStartHour = startTime.hour() + startTime.minute() / 60;
-                            const bookingEndHour = endTime.hour() + endTime.minute() / 60;
-                            const peakStartHour = peakStart.hour() + peakStart.minute() / 60;
-                            const peakEndHour = peakEnd.hour() + peakEnd.minute() / 60;
-                            
-                            if (
-                              (bookingStartHour <= peakEndHour && bookingStartHour >= peakStartHour) ||
-                              (bookingEndHour <= peakEndHour && bookingEndHour >= peakStartHour) ||
-                              (bookingStartHour <= peakStartHour && bookingEndHour >= peakEndHour)
-                            ) {
-                              hourlyRate += fieldGroup.priceIncrease;
-                            }
-                          }
-                          
-                          return formatCurrency(hourlyRate * durationHours);
-                        }
-                        return '-';
-                      })()
+                  {formData.fieldGroupId ? 
+                    formatCurrency(fieldGroups.find(g => g.id === formData.fieldGroupId)?.basePrice || 0) 
                     : '-'
                   }
                 </Text>
               </div>
               
-              {bookingData.services.length > 0 && (
+              {formData.services && formData.services.length > 0 && (
                 <div className="flex justify-between mb-2">
                   <Text>Dịch vụ:</Text>
                   <Text>
                     {formatCurrency(
-                      bookingData.services.reduce((total, service) => total + service.price * service.quantity, 0)
+                      formData.services.reduce((total, service) => {
+                        const serviceInfo = services.find(s => s.id === service.serviceId);
+                        return total + (serviceInfo?.price || 0) * service.quantity;
+                      }, 0)
                     )}
                   </Text>
                 </div>
               )}
               
-              {bookingData.useVoucher && bookingData.voucherId && (
-                <div className="flex justify-between mb-2 text-red-600">
-                  <Text>Giảm giá:</Text>
-                  <Text>
-                    {(() => {
-                      const voucher = facilityData.vouchers.find(v => v.id === bookingData.voucherId);
-                      if (voucher) {
-                        if (voucher.discountType === 'percentage') {
-                          return `-${voucher.discount}%`;
-                        } else {
-                          return `-${formatCurrency(voucher.discount)}`;
-                        }
-                      }
-                      return '-';
-                    })()}
-                  </Text>
+              {formData.isRecurring && (
+                <div className="flex justify-between mb-2">
+                  <Text>Số ngày đặt:</Text>
+                  <Text>{selectedDates.length}</Text>
                 </div>
               )}
               
@@ -882,7 +757,7 @@ const BookingPage: React.FC = () => {
               
               <div className="flex justify-between text-lg font-bold">
                 <Text>Tổng cộng:</Text>
-                <Text className="text-blue-600">{formatCurrency(bookingData.totalPrice)}</Text>
+                <Text className="text-blue-600">{formatCurrency(calculateTotalPrice())}</Text>
               </div>
             </div>
           </div>
@@ -890,52 +765,41 @@ const BookingPage: React.FC = () => {
       )
     }
   ];
-  
-  // Render booking success
-  if (bookingSuccess) {
-    return (
-      <div className="container mx-auto px-4 py-6 max-w-4xl">
-        <Result
-          status="success"
-          title="Đặt sân thành công!"
-          subTitle={`Mã đặt sân: ${Math.random().toString(36).substring(2, 10).toUpperCase()}`}
-          extra={[
-            <Button 
-              type="primary" 
-              key="dashboard" 
-              onClick={() => navigate('/player/dashboard')}
-            >
-              Xem lịch sử đặt sân
-            </Button>,
-            <Button 
-              key="home" 
-              onClick={() => navigate('/')}
-            >
-              Về trang chủ
-            </Button>,
-          ]}
-        />
-      </div>
-    );
-  }
-  
+
   return (
     <div className="container mx-auto px-4 py-6 max-w-4xl">
       {/* Breadcrumb */}
-      <Breadcrumb 
-        items={[
-          { title: <Link to="/">Trang chủ</Link> },
-          { title: <Link to={`/facility/${facilityId}`}>Thông tin cơ sở</Link> },
-          { title: 'Đặt sân' }
-        ]} 
-        className="mb-6" 
-      />
+      <div className="mb-6">
+        <a onClick={() => navigate('/')} className="text-blue-600 hover:text-blue-800">Trang chủ</a>
+        <span className="mx-2">/</span>
+        <a onClick={() => navigate(`/facility/${facilityId}`)} className="text-blue-600 hover:text-blue-800">Thông tin cơ sở</a>
+        <span className="mx-2">/</span>
+        <span>Đặt sân</span>
+      </div>
       
-      {/* Title */}
+      {/* Title and Timer */}
       <div className="flex justify-between items-center mb-6">
         <Title level={2} className="m-0">Đặt sân</Title>
-        <Text className="text-gray-500">Cơ sở: {facilityData.name}</Text>
+        {currentStep > 0 && (
+          <div className="flex items-center">
+            <ClockCircleOutlined className="mr-2 text-red-500" />
+            <Text className="text-red-500">Thời gian còn lại: {formatTime(timeRemaining)}</Text>
+          </div>
+        )}
       </div>
+      
+      {/* Error message */}
+      {error && (
+        <Alert
+          message="Lỗi"
+          description={error}
+          type="error"
+          showIcon
+          className="mb-4"
+          closable
+          onClose={() => setError(null)}
+        />
+      )}
       
       {/* Steps */}
       <Steps
@@ -963,6 +827,7 @@ const BookingPage: React.FC = () => {
           <Button 
             type="primary" 
             onClick={handleNext}
+            loading={loading}
           >
             Tiếp theo <ArrowRightOutlined />
           </Button>
@@ -970,6 +835,7 @@ const BookingPage: React.FC = () => {
           <Button 
             type="primary" 
             onClick={() => setShowConfirmModal(true)}
+            loading={loading}
           >
             Xác nhận đặt sân <CheckCircleOutlined />
           </Button>
@@ -987,7 +853,146 @@ const BookingPage: React.FC = () => {
         cancelText="Hủy"
       >
         <p>Bạn có chắc chắn muốn đặt sân với thông tin đã chọn?</p>
-        <p>Tổng số tiền: <span className="text-blue-600 font-bold">{formatCurrency(bookingData.totalPrice)}</span></p>
+        <p>Tổng số tiền: <span className="text-blue-600 font-bold">{formatCurrency(calculateTotalPrice())}</span></p>
+        {formData.paymentMethod !== 'cash' && (
+          <Alert
+            message="Lưu ý"
+            description="Bạn sẽ được chuyển đến trang thanh toán sau khi xác nhận."
+            type="info"
+            showIcon
+            className="mt-4"
+          />
+        )}
+      </Modal>
+
+      {/* Recurring Modal - Redesigned */}
+      <Modal
+        title="Đặt sân định kỳ"
+        open={showRecurringModal}
+        onOk={handleRecurringModalOk}
+        onCancel={() => setShowRecurringModal(false)}
+        width={800}
+        okText="Xác nhận"
+        cancelText="Hủy"
+      >
+        <div className="space-y-4">
+          <Alert
+            message="Lưu ý: Bạn chỉ có thể đặt sân định kỳ trong vòng 1 tháng kể từ ngày hiện tại"
+            type="info"
+            showIcon
+            className="mb-4"
+          />
+
+          <div>
+            <Text strong>Chọn phương thức:</Text>
+            <Radio.Group 
+              className="ml-4"
+              value={recurringSelectionMode}
+              onChange={e => handleRecurringModeChange(e.target.value)}
+            >
+              <Radio value="auto">Tự động</Radio>
+              <Radio value="manual">Tùy chọn</Radio>
+            </Radio.Group>
+          </div>
+
+          {recurringSelectionMode === 'auto' && (
+            <div>
+              <Text strong>Chọn loại định kỳ:</Text>
+              <Radio.Group 
+                className="ml-4"
+                value={recurringType}
+                onChange={e => handleRecurringTypeChange(e.target.value)}
+              >
+                <Space direction="vertical">
+                  <Radio value={RecurringType.DAILY}>Hàng ngày</Radio>
+                  <Radio value={RecurringType.WEEKLY}>Hàng tuần</Radio>
+                </Space>
+              </Radio.Group>
+              
+              {recurringType === RecurringType.WEEKLY && (
+                <div className="mt-4 ml-4">
+                  <Text>Chọn thêm tối đa 2 ngày trong tuần:</Text>
+                  <div className="mt-2">
+                    <Checkbox.Group
+                      options={WEEKDAYS.filter(day => day.value !== form.getFieldValue('date')?.day()).map(day => ({
+                        label: day.label,
+                        value: day.value
+                      }))}
+                      value={additionalWeekdays}
+                      onChange={handleAdditionalWeekdayChange}
+                    />
+                  </div>
+                  <Text type="secondary" className="block mt-1">
+                    Đã chọn: {additionalWeekdays.length} ngày
+                  </Text>
+                </div>
+              )}
+            </div>
+          )}
+
+          <Divider />
+
+          {recurringSelectionMode === 'auto' ? (
+            <div>
+              <Text strong>Các ngày đã chọn tự động:</Text>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {selectedDates.map(date => (
+                  <Tag key={date.format('YYYY-MM-DD')} color="blue">
+                    {date.format('DD/MM/YYYY')} ({getWeekdayName(date)})
+                  </Tag>
+                ))}
+              </div>
+              <Text type="secondary" className="block mt-2">
+                Các ngày này được tự động tạo dựa trên ngày đặt sân ({form.getFieldValue('date')?.format('DD/MM/YYYY')}) và loại định kỳ bạn đã chọn
+              </Text>
+            </div>
+          ) : (
+            <div>
+              <Text strong>Chọn ngày thủ công:</Text>
+              <div className="mt-2">
+                <Calendar
+                  fullscreen={false}
+                  onSelect={handleDateSelect}
+                  disabledDate={current => {
+                    // Disable dates before today or after 1 month from now
+                    return (current && current < dayjs().startOf('day')) || 
+                          (current && current > maxBookingDate);
+                  }}
+                  dateCellRender={date => {
+                    const isSelected = selectedDates.some(d => d.isSame(date, 'day'));
+                    const isToday = date.isSame(dayjs(), 'day');
+                    return isSelected ? (
+                      <div className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center">
+                        {date.date()}
+                      </div>
+                    ) : isToday ? (
+                      <div className="border border-blue-500 text-blue-500 rounded-full w-6 h-6 flex items-center justify-center">
+                        {date.date()}
+                      </div>
+                    ) : null;
+                  }}
+                />
+              </div>
+              <div className="mt-4">
+                <Text strong>Ngày đã chọn ({selectedDates.length}):</Text>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {selectedDates.map(date => (
+                    <Tag 
+                      key={date.format('YYYY-MM-DD')} 
+                      color="blue"
+                      closable
+                      onClose={() => {
+                        setSelectedDates(prev => prev.filter(d => !d.isSame(date, 'day')));
+                      }}
+                    >
+                      {date.format('DD/MM/YYYY')} ({getWeekdayName(date)})
+                    </Tag>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </Modal>
     </div>
   );
