@@ -23,9 +23,13 @@ const NotificationIcon: React.FC = () => {
     return () => clearInterval(interval);
   }, [dispatch]);
 
+  const dropdownRender = () => {
+    return <NotificationPanel onClose={() => setOpen(false)} />;
+  };
+
   return (
     <Dropdown
-      overlay={<NotificationPanel onClose={() => setOpen(false)} />}
+      dropdownRender={dropdownRender}
       trigger={['click']}
       open={open}
       onOpenChange={setOpen}

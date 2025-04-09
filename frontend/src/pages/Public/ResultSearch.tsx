@@ -89,7 +89,7 @@ const ResultSearch: React.FC = () => {
       setLoading(true);
       try {
         // Simulate API call delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 100));
         setFacilities(mockFacilities);
         setError(null);
       } catch (err) {
@@ -125,7 +125,7 @@ const ResultSearch: React.FC = () => {
   ];
 
   // Xử lý thay đổi filter
-  const handleFilterChange = (filterName: string, value: any) => {
+  const handleFilterChange = (filterName: string, value: string[] | [number, number] | number | boolean | string | number[]) => {
     setFilters(prev => ({
       ...prev,
       [filterName]: value
@@ -219,36 +219,36 @@ const ResultSearch: React.FC = () => {
   const FacilityCard = ({ facility }: { facility: FacilityData }) => (
     <Card 
       hoverable 
-      className="w-full mb-4"
+      className="w-full h-full"
       onClick={() => handleFacilityClick(facility.id)}
-      cover={<img alt={facility.name} src={facility.imagesUrl[0] || 'https://via.placeholder.com/300'} className="h-48 object-cover" />}
+      cover={<img alt={facility.name} src={facility.imagesUrl[0] || 'https://via.placeholder.com/300'} className="h-40 sm:h-48 object-cover w-full" />}
     >
       <div className="flex justify-between items-center mb-2">
-        <span className="text-gray-600">
+        <span className="text-gray-600 text-xs sm:text-sm">
           <ClockCircleOutlined className="mr-1" />
           {facility.openTime1.substring(0, 5)} - {facility.closeTime1.substring(0, 5)}
         </span>
         <div className="flex items-center">
-          <Rate disabled defaultValue={facility.avgRating} className="text-sm" />
-          <span className="ml-2 text-gray-500">
+          <Rate disabled defaultValue={facility.avgRating} className="text-xs" />
+          <span className="ml-1 text-gray-500 text-xs">
             <UserOutlined className="mr-1" />
             {facility.numberOfRatings}
           </span>
         </div>
       </div>
-      <h3 className="text-lg font-semibold mb-2">{facility.name}</h3>
-      <div className="flex gap-2 mb-2 flex-wrap">
+      <h3 className="text-base font-semibold mb-2 line-clamp-1">{facility.name}</h3>
+      <div className="flex gap-1 mb-2 flex-wrap">
         {facility.sports.map(sport => (
-          <Tag key={sport.id} color="blue">{sport.name}</Tag>
+          <Tag key={sport.id} color="blue" className="text-xs py-0.5 px-1">{sport.name}</Tag>
         ))}
       </div>
-      <p className="text-gray-600 mb-2">
+      <p className="text-gray-600 mb-2 text-xs sm:text-sm line-clamp-1">
         <EnvironmentOutlined className="mr-1" />
         {facility.location}
       </p>
       <div className="flex justify-between items-center">
         <div>
-          <Tag color={facility.status === 'active' ? 'success' : facility.status === 'pending' ? 'warning' : 'error'}>
+          <Tag color={facility.status === 'active' ? 'success' : facility.status === 'pending' ? 'warning' : 'error'} className="text-xs py-0.5 px-1">
             {facility.status === 'active' ? 'Hoạt động' : facility.status === 'pending' ? 'Đang chờ' : 'Bảo trì'}
           </Tag>
         </div>
@@ -269,222 +269,233 @@ const ResultSearch: React.FC = () => {
   const filteredFacilities = getFilteredFacilities();
 
   return (
-    <div className="container mx-auto px-4 py-6">
-      {/* Breadcrumb */}
-      <Breadcrumb items={breadcrumbItems} className="mb-6" />
-    
-      {/* Title */}
-      <Title level={2} className="mb-6">Kết quả tìm kiếm</Title>
-     
-      {/* Search bar */}
-      <div className="bg-white p-4 rounded-lg shadow-md mb-6">
-        <Row gutter={[16, 16]} align="middle">
-          <Col xs={24} md={8} lg={10}>
-            <Input 
-              placeholder="Tìm kiếm cơ sở thể thao" 
-              prefix={<SearchOutlined />}
-              value={searchParams.keyword}
-              onChange={(e) => setSearchParams(prev => ({ ...prev, keyword: e.target.value }))}
-              size="large"
-            />
-          </Col>
+    <div className="w-full px-4 py-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Breadcrumb */}
+        <Breadcrumb items={breadcrumbItems} className="mb-4 md:mb-6" />
+      
+        {/* Title */}
+        <Title level={2} className="mb-4 md:mb-6 text-xl md:text-2xl lg:text-3xl">Kết quả tìm kiếm</Title>
+       
+        {/* Search bar */}
+        <div className="bg-white p-3 md:p-4 rounded-lg shadow-md mb-4 md:mb-6">
+          <Row gutter={[12, 12]} align="middle">
+            <Col xs={24} md={8} lg={10}>
+              <Input 
+                placeholder="Tìm kiếm cơ sở thể thao" 
+                prefix={<SearchOutlined />}
+                value={searchParams.keyword}
+                onChange={(e) => setSearchParams(prev => ({ ...prev, keyword: e.target.value }))}
+                size="middle"
+              />
+            </Col>
+            <Col xs={24} md={8} lg={6}>
+              <Select
+                placeholder="Chọn môn thể thao"
+                style={{ width: '100%' }}
+                value={searchParams.sport}
+                onChange={(value) => setSearchParams(prev => ({ ...prev, sport: value }))}
+                size="middle"
+                allowClear
+                options={sportOptions}
+              />
+            </Col>
+            <Col xs={24} md={8} lg={6}>
+              <Input 
+                prefix={<EnvironmentOutlined />}
+                placeholder="Địa điểm"
+                value={searchParams.location}
+                onChange={(e) => setSearchParams(prev => ({ ...prev, location: e.target.value }))}
+                size="middle"
+              />
+            </Col>
+            <Col xs={24} md={24} lg={2}>
+              <Button 
+                type="primary" 
+                icon={<SearchOutlined />} 
+                size="middle"
+                block
+              >
+                Tìm kiếm
+              </Button>
+            </Col>
+          </Row>
+        </div>
+       
+        {/* Main content */}
+        <Row gutter={[16, 16]}>
+          {/* Left sidebar - Filters */}
           <Col xs={24} md={8} lg={6}>
-            <Select
-              placeholder="Chọn môn thể thao"
-              style={{ width: '100%' }}
-              value={searchParams.sport}
-              onChange={(value) => setSearchParams(prev => ({ ...prev, sport: value }))}
-              size="large"
-              allowClear
-              options={sportOptions}
-            />
+            <div className="bg-white p-3 md:p-4 rounded-lg shadow-md sticky top-4">
+              <div className="flex justify-between items-center mb-3 md:mb-4">
+                <Title level={4} className="m-0 text-base md:text-lg">Bộ lọc</Title>
+                <Button 
+                  type="text" 
+                  size="small"
+                  onClick={() => {
+                    setFilters({
+                      sports: [],
+                      priceRange: [0, 1000000],
+                      rating: 0,
+                      hasPromotion: false,
+                      hasEvent: false,
+                      openNow: false,
+                      facilities: [],
+                    });
+                  }}
+                >
+                  Đặt lại
+                </Button>
+              </div>
+              
+              <Divider className="my-2 md:my-3" />
+
+              {/* Môn thể thao */}
+              <div className="mb-3 md:mb-4">
+                <Title level={5} className="text-sm md:text-base">Môn thể thao</Title>
+                <Checkbox.Group
+                  options={sportOptions}
+                  value={filters.sports}
+                  onChange={(values) => handleFilterChange('sports', values)}
+                  className="flex flex-col gap-1 mt-2"
+                />
+              </div>
+
+              <Divider className="my-2 md:my-3" />
+
+              {/* Khoảng giá */}
+              <div className="mb-3 md:mb-4">
+                <Title level={5} className="text-sm md:text-base">Khoảng giá (VNĐ)</Title>
+                <Slider
+                  range
+                  min={0}
+                  max={1000000}
+                  step={50000}
+                  value={filters.priceRange}
+                  onChange={(value) => handleFilterChange('priceRange', value)}
+                  tooltip={{ formatter: (value) => `${value?.toLocaleString()}đ` }}
+                  className="mt-2"
+                />
+                <div className="flex justify-between text-gray-500 mt-2 text-xs md:text-sm">
+                  <span>{filters.priceRange[0].toLocaleString()}đ</span>
+                  <span>{filters.priceRange[1].toLocaleString()}đ</span>
+                </div>
+              </div>
+
+              <Divider className="my-2 md:my-3" />
+
+              {/* Đánh giá */}
+              <div className="mb-3 md:mb-4">
+                <Title level={5} className="text-sm md:text-base">Đánh giá tối thiểu</Title>
+                <Rate 
+                  allowHalf 
+                  value={filters.rating} 
+                  onChange={(value) => handleFilterChange('rating', value)} 
+                  className="mt-2"
+                />
+              </div>
+
+              <Divider className="my-2 md:my-3" />
+
+              {/* Thời gian */}
+              <div className="mb-3 md:mb-4">
+                <Title level={5} className="text-sm md:text-base">Thời gian</Title>
+                <Checkbox 
+                  checked={filters.openNow}
+                  onChange={(e) => handleFilterChange('openNow', e.target.checked)}
+                  className="mt-2"
+                >
+                  Đang mở cửa
+                </Checkbox>
+              </div>
+
+              <Divider className="my-2 md:my-3" />
+
+              {/* Tiện ích */}
+              <div className="mb-3 md:mb-4">
+                <Title level={5} className="text-sm md:text-base">Tiện ích</Title>
+                <Checkbox.Group
+                  options={facilityOptions}
+                  value={filters.facilities}
+                  onChange={(values) => handleFilterChange('facilities', values)}
+                  className="flex flex-col gap-1 mt-2"
+                />
+              </div>
+            </div> 
           </Col>
-          <Col xs={24} md={8} lg={6}>
-            <Input 
-              prefix={<EnvironmentOutlined />}
-              placeholder="Địa điểm"
-              value={searchParams.location}
-              onChange={(e) => setSearchParams(prev => ({ ...prev, location: e.target.value }))}
-              size="large"
-            />
-          </Col>
-          <Col xs={24} md={24} lg={2}>
-            <Button 
-              type="primary" 
-              icon={<SearchOutlined />} 
-              size="large"
-              block
-            >
-              Tìm kiếm
-            </Button>
+          
+          {/* Right content - Search results */}
+          <Col xs={24} md={16} lg={18}>
+            {/* Sort options */}
+            <div className="bg-white p-3 md:p-4 rounded-lg shadow-md mb-4 md:mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+              <Text className="text-sm md:text-base">Tìm thấy {filteredFacilities.length} kết quả</Text>
+              <div className="flex items-center">
+                <Text className="mr-2 text-sm md:text-base">Sắp xếp theo:</Text>
+                <Select
+                  defaultValue="relevance"
+                  style={{ width: 150 }}
+                  onChange={handleSortChange}
+                  size="middle"
+                  options={[
+                    { value: 'relevance', label: 'Liên quan nhất' },
+                    { value: 'rating', label: 'Đánh giá cao nhất' },
+                    { value: 'priceAsc', label: 'Giá: Thấp đến cao' },
+                    { value: 'priceDesc', label: 'Giá: Cao đến thấp' },
+                  ]}
+                />
+              </div>
+            </div>
+
+            {/* Results */}
+            {loading ? (
+              <div className="flex justify-center items-center py-8 md:py-12">
+                <Spin size="large" />
+              </div>
+            ) : error ? (
+              <div className="bg-white p-4 md:p-6 rounded-lg shadow-md text-center">
+                <Text type="danger">{error}</Text>
+                <Button 
+                  type="primary" 
+                  className="mt-4"
+                  onClick={() => window.location.reload()}
+                >
+                  Thử lại
+                </Button>
+              </div>
+            ) : filteredFacilities.length > 0 ? (
+              <>
+                <Row gutter={[12, 12]}>
+                  {getPaginatedFacilities().map(facility => (
+                    <Col key={facility.id} xs={12} sm={8} lg={6} className="h-full">
+                      <FacilityCard facility={facility} />
+                    </Col>
+                  ))}
+                </Row>
+
+                {/* Pagination */}
+                <div className="mt-6 md:mt-8 flex justify-center">
+                  <Pagination
+                    current={currentPage}
+                    pageSize={pageSize}
+                    total={filteredFacilities.length}
+                    onChange={handlePageChange}
+                    showSizeChanger
+                    showQuickJumper
+                    showTotal={(total) => `Tổng cộng ${total} kết quả`}
+                    responsive
+                    className="text-sm"
+                  />
+                </div>
+              </>
+            ) : (
+              <Empty
+                description="Không tìm thấy kết quả nào phù hợp"
+                className="py-8 md:py-12"
+              />
+            )}
           </Col>
         </Row>
       </div>
-     
-      {/* Main content */}
-      <Row gutter={24}>
-        {/* Left sidebar - Filters */}
-        <Col xs={24} md={8} lg={6}>
-          <div className="bg-white p-4 rounded-lg shadow-md sticky top-4">
-            <div className="flex justify-between items-center mb-4">
-              <Title level={4} className="m-0">Bộ lọc</Title>
-              <Button 
-                type="text" 
-                onClick={() => {
-                  setFilters({
-                    sports: [],
-                    priceRange: [0, 1000000],
-                    rating: 0,
-                    hasPromotion: false,
-                    hasEvent: false,
-                    openNow: false,
-                    facilities: [],
-                  });
-                }}
-              >
-                Đặt lại
-              </Button>
-            </div>
-            
-            <Divider className="my-3" />
-
-            {/* Môn thể thao */}
-            <div className="mb-4">
-              <Title level={5}>Môn thể thao</Title>
-              <Checkbox.Group
-                options={sportOptions}
-                value={filters.sports}
-                onChange={(values) => handleFilterChange('sports', values)}
-              />
-            </div>
-
-            <Divider className="my-3" />
-
-            {/* Khoảng giá */}
-            <div className="mb-4">
-              <Title level={5}>Khoảng giá (VNĐ)</Title>
-              <Slider
-                range
-                min={0}
-                max={1000000}
-                step={50000}
-                value={filters.priceRange}
-                onChange={(value) => handleFilterChange('priceRange', value)}
-                tooltip={{ formatter: (value) => `${value?.toLocaleString()}đ` }}
-              />
-              <div className="flex justify-between text-gray-500 mt-2">
-                <span>{filters.priceRange[0].toLocaleString()}đ</span>
-                <span>{filters.priceRange[1].toLocaleString()}đ</span>
-              </div>
-            </div>
-
-            <Divider className="my-3" />
-
-            {/* Đánh giá */}
-            <div className="mb-4">
-              <Title level={5}>Đánh giá tối thiểu</Title>
-              <Rate 
-                allowHalf 
-                value={filters.rating} 
-                onChange={(value) => handleFilterChange('rating', value)} 
-              />
-            </div>
-
-            <Divider className="my-3" />
-
-            {/* Thời gian */}
-            <div className="mb-4">
-              <Title level={5}>Thời gian</Title>
-              <Checkbox 
-                checked={filters.openNow}
-                onChange={(e) => handleFilterChange('openNow', e.target.checked)}
-              >
-                Đang mở cửa
-              </Checkbox>
-            </div>
-
-            <Divider className="my-3" />
-
-            {/* Tiện ích */}
-            <div className="mb-4">
-              <Title level={5}>Tiện ích</Title>
-              <Checkbox.Group
-                options={facilityOptions}
-                value={filters.facilities}
-                onChange={(values) => handleFilterChange('facilities', values)}
-              />
-            </div>
-          </div> 
-        </Col>
-        
-        {/* Right content - Search results */}
-        <Col xs={24} md={16} lg={18}>
-          {/* Sort options */}
-          <div className="bg-white p-4 rounded-lg shadow-md mb-6 flex justify-between items-center">
-            <Text>Tìm thấy {filteredFacilities.length} kết quả</Text>
-            <div className="flex items-center">
-              <Text className="mr-2">Sắp xếp theo:</Text>
-              <Select
-                defaultValue="relevance"
-                style={{ width: 150 }}
-                onChange={handleSortChange}
-                options={[
-                  { value: 'relevance', label: 'Liên quan nhất' },
-                  { value: 'rating', label: 'Đánh giá cao nhất' },
-                  { value: 'priceAsc', label: 'Giá: Thấp đến cao' },
-                  { value: 'priceDesc', label: 'Giá: Cao đến thấp' },
-                ]}
-              />
-            </div>
-          </div>
-
-          {/* Results */}
-          {loading ? (
-            <div className="flex justify-center items-center py-12">
-              <Spin size="large" />
-            </div>
-          ) : error ? (
-            <div className="bg-white p-6 rounded-lg shadow-md text-center">
-              <Text type="danger">{error}</Text>
-              <Button 
-                type="primary" 
-                className="mt-4"
-                onClick={() => window.location.reload()}
-              >
-                Thử lại
-              </Button>
-            </div>
-          ) : filteredFacilities.length > 0 ? (
-            <>
-              <Row gutter={[16, 16]}>
-                {getPaginatedFacilities().map(facility => (
-                  <Col key={facility.id} xs={24} sm={12} lg={8} xl={6}>
-                    <FacilityCard facility={facility} />
-                  </Col>
-                ))}
-              </Row>
-
-              {/* Pagination */}
-              <div className="mt-8 flex justify-center">
-                <Pagination
-                  current={currentPage}
-                  pageSize={pageSize}
-                  total={filteredFacilities.length}
-                  onChange={handlePageChange}
-                  showSizeChanger
-                  showQuickJumper
-                  showTotal={(total) => `Tổng cộng ${total} kết quả`}
-                />
-              </div>
-            </>
-          ) : (
-            <Empty
-              description="Không tìm thấy kết quả nào phù hợp"
-              className="py-12"
-            />
-          )}
-        </Col>
-      </Row>
     </div>
   );
 };

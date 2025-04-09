@@ -5,12 +5,13 @@ import { UpdateInfo } from '@/types/user.type';
 import { login } from '@/store/slices/userSlice';
 import { 
   Card, Avatar, Typography, Divider, Row, Col, Spin, Alert, Button, Form, Input, 
-  Select, DatePicker, message, Tabs, Upload, Tag, ConfigProvider
+  Select, DatePicker, message, Tabs, Upload, Tag, ConfigProvider, List, Empty, Tooltip, Rate
 } from 'antd';
 import type { TabsProps } from 'antd';
 import { 
   UserOutlined, MailOutlined, PhoneOutlined, CalendarOutlined, BankOutlined, 
-  EditOutlined, SaveOutlined, CloseOutlined, UploadOutlined, ManOutlined, WomanOutlined
+  EditOutlined, SaveOutlined, CloseOutlined, UploadOutlined, ManOutlined, WomanOutlined,
+  HeartOutlined, DeleteOutlined, EnvironmentOutlined, ClockCircleOutlined
 } from '@ant-design/icons';
 import moment, { Moment } from 'moment';
 import locale from 'antd/es/date-picker/locale/vi_VN';
@@ -32,6 +33,40 @@ interface ProfileFormValues {
   bankAccount?: string;
 }
 
+// Mock data cho sân yêu thích
+const mockFavoriteFacilities = [
+  {
+    id: 'facility-1',
+    name: 'Sân bóng đá mini TDT Arena',
+    location: 'Quận 7, TP.HCM',
+    rating: 4.8,
+    image: 'https://placehold.co/300x200/orange/white?text=TDT+Arena',
+    sports: ['Bóng đá', 'Futsal'],
+    openTime: '07:00',
+    closeTime: '22:00'
+  },
+  {
+    id: 'facility-2',
+    name: 'Sân bóng rổ Star Basketball Court',
+    location: 'Quận 1, TP.HCM',
+    rating: 4.5,
+    image: 'https://placehold.co/300x200/blue/white?text=Star+Basketball',
+    sports: ['Bóng rổ'],
+    openTime: '06:00',
+    closeTime: '21:00'
+  },
+  {
+    id: 'facility-3',
+    name: 'Sân cầu lông Thống Nhất',
+    location: 'Quận 10, TP.HCM',
+    rating: 4.2,
+    image: 'https://placehold.co/300x200/green/white?text=Badminton+Court',
+    sports: ['Cầu lông'],
+    openTime: '08:00',
+    closeTime: '23:00'
+  }
+];
+
 const UserProfile: React.FC = () => {
   const dispatch = useAppDispatch();
   const { user, isLoading, error } = useAppSelector((state) => state.user);
@@ -41,6 +76,9 @@ const UserProfile: React.FC = () => {
   const [uploadLoading, setUploadLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('1');
   const [initialValues, setInitialValues] = useState<ProfileFormValues | null>(null);
+
+  // State for favorite facilities
+  const [favoriteFacilities, setFavoriteFacilities] = useState(mockFavoriteFacilities);
 
   // Helper function to format dates
   const formatDate = (dateString: string) => {
@@ -169,6 +207,18 @@ const UserProfile: React.FC = () => {
     return false; // Prevent auto upload
   };
 
+  // Handle remove favorite facility
+  const handleRemoveFavorite = (facilityId: string) => {
+    // In real application, this would make an API call
+    message.success('Đã xóa sân khỏi danh sách yêu thích');
+    setFavoriteFacilities(prev => prev.filter(item => item.id !== facilityId));
+  };
+
+  // Handle view facility details
+  const handleViewFacility = (facilityId: string) => {
+    window.location.href = `/facility/${facilityId}`;
+  };
+
   if (isLoading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
@@ -223,7 +273,7 @@ const UserProfile: React.FC = () => {
     }
   };
 
-  // Cấu hình tabs cho component Tabs
+  // Update the tabItems to include a new tab for favorite facilities
   const tabItems: TabsProps['items'] = [
     {
       key: '1',
@@ -313,6 +363,99 @@ const UserProfile: React.FC = () => {
         </Row>
       ),
     },
+    {
+      key: '4',
+      label: (
+        <span>
+          <HeartOutlined /> Sân Yêu Thích
+        </span>
+      ),
+      children: (
+        <div style={{ marginTop: '16px' }}>
+          {favoriteFacilities.length > 0 ? (
+            <List
+              grid={{ 
+                gutter: 16,
+                xs: 1,
+                sm: 2,
+                md: 2,
+                lg: 3,
+                xl: 3,
+                xxl: 3,
+              }}
+              dataSource={favoriteFacilities}
+              renderItem={(item) => (
+                <List.Item>
+                  <Card
+                    hoverable
+                    cover={<img alt={item.name} src={item.image} style={{ height: 160, objectFit: 'cover' }} />}
+                    actions={[
+                      <Tooltip title="Xem chi tiết">
+                        <Button type="text" icon={<EditOutlined />} onClick={() => handleViewFacility(item.id)} />
+                      </Tooltip>,
+                      <Tooltip title="Xóa khỏi yêu thích">
+                        <Button 
+                          type="text" 
+                          danger 
+                          icon={<DeleteOutlined />} 
+                          onClick={() => handleRemoveFavorite(item.id)} 
+                        />
+                      </Tooltip>
+                    ]}
+                  >
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-gray-600 text-xs sm:text-sm">
+                        <ClockCircleOutlined className="mr-1" />
+                        {item.openTime} - {item.closeTime}
+                      </span>
+                      <div className="flex items-center">
+                        <Rate disabled defaultValue={item.rating} className="text-xs" />
+                        <span className="ml-1 text-gray-500 text-xs">
+                          {item.rating}
+                        </span>
+                      </div>
+                    </div>
+                    <Card.Meta
+                      title={item.name}
+                      description={
+                        <>
+                          <div className="flex items-center mb-2">
+                            <EnvironmentOutlined style={{ marginRight: 8, color: '#1890ff' }} />
+                            <Text ellipsis style={{ fontSize: '12px' }}>{item.location}</Text>
+                          </div>
+                          <div>
+                            {item.sports.map(sport => (
+                              <Tag key={sport} color="blue" style={{ marginBottom: 5 }}>{sport}</Tag>
+                            ))}
+                          </div>
+                        </>
+                      }
+                    />
+                  </Card>
+                </List.Item>
+              )}
+            />
+          ) : (
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description={
+                <div>
+                  <p>Bạn chưa có sân yêu thích nào</p>
+                  <Button
+                    type="primary"
+                    icon={<HeartOutlined />}
+                    onClick={() => window.location.href = '/result-search'}
+                    style={{ marginTop: 16 }}
+                  >
+                    Tìm sân ngay
+                  </Button>
+                </div>
+              }
+            />
+          )}
+        </div>
+      ),
+    }
   ];
 
   // Profile view (not editing)

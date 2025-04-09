@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Tag, 
@@ -51,6 +51,26 @@ const FacilityManagement: React.FC = () => {
   const [deleteModalVisible, setDeleteModalVisible] = useState<boolean>(false);
   const [selectedFacilityId, setSelectedFacilityId] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState<boolean>(false);
+  
+  // Thêm tham chiếu cho container width để tính toán số cột
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState<number>(0);
+
+  // Theo dõi width của container để điều chỉnh giao diện
+  useEffect(() => {
+    const updateWidth = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.offsetWidth);
+      }
+    };
+
+    // Cập nhật ban đầu
+    updateWidth();
+
+    // Theo dõi thay đổi kích thước
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
+  }, []);
   
   // Fetch facilities on component mount
   useEffect(() => {
@@ -228,49 +248,54 @@ const FacilityManagement: React.FC = () => {
   };
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
-      <div className="max-w-7xl mx-auto">
-        {/* Header with Title */}
-        <div className="mb-8">          
-          <h1 className="text-2xl font-bold text-gray-800">Quản lý tất cả các cơ sở của bạn</h1>
-          <p className="text-gray-500 mt-2">Quản lý, theo dõi và cập nhật thông tin các cơ sở thể thao của bạn</p>
+    <div className="p-3 sm:p-4 md:p-6 bg-gray-50 min-h-screen">
+      <div ref={containerRef} className="max-w-7xl mx-auto">
+        {/* Header with Title - Responsive text size */}
+        <div className="mb-4 md:mb-8">          
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Quản lý tất cả các cơ sở của bạn</h1>
+          <p className="text-sm sm:text-base text-gray-500 mt-2">Quản lý, theo dõi và cập nhật thông tin các cơ sở thể thao của bạn</p>
         </div>
 
-        {/* Search and Add Button */}
-        <div className="flex flex-col md:flex-row items-center justify-between mt-4 mb-8 gap-4">
-          <Input
-            placeholder="Tìm kiếm cơ sở theo tên, địa chỉ..."
-            prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
-            className="max-w-md"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            allowClear
-            size="large"
-          />
+        {/* Search and Add Button - Better stacking on mobile */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between mt-2 md:mt-4 mb-4 md:mb-8 gap-3">
+          <div className="flex-grow max-w-full sm:max-w-md">
+            <Input
+              placeholder="Tìm kiếm cơ sở theo tên, địa chỉ..."
+              prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
+              className="w-full"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              allowClear
+              size={containerWidth < 640 ? "middle" : "large"}
+            />
+          </div>
           
           <Button 
             type="primary" 
             icon={<PlusOutlined />} 
             onClick={handleCreateFacility}
-            size="large"
-            className="bg-blue-500"
+            size={containerWidth < 640 ? "middle" : "large"}
+            className="bg-blue-500 w-full sm:w-auto"
           >
             Thêm cơ sở mới
           </Button>
         </div>
         
-        {/* Filter Tabs */}
-        <div className="mb-8">
-          <Tabs 
-            activeKey={activeFilter} 
-            onChange={handleFilterClick}
-            type="card"
-            className="facility-filter-tabs"
-            items={tabItems}
-          />
+        {/* Filter Tabs - Responsive scrollable on mobile */}
+        <div className="mb-4 md:mb-8 overflow-x-auto -mx-3 px-3 pb-1">
+          <div className="min-w-max">
+            <Tabs 
+              activeKey={activeFilter} 
+              onChange={handleFilterClick}
+              type="card"
+              className="facility-filter-tabs"
+              items={tabItems}
+              size={containerWidth < 768 ? "small" : "middle"}
+            />
+          </div>
         </div>
         
-        {/* Facility Cards Grid */}
+        {/* Facility Cards Grid - Dynamic columns based on screen size */}
         {loading ? (
           <div className="flex justify-center items-center h-64 flex-col">
             <Spin size="large" />
@@ -278,19 +303,20 @@ const FacilityManagement: React.FC = () => {
           </div>
         ) : filteredFacilities.length > 0 ? (
           <>
-            <Row gutter={[24, 24]}>
+            <Row gutter={[16, 16]} className="facility-cards-grid">
               {filteredFacilities.map((facility) => (
-                <Col key={facility.id} xs={24} sm={12} lg={8}>
+                <Col key={facility.id} xs={24} sm={12} lg={8} xl={8}>
                   <Card 
                     hoverable
                     className="h-full shadow-sm hover:shadow-md transition-shadow"
                     cover={
-                      <div className="h-48 overflow-hidden relative">
+                      <div className="h-40 sm:h-48 overflow-hidden relative">
                         {facility.imagesUrl && facility.imagesUrl.length > 0 ? (
                           <img 
                             src={facility.imagesUrl[0]} 
                             alt={facility.name} 
                             className="w-full h-full object-cover transition-transform hover:scale-105"
+                            loading="lazy" // Cải thiện performance
                           />
                         ) : (
                           <div className="w-full h-full bg-gray-200 flex items-center justify-center">
@@ -308,6 +334,9 @@ const FacilityManagement: React.FC = () => {
                         </div>
                       </div>
                     }
+                    styles={{ 
+                      body: { padding: containerWidth < 640 ? '12px' : '16px' }
+                    }}
                     actions={[
                       <Tooltip title="Xem chi tiết">
                         <Button 
@@ -333,12 +362,12 @@ const FacilityManagement: React.FC = () => {
                       </Tooltip>
                     ]}
                   >
-                    <div className="p-2">
+                    <div className="p-1 sm:p-2">
                       {/* Tên cơ sở */}
-                      <h3 className="text-lg font-semibold line-clamp-2 mb-2">{facility.name}</h3>
+                      <h3 className="text-base sm:text-lg font-semibold line-clamp-2 mb-1 sm:mb-2">{facility.name}</h3>
                       
                       {/* Giờ hoạt động */}
-                      <div className="flex items-center text-gray-500 mb-2">
+                      <div className="flex items-center text-gray-500 mb-1 sm:mb-2 text-xs sm:text-sm">
                         <OperatingHoursDisplay facility={facility} />
                         
                         {/* Rating */}
@@ -349,23 +378,26 @@ const FacilityManagement: React.FC = () => {
                       </div>
                       
                       {/* Môn thể thao */}
-                      <div className="mb-3">
+                      <div className="mb-2 sm:mb-3">
                         <div className="flex flex-wrap gap-1">
-                          {facility.sports && facility.sports.map((sport) => (
-                            <Tag key={sport.id} color="blue">{getSportNameInVietnamese(sport.name)}</Tag>
+                          {facility.sports && facility.sports.slice(0, containerWidth < 380 ? 2 : 4).map((sport) => (
+                            <Tag key={sport.id} color="blue" className="text-xs sm:text-sm">{getSportNameInVietnamese(sport.name)}</Tag>
                           ))}
+                          {facility.sports && facility.sports.length > (containerWidth < 380 ? 2 : 4) && (
+                            <Tag className="text-xs sm:text-sm">+{facility.sports.length - (containerWidth < 380 ? 2 : 4)}</Tag>
+                          )}
                         </div>
                       </div>
                       
                       {/* Địa chỉ */}
-                      <div className="flex items-start mb-3 text-gray-600">
-                        <EnvironmentOutlined className="mr-2 mt-1 flex-shrink-0" />
-                        <p className="line-clamp-2 text-sm">{facility.location}</p>
+                      <div className="flex items-start mb-2 sm:mb-3 text-gray-600">
+                        <EnvironmentOutlined className="mr-1 sm:mr-2 mt-1 flex-shrink-0 text-xs sm:text-sm" />
+                        <p className="line-clamp-2 text-xs sm:text-sm">{facility.location}</p>
                       </div>
                       
                       {/* Khoảng giá */}
-                      <div className="flex items-center text-blue-600 font-medium">
-                        <DollarOutlined className="mr-2 text-green-600" />
+                      <div className="flex items-center text-blue-600 font-medium text-xs sm:text-sm">
+                        <DollarOutlined className="mr-1 sm:mr-2 text-green-600" />
                         {facility.minPrice !== undefined && facility.maxPrice !== undefined ? (
                           <>
                             <span className="text-blue-600 font-medium">
@@ -391,24 +423,26 @@ const FacilityManagement: React.FC = () => {
               ))}
             </Row>
             
-            {/* Pagination */}
-            <div className="mt-8 flex justify-center">
+            {/* Pagination - Responsive size and options */}
+            <div className="mt-6 sm:mt-8 flex justify-center overflow-x-auto py-2">
               <Pagination 
                 current={currentPage}
                 total={totalItems}
                 pageSize={pageSize}
                 onChange={handlePageChange}
-                showSizeChanger
-                pageSizeOptions={['9', '18', '36', '72']}
-                showTotal={(total) => `Tổng cộng ${total} cơ sở`}
+                showSizeChanger={containerWidth >= 640}
+                pageSizeOptions={['9', '18', '36']}
+                showTotal={(total) => containerWidth >= 640 ? `Tổng cộng ${total} cơ sở` : `${total} cơ sở`}
+                size={containerWidth < 640 ? "small" : "default"}
+                className="responsive-pagination"
               />
             </div>
           </>
         ) : (
-          <div className="bg-white rounded-lg shadow-sm p-12">
+          <div className="bg-white rounded-lg shadow-sm p-6 sm:p-12">
             <Empty 
               description={
-                <span className="text-gray-500">
+                <span className="text-gray-500 text-sm sm:text-base">
                   {searchQuery 
                     ? "Không tìm thấy cơ sở phù hợp với tìm kiếm của bạn" 
                     : activeFilter !== 'all'
@@ -417,6 +451,7 @@ const FacilityManagement: React.FC = () => {
                   }
                 </span>
               }
+              imageStyle={{ height: containerWidth < 640 ? 80 : 100 }}
             >
               {!searchQuery && activeFilter === 'all' && facilities.length === 0 && (
                 <Button 
@@ -424,6 +459,7 @@ const FacilityManagement: React.FC = () => {
                   icon={<PlusOutlined />} 
                   onClick={handleCreateFacility}
                   className="mt-4"
+                  size={containerWidth < 640 ? "middle" : "large"}
                 >
                   Thêm cơ sở mới
                 </Button>
@@ -432,14 +468,14 @@ const FacilityManagement: React.FC = () => {
           </div>
         )}
         
-        {/* Detail Modal */}
+        {/* Modal styles - Cải thiện trải nghiệm trên mobile */}
         <Modal
           title={null}
           open={detailModalVisible}
           onCancel={closeDetailModal}
           footer={null}
-          width={900}
-          style={{ top: 20 }}
+          width={containerWidth < 768 ? '95%' : 900}
+          style={{ top: containerWidth < 768 ? 10 : 20 }}
           styles={{ body: { padding: 0 } }}
           destroyOnClose
         >
@@ -455,14 +491,13 @@ const FacilityManagement: React.FC = () => {
           )}
         </Modal>
         
-        {/* Edit Modal */}
         <Modal
           title={null}
           open={editModalVisible}
           onCancel={() => closeEditModal()}
           footer={null}
-          width={800}
-          style={{ top: 20 }}
+          width={containerWidth < 768 ? '95%' : 800}
+          style={{ top: containerWidth < 768 ? 10 : 20 }}
           styles={{ body: { padding: 0 } }}
           destroyOnClose
         >
@@ -474,7 +509,6 @@ const FacilityManagement: React.FC = () => {
           )}
         </Modal>
         
-        {/* Delete Confirmation Modal */}
         <Modal
           title="Xác nhận xóa cơ sở"
           open={deleteModalVisible}
@@ -493,8 +527,9 @@ const FacilityManagement: React.FC = () => {
               Xóa
             </Button>,
           ]}
+          width={containerWidth < 480 ? '90%' : 'auto'}
         >
-          <p>Bạn có chắc chắn muốn xóa cơ sở này không? Hành động này không thể hoàn tác và sẽ xóa tất cả dữ liệu liên quan đến cơ sở.</p>
+          <p className="text-sm sm:text-base">Bạn có chắc chắn muốn xóa cơ sở này không? Hành động này không thể hoàn tác và sẽ xóa tất cả dữ liệu liên quan đến cơ sở.</p>
         </Modal>
       </div>
     </div>

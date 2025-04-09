@@ -19,3 +19,221 @@
   ::-webkit-scrollbar-thumb:hover {
     background: #555;
   }
+
+/* Custom scrollbar cho owner sidebar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(136, 136, 136, 0.5);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(85, 85, 85, 0.8);
+}
+
+/* Owner layout transitions */
+.owner-layout-transition {
+  transition-property: width, margin, padding;
+  transition-duration: 300ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Owner sidebar transition */
+@media (min-width: 768px) {
+  .sidebar-transition {
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: width;
+  }
+}
+
+/* FacilityManagement responsive styles */
+.facility-filter-tabs .ant-tabs-nav {
+  margin-bottom: 16px;
+}
+
+@media (max-width: 639px) {
+  .facility-filter-tabs .ant-tabs-nav-list {
+    flex-wrap: nowrap;
+  }
+  
+  .facility-filter-tabs .ant-tabs-tab {
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+  
+  .responsive-pagination .ant-pagination-item,
+  .responsive-pagination .ant-pagination-prev,
+  .responsive-pagination .ant-pagination-next {
+    margin: 0 2px;
+    min-width: 28px;
+    height: 28px;
+    line-height: 28px;
+  }
+  
+  .responsive-pagination .ant-pagination-item a {
+    padding: 0;
+  }
+}
+
+/* Fix for Ant Design tables on mobile */
+.ant-table-wrapper {
+  overflow-x: auto;
+}
+
+.ant-table-wrapper .ant-table {
+  min-width: 500px;
+}
+
+/* Fix for Ant Design form items on mobile */
+@media (max-width: 575px) {
+  .ant-form-item-label {
+    padding-bottom: 4px;
+  }
+  
+  .ant-form-item {
+    margin-bottom: 16px;
+  }
+}
+
+/* Review Management Page Styles */
+.review-table .ant-table-thead > tr > th {
+  white-space: nowrap;
+  background-color: #fafafa;
+}
+
+.review-table .ant-table-tbody > tr > td {
+  padding: 12px 8px;
+}
+
+/* Review Management Filter Styles */
+.review-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.review-filter-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.review-filter-label {
+  white-space: nowrap;
+  min-width: 80px;
+}
+
+@media (min-width: 768px) {
+  .review-filter-group {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .review-filter-item {
+    flex-direction: row;
+    align-items: center;
+    width: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .review-table .ant-table-thead > tr > th,
+  .review-table .ant-table-tbody > tr > td {
+    padding: 8px 4px;
+  }
+
+  .review-table .ant-table-cell {
+    font-size: 12px;
+  }
+
+  .review-table .ant-rate {
+    font-size: 14px;
+  }
+
+  .review-table .ant-avatar {
+    width: 24px;
+    height: 24px;
+  }
+
+  .review-table .ant-tag {
+    font-size: 10px;
+    padding: 0 4px;
+  }
+
+  /* Mobile filter adjustments */
+  .ant-space.ant-space-vertical {
+    width: 100%;
+  }
+
+  .ant-space-item {
+    width: 100%;
+  }
+
+  .ant-select {
+    width: 100% !important;
+  }
+
+  .ant-picker {
+    width: 100% !important;
+  }
+}
+
+/* Card hover effect */
+.ant-card {
+  transition: all 0.3s ease;
+}
+
+.ant-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Responsive spacing for mobile */
+@media (max-width: 576px) {
+  .ant-card-body {
+    padding: 12px;
+  }
+
+  .ant-statistic-title {
+    font-size: 12px;
+  }
+
+  .ant-statistic-content {
+    font-size: 20px;
+  }
+
+  .ant-tabs-nav {
+    margin-bottom: 12px;
+  }
+
+  .ant-tabs-tab {
+    padding: 8px 12px;
+  }
+
+  /* Additional mobile adjustments */
+  .ant-space {
+    gap: 8px !important;
+  }
+
+  .ant-form-item {
+    margin-bottom: 12px;
+  }
+
+  .ant-select-selector {
+    height: 32px !important;
+  }
+
+  .ant-input-search-button {
+    height: 32px !important;
+  }
+}

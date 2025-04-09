@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Select, Card, Typography, Modal, Input, Radio, message } from 'antd';
 import { PlusOutlined, ArrowRightOutlined, SearchOutlined } from '@ant-design/icons';
@@ -26,6 +26,8 @@ const SELECTED_FACILITY_KEY = 'owner_selected_facility_id';
 
 const ServiceManagement: React.FC = () => {
   const navigate = useNavigate();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState<number>(0);
   
   // Local state
   const [selectedFacilityId, setSelectedFacilityId] = useState<string>('');
@@ -44,8 +46,24 @@ const ServiceManagement: React.FC = () => {
   const [currentService, setCurrentService] = useState<Service | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [updatedValues, setUpdatedValues] = useState<UpdatedServiceValues | null>(null);
+
+  // Theo dõi kích thước màn hình
+  useEffect(() => {
+    const updateWidth = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.offsetWidth);
+      }
+    };
+
+    // Cập nhật ban đầu
+    updateWidth();
+
+    // Theo dõi thay đổi kích thước
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
+  }, []);
   
-  const itemsPerPage = 10;
+  const itemsPerPage = containerWidth < 640 ? 5 : 10;
 
   // Filter options - thay đổi từ status sang type
   const typeFilterOptions = [
@@ -159,6 +177,7 @@ const ServiceManagement: React.FC = () => {
       okText: 'Xóa',
       okType: 'danger',
       cancelText: 'Hủy',
+      width: containerWidth < 480 ? '95%' : 520,
       onOk: async () => {
         try {
           await serviceService.deleteService(serviceToDelete.id);
@@ -254,21 +273,23 @@ const ServiceManagement: React.FC = () => {
     setEditModalVisible(false);
   };
 
+  const isMobile = containerWidth <= 768;
+
   return (
-    <div className="p-6 md:p-8">
+    <div ref={containerRef} className="p-3 sm:p-4 md:p-6 bg-gray-50 min-h-screen">
       {/* Promotional Banner */}
-      <Card className="mb-8 overflow-hidden">
-        <div className="flex flex-col lg:flex-row justify-between gap-8">
+      <Card className="mb-4 md:mb-8 overflow-hidden">
+        <div className="flex flex-col lg:flex-row justify-between gap-4 md:gap-8">
           <div className="flex-1">
-            <Title level={2} style={{ fontSize: 26 }} className="text-xl md:text-2xl lg:text-3xl">
+            <Title level={2} className="text-lg sm:text-xl md:text-2xl lg:text-3xl !m-0 mb-2 sm:mb-4">
               Tạo ngay dịch vụ để tăng doanh thu cho cơ sở của bạn!!!
             </Title>
-            <Text className="block mb-8 text-gray-600">
+            <Text className="block mb-4 sm:mb-8 text-gray-600 text-sm sm:text-base">
               Cơ hội tăng đến 43% đơn đặt sân và 28% doanh thu khi tạo dịch vụ tiện ích cho Khách hàng.
             </Text>
             <Button 
               type="primary"
-              size="large"
+              size={isMobile ? "middle" : "large"}
               icon={<PlusOutlined />}
               onClick={handleCreateService}
               style={{ background: '#cc440a', display: 'flex', alignItems: 'center', width: 'fit-content' }}
@@ -276,7 +297,7 @@ const ServiceManagement: React.FC = () => {
               Tạo dịch vụ ngay <ArrowRightOutlined style={{ marginLeft: 8 }} />
             </Button>
           </div>
-          <div className="max-w-md">
+          <div className="lg:max-w-md max-w-xs mx-auto lg:mx-0">
             <img 
               src={serviceImage} 
               alt="Service illustration" 
@@ -287,15 +308,16 @@ const ServiceManagement: React.FC = () => {
       </Card>
 
       {/* Service List Section */}
-      <Card title="Danh sách dịch vụ" className="mb-8">
+      <Card title="Danh sách dịch vụ" className="mb-4 md:mb-8">
         {/* Facility selector */}
-        <div className="mb-6">
+        <div className="mb-4 md:mb-6">
           <Select
             placeholder="Chọn cơ sở của bạn"
             style={{ width: '100%' }}
             value={selectedFacilityId || undefined}
             onChange={handleFacilitySelect}
             popupMatchSelectWidth={false}
+            size={isMobile ? "middle" : "large"}
           >
             {facilities.map((facility) => (
               <Option key={facility.id} value={facility.id}>
@@ -306,65 +328,76 @@ const ServiceManagement: React.FC = () => {
         </div>
 
         {/* Search and filters */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-          <div className="overflow-x-auto w-full md:w-auto pb-2 md:pb-0">
-            <Radio.Group 
-              options={typeFilterOptions} 
-              onChange={e => setTypeFilter(e.target.value)} 
-              value={typeFilter}
-              optionType="button"
-              className="flex-nowrap"
-            />
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 md:mb-6 gap-3 md:gap-4">
+          <div className="w-full md:w-auto overflow-x-auto pb-2 md:pb-0 -mx-4 px-4 md:mx-0 md:px-0">
+            <div className="min-w-max">
+              <Radio.Group 
+                options={typeFilterOptions} 
+                onChange={e => setTypeFilter(e.target.value)} 
+                value={typeFilter}
+                optionType="button"
+                size={isMobile ? "small" : "middle"}
+                className="flex-nowrap"
+              />
+            </div>
           </div>
           
-          <Input
-            placeholder="Tìm kiếm dịch vụ"
-            prefix={<SearchOutlined />}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ maxWidth: 300, width: '100%' }}
-          />
+          <div className="w-full md:w-auto">
+            <Input
+              placeholder="Tìm kiếm dịch vụ"
+              prefix={<SearchOutlined />}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full md:w-[300px]"
+              size={isMobile ? "middle" : "large"}
+            />
+          </div>
         </div>
 
         {/* Conditional rendering based on state */}
         {!selectedFacilityId ? (
-          <div className="flex flex-col items-center justify-center h-64 bg-white rounded-lg p-6">
-            <p className="text-lg text-gray-600 mb-4">Vui lòng chọn cơ sở để xem danh sách dịch vụ</p>
+          <div className="flex flex-col items-center justify-center h-40 sm:h-64 bg-white rounded-lg p-4 md:p-6">
+            <p className="text-base md:text-lg text-gray-600 mb-4 text-center">Vui lòng chọn cơ sở để xem danh sách dịch vụ</p>
           </div>
         ) : error ? (
-          <div className="p-4 bg-red-100 text-red-700 rounded-lg">
+          <div className="p-4 bg-red-100 text-red-700 rounded-lg text-sm md:text-base">
             {error}
           </div>
         ) : loading ? (
-          <div className="flex justify-center items-center h-64">
-            <p className="text-lg">Đang tải dữ liệu...</p>
+          <div className="flex justify-center items-center h-40 sm:h-64">
+            <p className="text-base md:text-lg">Đang tải dữ liệu...</p>
           </div>
         ) : filteredServices.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 bg-white rounded-lg p-6">
-            <p className="text-lg text-gray-600 mb-4">Chưa có dịch vụ nào</p>
+          <div className="flex flex-col items-center justify-center h-40 sm:h-64 bg-white rounded-lg p-4 md:p-6">
+            <p className="text-base md:text-lg text-gray-600 mb-4 text-center">Chưa có dịch vụ nào</p>
             <Button
               type="primary"
               icon={<PlusOutlined />}
               onClick={handleCreateService}
+              size={isMobile ? "middle" : "large"}
             >
               Thêm dịch vụ mới
             </Button>
           </div>
         ) : (
-          <ServiceTable
-            services={currentServices}
-            loading={loading}
-            onDelete={handleDeleteService}
-            onView={handleViewService}
-            onEdit={handleEditService}
-            pagination={{
-              current: currentPage,
-              total: totalServices,
-              pageSize: itemsPerPage,
-              onChange: (page: number) => setCurrentPage(page),
-              showSizeChanger: false
-            }}
-          />
+          <div className="overflow-x-auto -mx-4 px-4 sm:-mx-0 sm:px-0">
+            <div className="min-w-[650px]">
+              <ServiceTable
+                services={currentServices}
+                loading={loading}
+                onDelete={handleDeleteService}
+                onView={handleViewService}
+                onEdit={handleEditService}
+                pagination={{
+                  current: currentPage,
+                  total: totalServices,
+                  pageSize: itemsPerPage,
+                  onChange: (page: number) => setCurrentPage(page),
+                  showSizeChanger: false
+                }}
+              />
+            </div>
+          </div>
         )}
       </Card>
 

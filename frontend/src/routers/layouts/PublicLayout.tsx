@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom';
 import React, { Suspense } from 'react';
 import Header from '@/components/Player/Header';
 import Footer from '@/components/Player/Footer';
+import ChatWidget from '@/components/Chat/ChatWidget';
 
 const Loading = () => (
   <div className="flex items-center justify-center h-screen">
@@ -12,10 +13,13 @@ const Loading = () => (
 export const PublicLayout: React.FC = () => {
   return (
     <Suspense fallback={<Loading />}>
-      <div className="font-main overflow-x-hidden relative">
+      <div className="font-main min-h-screen flex flex-col">
         <Header />
-        <Outlet />
+        <main className="flex-grow">
+          <Outlet />
+        </main>
         <Footer />
+        <ChatWidget />
       </div>
     </Suspense>
   );

@@ -12,14 +12,11 @@ export const mockServices: Service[] = [
       id: 1,
       name: 'Bóng đá'
     },
-    status: 'available',
     unit: 'giờ',
-    serviceType: 'rental',
+    type: 'rental',
+    bookedCountOnDate: 10,
     facilityId: '1',
-    inUseCount: 10,
     bookedCount: 120,
-    lastUpdated: new Date('2023-10-15'),
-    popularityScore: 85
   },
   {
     id: 2,
@@ -31,14 +28,11 @@ export const mockServices: Service[] = [
       id: 1,
       name: 'Bóng đá'
     },
-    status: 'available',
     unit: 'giờ',
-    serviceType: 'rental',
+    type: 'rental',
+    bookedCountOnDate: 10,
     facilityId: '1',
-    inUseCount: 8,
     bookedCount: 95,
-    lastUpdated: new Date('2023-10-12'),
-    popularityScore: 75
   },
   {
     id: 3,
@@ -50,14 +44,11 @@ export const mockServices: Service[] = [
       id: 2,
       name: 'Bóng rổ'
     },
-    status: 'available',
     unit: 'chai',
-    serviceType: 'food',
+    type: 'food',
+    bookedCountOnDate: 10,
     facilityId: '3',
-    inUseCount: 0,
     bookedCount: 210,
-    lastUpdated: new Date('2023-10-20'),
-    popularityScore: 90
   },
   {
     id: 4,
@@ -69,14 +60,11 @@ export const mockServices: Service[] = [
       id: 3,
       name: 'Tennis'
     },
-    status: 'low_stock',
     unit: 'giờ',
-    serviceType: 'rental',
+    type: 'rental',
     facilityId: '2',
-    inUseCount: 15,
+    bookedCountOnDate: 15,
     bookedCount: 180,
-    lastUpdated: new Date('2023-10-18'),
-    popularityScore: 92
   },
   {
     id: 5,
@@ -88,14 +76,11 @@ export const mockServices: Service[] = [
       id: 3,
       name: 'Tennis'
     },
-    status: 'available',
     unit: 'giờ',
-    serviceType: 'rental',
+    type: 'rental',
     facilityId: '2',
-    inUseCount: 30,
+    bookedCountOnDate: 30,
     bookedCount: 250,
-    lastUpdated: new Date('2023-10-19'),
-    popularityScore: 88
   },
   {
     id: 6,
@@ -107,14 +92,11 @@ export const mockServices: Service[] = [
       id: 3,
       name: 'Tennis'
     },
-    status: 'available',
     unit: 'buổi',
-    serviceType: 'coaching',
+    type: 'coaching',
     facilityId: '2',
-    inUseCount: 2,
+    bookedCountOnDate: 2,
     bookedCount: 45,
-    lastUpdated: new Date('2023-10-05'),
-    popularityScore: 70
   },
   {
     id: 7,
@@ -126,13 +108,10 @@ export const mockServices: Service[] = [
       id: 4,
       name: 'Bóng đá'
     },
-    status: 'low_stock',
     unit: 'buổi',
-    serviceType: 'other',
+    type: 'other',
     facilityId: '1',
-    inUseCount: 3,
+    bookedCountOnDate: 3,
     bookedCount: 78,
-    lastUpdated: new Date('2023-10-10'),
-    popularityScore: 65
   }
 ];

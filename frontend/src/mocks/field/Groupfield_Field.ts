@@ -99,7 +99,7 @@ export const mockFieldGroups: FieldGroup[] = [
         name: 'Bóng đá',
       }
     ],
-    facilityId: '2'
+    facilityId: '1'
   },
   {
     id: '3',
@@ -139,6 +139,6 @@ export const mockFieldGroups: FieldGroup[] = [
         name: 'Bóng rổ',
       }
     ],
-    facilityId: '3'
+    facilityId: '2'
   }
 ];

@@ -3,6 +3,7 @@ import { Table, Space, Button, Tooltip, Tag, Typography, Dropdown } from 'antd';
 import { EditOutlined, DeleteOutlined, EyeOutlined, PlusCircleOutlined } from '@ant-design/icons';
 import { FieldGroup, Field } from '@/types/field.type';
 import { getStatusTag, formatPrice, formatTime } from '@/utils/statusUtils';
+import { getSportNameInVietnamese } from '@/utils/translateSport';
 
 const { Text } = Typography;
 
@@ -90,7 +91,7 @@ const FieldGroupTable: React.FC<FieldGroupTableProps> = ({
           color="blue" 
           style={{ margin: '2px', borderRadius: '4px', padding: '2px 8px' }}
         >
-          {sports[0].name}
+          {getSportNameInVietnamese(sports[0].name)}
         </Tag>
       );
     }
@@ -106,7 +107,7 @@ const FieldGroupTable: React.FC<FieldGroupTableProps> = ({
                 color="blue" 
                 style={{ margin: '2px', borderRadius: '4px', padding: '2px 8px' }}
               >
-                {sport.name}
+                {getSportNameInVietnamese(sport.name)}
               </Tag>
             ),
           })),

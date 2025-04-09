@@ -15,15 +15,22 @@ export enum RecurringType {
   NONE = 'none',
   DAILY = 'daily',
   WEEKLY = 'weekly',
-  MONTHLY = 'monthly'
+  MONTHLY_BY_DAY = 'monthly_by_day',
+  MONTHLY_BY_DATE = 'monthly_by_date',
+  YEARLY = 'yearly',
+  CUSTOM = 'custom',
+  SAME_WEEK = 'same_week'
 }
 
 export interface RecurringConfig {
   type: RecurringType;
   startDate: Dayjs;
-  endDate: Dayjs;
+  endDate?: Dayjs;
   daysOfWeek?: number[]; // 0-6 for Sunday-Saturday
   daysOfMonth?: number[]; // 1-31
+  frequency?: number; // For every X days/weeks/months
+  endType?: 'never' | 'on_date' | 'after_occurrences';
+  endOccurrences?: number;
 }
 
 export interface BookingSlot {
@@ -76,8 +83,10 @@ export interface BookingFormData {
   }[];
   paymentMethod: 'banking' | 'momo' | 'vnpay' | 'cash';
   voucherCode?: string;
+  voucherId?: number;
   isRecurring: boolean;
   recurringConfig?: RecurringConfig;
+  recurringOption?: string;
 }
 
 export interface BookingSummary {

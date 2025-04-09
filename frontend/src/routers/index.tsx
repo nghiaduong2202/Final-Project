@@ -11,15 +11,22 @@ import HomePage from '@/pages/Public/Home';
 import UserProfile from '@/pages/Public/UserProfile';
 import DetailFacility from '@/pages/Public/DetailFacility';
 import ResultSearch from '@/pages/Public/ResultSearch';
+import HelpCenter from '@/pages/Public/HelpCenter';
+import FAQ from '@/pages/Public/FAQ';
+import ContactSupport from '@/pages/Public/ContactSupport';
+import EventList from '@/pages/Public/EventList';
 
 // Player pages
-import BookingPage from '@/pages/Player/Booking';
-import HistoryBooking from '@/pages/Player/HistoryBooking';
-// import ResultBooking from '@/pages/Player/ResutlBooking';
+import BookingPage from '@/pages/Player/Booking/Booking';
+import HistoryBooking from '@/pages/Player/HistoryBooking/HistoryBooking';
+import BookingDetail from '@/pages/Player/BookingDetail/BookingDetail';
+import BookingReview from '@/pages/Player/BookingReview/BookingReview';
 // import ResultBookingVNPay from '@/pages/Player/ResultBookingVNPay';
 
 // Owner pages
 import PlaySchedule from '@/pages/Owner/PlaySchedule/PLaySchedule';
+import Dashboard from '@/pages/Owner/Dashboard/Dashboard';
+import SupportContact from '@/pages/Owner/SupportContact/SupportContact';
 
 import FacilityManagement from '@/pages/Owner/FacilityManagement/FacilityManagement';
 import CreateFacility from '@/pages/Owner/FacilityManagement/CreateFacility/CreateFacility';
@@ -40,9 +47,9 @@ import Banking from '@/pages/Owner/Banking/Banking';
 
 import ChatManagement from '@/pages/Owner/ChatManagement/ChatManagement';
 
-// import ReportManagement from '@/pages/Owner/ReportManagement/ReportManagement';
+import ReportManagement from '@/pages/Owner/ReportManagement/ReportManagement';
 
-// import ReviewManagement from '@/pages/Owner/ReviewManagement/ReviewManagement';
+import ReviewManagement from '@/pages/Owner/ReviewManagement/ReviewManagement';
 
 
 
@@ -56,6 +63,11 @@ const AppRouter: React.FC = () => {
         <Route path='/' element={<HomePage />} />
         <Route path='/facility/:facilityId' element={<DetailFacility />} />
         <Route path='/result-search' element={<ResultSearch />} />
+        <Route path='/help-center' element={<HelpCenter />} />
+        <Route path='/faq' element={<FAQ />} />
+        <Route path='/contact-support' element={<ContactSupport />} />
+        <Route path='/events' element={<EventList />} />
+        <Route path='/error' element={<ErrorPage />} />
       </Route> 
 
       {/* player routes */}
@@ -66,7 +78,8 @@ const AppRouter: React.FC = () => {
       }>
         <Route path='/user/booking/:facilityId' element={<BookingPage />} />
         <Route path='/user/history-booking' element={<HistoryBooking />} />
-        {/* <Route path='/user/booking/result-booking/:bookingId' element={<ResultBooking />} /> */}
+        <Route path='/user/booking/detail/:bookingId' element={<BookingDetail />} />
+        <Route path='/user/booking/review/:bookingId' element={<BookingReview />} />        
         {/* <Route path='/user/booking/result-booking-vnpay' element={<ResultBookingVNPay />} /> */}
         <Route path='/user/profile' element={<UserProfile />} />
       </Route>
@@ -78,6 +91,7 @@ const AppRouter: React.FC = () => {
         </ProtectedRoute>
       }>
         <Route path='/owner' element={<PlaySchedule />} />
+        <Route path='/owner/dashboard' element={<Dashboard />} />
 
         <Route path='/owner/facility-management' element={<FacilityManagement />} />
         <Route path='/owner/create-facility' element={<CreateFacility />} />           
@@ -94,13 +108,14 @@ const AppRouter: React.FC = () => {
         <Route path='/owner/event-management' element={<EventManagement />} />
         <Route path='/owner/create-event' element={<CreateEvent />} />  
 
-        {/* <Route path='/owner/review-management' element={<ReviewManagement />} />   */}
+        <Route path='/owner/review-management' element={<ReviewManagement />} />  
 
         <Route path='/owner/banking' element={<Banking />} />
 
         <Route path='/owner/chat' element={<ChatManagement />} />
+        <Route path='/owner/support' element={<SupportContact />} />
 
-        {/* <Route path='/owner/report-management' element={<ReportManagement />} />            */}
+        <Route path='/owner/report-management' element={<ReportManagement />} />           
                 
         <Route path='/owner/profile' element={<UserProfile />} />
       </Route>

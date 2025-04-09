@@ -234,12 +234,17 @@ class FacilityService {
   // Check if a facility name already exists
   async checkFacilityNameExists(name: string): Promise<FacilityNameCheckResponse> {
     try {
-      const response = await api.get('/facility/check-name', {
-        params: { name }
-      });
-      return response.data;
+      // Fetch all facilities from dropdown
+      const facilities = await this.getFacilitiesDropdown();
+      
+      // Check if any facility has the same name (case insensitive)
+      const exists = facilities.some(
+        facility => facility.name.toLowerCase() === name.toLowerCase()
+      );
+      
+      return { exists };
     } catch (error) {
-      console.error('API call failed:', error);
+      console.error('Name check failed:', error);
       throw error;
     }
   }

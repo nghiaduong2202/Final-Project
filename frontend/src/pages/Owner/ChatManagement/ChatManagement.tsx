@@ -1,209 +1,526 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Badge, 
+  Button, 
+  Input, 
+  Avatar, 
+  Empty, 
+  Dropdown, 
+  Tooltip, 
+  Tabs, 
+  Card,
+  Typography,
+  Space
+} from 'antd';
+import { 
+  SearchOutlined, 
+  SendOutlined, 
+  SmileOutlined, 
+  PictureOutlined,
+  PushpinOutlined,
+  MoreOutlined,
+  UserOutlined,
+  EllipsisOutlined,
+  DeleteOutlined,
+  CheckOutlined,
+  ShopOutlined
+} from '@ant-design/icons';
+import './ChatManagement.css';
+
+const { Title, Text } = Typography;
 
 interface Message {
   id: string;
+  conversationId: string;
   senderId: string;
-  senderName: string;
-  senderAvatar: string;
+  senderName?: string;
+  senderAvatar?: string;
   content: string;
   timestamp: string;
-  isAudio?: boolean;
-  audioDuration?: string;
+  isRead: boolean;
 }
 
+interface Conversation {
+  id: string;
+  name: string;
+  avatar: string;
+  lastMessage: string;
+  lastMessageTime: string;
+  unreadCount: number;
+  isSaved: boolean;
+  facility?: string;
+}
+
+const mockConversations: Conversation[] = [
+  {
+    id: '1',
+    name: 'Nguyễn Tuấn Anh',
+    avatar: 'https://randomuser.me/api/portraits/men/32.jpg',
+    lastMessage: 'Tôi muốn đặt sân ngày mai có được không?',
+    lastMessageTime: '2023-07-10T14:30:00',
+    unreadCount: 3,
+    isSaved: true,
+    facility: 'Sân bóng đá Mini 5v5'
+  },
+  {
+    id: '2',
+    name: 'Trần Thị Hoa',
+    avatar: 'https://randomuser.me/api/portraits/women/44.jpg',
+    lastMessage: 'Sân có mở cửa vào chủ nhật không?',
+    lastMessageTime: '2023-07-09T18:45:00',
+    unreadCount: 0,
+    isSaved: false,
+    facility: 'Sân cầu lông số 3'
+  },
+  {
+    id: '3',
+    name: 'Phạm Văn Đức',
+    avatar: 'https://randomuser.me/api/portraits/men/62.jpg',
+    lastMessage: 'Cảm ơn bạn đã hỗ trợ!',
+    lastMessageTime: '2023-07-08T09:15:00',
+    unreadCount: 0,
+    isSaved: false,
+    facility: 'Sân bóng đá 7v7'
+  },
+  {
+    id: '4',
+    name: 'Lê Minh Tâm',
+    avatar: 'https://randomuser.me/api/portraits/women/22.jpg',
+    lastMessage: 'Tôi sẽ đến vào lúc 7h tối',
+    lastMessageTime: '2023-07-07T20:30:00',
+    unreadCount: 1,
+    isSaved: true,
+    facility: 'Sân cầu lông số 1'
+  },
+  {
+    id: '5',
+    name: 'Hoàng Quốc Bảo',
+    avatar: 'https://randomuser.me/api/portraits/men/36.jpg',
+    lastMessage: 'Giá thuê sân trong bao lâu vậy?',
+    lastMessageTime: '2023-07-06T15:20:00',
+    unreadCount: 0,
+    isSaved: false,
+    facility: 'Sân bóng rổ'
+  }
+];
+
+const mockMessages: Message[] = [
+  {
+    id: 'm1',
+    conversationId: '1',
+    senderId: 'customer',
+    content: 'Xin chào! Tôi muốn đặt sân ngày mai, cụ thể là sân bóng đá Mini 5v5 từ 18h-20h có được không?',
+    timestamp: '2023-07-10T14:30:00',
+    isRead: false
+  },
+  {
+    id: 'm2',
+    conversationId: '1',
+    senderId: 'owner',
+    content: 'Chào bạn! Cảm ơn bạn đã liên hệ với chúng tôi. Để mình kiểm tra lịch đặt sân ngay.',
+    timestamp: '2023-07-10T14:35:00',
+    isRead: true
+  },
+  {
+    id: 'm3',
+    conversationId: '1',
+    senderId: 'owner',
+    content: 'Sân bóng đá Mini 5v5 vào ngày mai từ 18h-20h vẫn còn trống. Bạn có muốn đặt luôn không?',
+    timestamp: '2023-07-10T14:38:00',
+    isRead: true
+  },
+  {
+    id: 'm4',
+    conversationId: '1',
+    senderId: 'customer',
+    content: 'Tốt quá! Vâng, tôi muốn đặt ngay. Giá thuê sân là bao nhiêu vậy?',
+    timestamp: '2023-07-10T14:40:00',
+    isRead: false
+  },
+  {
+    id: 'm5',
+    conversationId: '1',
+    senderId: 'customer',
+    content: 'Và tôi có thể thanh toán qua hình thức nào?',
+    timestamp: '2023-07-10T14:41:00',
+    isRead: false
+  },
+  {
+    id: 'm6',
+    conversationId: '2',
+    senderId: 'customer',
+    content: 'Xin chào, sân có mở cửa vào chủ nhật không?',
+    timestamp: '2023-07-09T18:45:00',
+    isRead: true
+  },
+  {
+    id: 'm7',
+    conversationId: '2',
+    senderId: 'owner',
+    content: 'Chào bạn, sân chúng tôi mở cửa tất cả các ngày trong tuần từ 6h sáng đến 22h tối.',
+    timestamp: '2023-07-09T18:50:00',
+    isRead: true
+  },
+  {
+    id: 'm8',
+    conversationId: '4',
+    senderId: 'customer',
+    content: 'Tôi đã đặt sân cầu lông số 1 vào tối nay. Tôi sẽ đến vào lúc 7h tối.',
+    timestamp: '2023-07-07T20:30:00',
+    isRead: false
+  }
+];
+
 const ChatManagement: React.FC = () => {
-  const [selectedUser, setSelectedUser] = useState<string | null>(null);
-  const [messageInput, setMessageInput] = useState('');
+  const [currentTab, setCurrentTab] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeConversation, setActiveConversation] = useState<string | null>(null);
+  const [currentMessage, setCurrentMessage] = useState('');
+  const [conversations, setConversations] = useState<Conversation[]>(mockConversations);
+  const [messages, setMessages] = useState<Message[]>(mockMessages);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   
-  const messages: Message[] = [
-    {
-      id: '1',
-      senderId: 'ANH-2607',
-      senderName: 'Nguyễn Tuấn Anh',
-      senderAvatar: '/path-to-avatar.jpg',
-      content: 'Xin chào! tôi là nguyễn tuấn anh, tôi muốn đặt sân này, không biết phải làm sao?',
-      timestamp: '05:30 PM'
-    },
-    {
-      id: '2',
-      senderId: 'OWNER',
-      senderName: 'Owner',
-      senderAvatar: '/path-to-owner-avatar.jpg',
-      content: 'Hello! xin chào bạn, rất vui được gặp bạn!',
-      timestamp: '04:45 PM'
-    },
-    // ... more messages
-  ];
+  // Scroll to bottom when messages change or conversation is opened
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, activeConversation]);
+
+  const handleSendMessage = () => {
+    if (!currentMessage.trim() || !activeConversation) return;
+    
+    const newMessage: Message = {
+      id: `msg-${Date.now()}`,
+      conversationId: activeConversation,
+      senderId: 'owner',
+      content: currentMessage,
+      timestamp: new Date().toISOString(),
+      isRead: true,
+    };
+    
+    setMessages([...messages, newMessage]);
+    setCurrentMessage('');
+    
+    // Update conversation's last message
+    setConversations(prev => prev.map((conv: Conversation) => 
+      conv.id === activeConversation 
+        ? { ...conv, lastMessage: currentMessage, lastMessageTime: new Date().toISOString() } 
+        : conv
+    ));
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleSendMessage();
+    }
+  };
+
+  const filteredConversations = conversations.filter((conv: Conversation) => {
+    // Filter by search query
+    const matchesSearch = searchQuery === '' || 
+      conv.name.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    // Filter by tab
+    if (currentTab === 'unread') {
+      return matchesSearch && conv.unreadCount > 0;
+    } else if (currentTab === 'saved') {
+      return matchesSearch && conv.isSaved;
+    }
+    
+    return matchesSearch;
+  });
+
+  const conversationMessages = messages.filter((msg: Message) => 
+    msg.conversationId === activeConversation
+  );
+
+  const markAsRead = (conversationId: string) => {
+    setConversations(prev => prev.map((conv: Conversation) => 
+      conv.id === conversationId 
+        ? { ...conv, unreadCount: 0 } 
+        : conv
+    ));
+
+    setMessages(prev => prev.map((msg: Message) => 
+      msg.conversationId === conversationId 
+        ? { ...msg, isRead: true } 
+        : msg
+    ));
+  };
+
+  const handleConversationClick = (conversationId: string) => {
+    setActiveConversation(conversationId);
+    markAsRead(conversationId);
+  };
+
+  const getCurrentConversation = () => {
+    return conversations.find(c => c.id === activeConversation);
+  };
+
+  const handleTabChange = (key: string) => {
+    setCurrentTab(key);
+  };
 
   return (
-    <div className="h-screen flex">
-      {/* Left Sidebar - Chat List */}
-      <div className="w-1/3 border-r bg-white">
-        <div className="p-4 border-b">
-          <select className="w-full p-2 border rounded-lg">
-            <option>Tất cả tin nhắn</option>
-          </select>
-        </div>
+    <div className="chat-management-container">
+      <Card className="chat-management-card">
+        <Title level={4}>Quản lý tin nhắn</Title>
+        <Text type="secondary" className="subtitle">
+          Quản lý tất cả các cuộc trò chuyện với khách hàng của bạn
+        </Text>
         
-        <div className="p-4">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Tìm kiếm tin nhắn"
-              className="w-full p-2 pl-8 border rounded-lg"
+        <div className="chat-dashboard">
+          <div className="chat-sidebar">
+            <Tabs 
+              activeKey={currentTab} 
+              onChange={handleTabChange}
+              className="chat-tabs"
+              items={[
+                {
+                  key: 'all',
+                  label: 'Tất cả',
+                  children: null
+                },
+                {
+                  key: 'unread',
+                  label: (
+                    <Badge count={conversations.filter(c => c.unreadCount > 0).length} size="small">
+                      Chưa đọc
+                    </Badge>
+                  ),
+                  children: null
+                },
+                {
+                  key: 'saved',
+                  label: 'Đã ghim',
+                  children: null
+                }
+              ]}
             />
-            <svg className="w-4 h-4 absolute left-2 top-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </div>
-        </div>
-
-        {/* Chat List */}
-        <div className="overflow-y-auto">
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`p-4 border-b hover:bg-gray-50 cursor-pointer ${
-                selectedUser === message.senderId ? 'bg-blue-50' : ''
-              }`}
-              onClick={() => setSelectedUser(message.senderId)}
-            >
-              <div className="flex items-center gap-3">
-                <img
-                  src={message.senderAvatar}
-                  alt=""
-                  className="w-10 h-10 rounded-full"
-                />
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-medium">{message.senderName}</h3>
-                    <span className="text-sm text-gray-500">{message.timestamp}</span>
-                  </div>
-                  <p className="text-sm text-gray-600 truncate">{message.content}</p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Right Side - Chat Window */}
-      <div className="flex-1 flex flex-col bg-gray-50">
-        {selectedUser ? (
-          <>
-            {/* Chat Header */}
-            <div className="p-4 border-b bg-white flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                <img
-                  src="/path-to-selected-user-avatar.jpg"
-                  alt=""
-                  className="w-10 h-10 rounded-full"
-                />
-                <h2 className="font-medium">Nguyễn Tuấn Anh</h2>
-              </div>
-              <div className="flex gap-2">
-                <button className="p-2">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h.01M17 21h.01M12 17h.01M12 21h.01M7 17h.01M7 21h.01M3 13v8h18v-8M3 8h18v5H3V8zm0-5h18v5H3V3z" />
-                  </svg>
-                </button>
-                <button className="p-2">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                  </svg>
-                </button>
-                <button className="p-2">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                  </svg>
-                </button>
-              </div>
+            
+            <div className="chat-filter">
+              <Input 
+                placeholder="Tìm kiếm theo tên khách hàng" 
+                prefix={<SearchOutlined />}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="search-input"
+              />
             </div>
 
-            {/* Chat Messages */}
-            <div className="flex-1 overflow-y-auto p-4">
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex mb-4 ${
-                    message.senderId === 'OWNER' ? 'justify-end' : 'justify-start'
-                  }`}
-                >
-                  <div
-                    className={`max-w-[70%] rounded-lg p-3 ${
-                      message.senderId === 'OWNER'
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-white'
-                    }`}
+            <div className="chat-list">
+              {filteredConversations.length > 0 ? (
+                filteredConversations.map(conversation => (
+                  <div 
+                    key={conversation.id} 
+                    className={`chat-item ${activeConversation === conversation.id ? 'active' : ''} ${conversation.unreadCount > 0 ? 'unread' : ''}`}
+                    onClick={() => handleConversationClick(conversation.id)}
                   >
-                    {message.isAudio ? (
-                      <div className="flex items-center gap-2">
-                        <button className="p-1 rounded-full bg-white">
-                          <svg className="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" />
-                          </svg>
-                        </button>
-                        <div className="flex-1">
-                          <div className="h-1 bg-white/30 rounded">
-                            <div className="h-full w-1/3 bg-white rounded"></div>
-                          </div>
-                        </div>
-                        <span className="text-sm">{message.audioDuration}</span>
+                    <Badge count={conversation.unreadCount} size="small" className="badge-notify">
+                      <Avatar src={conversation.avatar} size={40} icon={<UserOutlined />} />
+                    </Badge>
+                    <div className="chat-item-content">
+                      <div className="chat-item-header">
+                        <span className="chat-item-name">{conversation.name}</span>
+                        <span className="chat-item-time">
+                          {new Date(conversation.lastMessageTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        </span>
                       </div>
-                    ) : (
-                      <p>{message.content}</p>
-                    )}
-                    <div className={`text-xs mt-1 ${
-                      message.senderId === 'OWNER' ? 'text-white/70' : 'text-gray-500'
-                    }`}>
-                      {message.timestamp}
+                      <div className="chat-item-facility">{conversation.facility}</div>
+                      <div className="chat-item-message">
+                        {conversation.lastMessage}
+                      </div>
+                    </div>
+                    <Dropdown menu={{ 
+                      items: [
+                        { 
+                          key: '1', 
+                          label: 'Đánh dấu đã đọc',
+                          icon: <CheckOutlined />,
+                          onClick: (e) => {
+                            e.domEvent.stopPropagation();
+                            markAsRead(conversation.id);
+                          }
+                        },
+                        { 
+                          key: '2', 
+                          label: conversation.isSaved ? 'Bỏ ghim' : 'Ghim trò chuyện',
+                          icon: <PushpinOutlined />,
+                          onClick: (e) => {
+                            e.domEvent.stopPropagation();
+                            setConversations(prev => prev.map((conv: Conversation) => 
+                              conv.id === conversation.id 
+                                ? { ...conv, isSaved: !conv.isSaved } 
+                                : conv
+                            ));
+                          }
+                        },
+                        { 
+                          key: '3', 
+                          label: 'Xóa trò chuyện',
+                          icon: <DeleteOutlined />,
+                          danger: true,
+                          onClick: (e) => {
+                            e.domEvent.stopPropagation();
+                            setConversations(prev => 
+                              prev.filter((conv: Conversation) => conv.id !== conversation.id)
+                            );
+                            if (activeConversation === conversation.id) {
+                              setActiveConversation(null);
+                            }
+                          }
+                        },
+                      ] 
+                    }} trigger={['click']} placement="bottomRight">
+                      <Button 
+                        type="text" 
+                        icon={<EllipsisOutlined />} 
+                        onClick={(e) => e.stopPropagation()}
+                        className="chat-item-more"
+                      />
+                    </Dropdown>
+                  </div>
+                ))
+              ) : (
+                <Empty 
+                  description="Không tìm thấy cuộc trò chuyện nào" 
+                  image={Empty.PRESENTED_IMAGE_SIMPLE} 
+                />
+              )}
+            </div>
+          </div>
+
+          <div className="chat-conversation-wrapper">
+            {activeConversation ? (
+              <div className="chat-conversation">
+                <div className="conversation-header">
+                  <div className="conversation-info">
+                    <Avatar 
+                      src={getCurrentConversation()?.avatar} 
+                      size="small" 
+                      icon={<UserOutlined />}
+                      className="header-avatar"
+                    />
+                    <div className="header-info">
+                      <span className="conversation-name">
+                        {getCurrentConversation()?.name}
+                      </span>
+                      <span className="conversation-facility">
+                        {getCurrentConversation()?.facility}
+                      </span>
                     </div>
                   </div>
+                  <Dropdown menu={{ 
+                    items: [
+                      { 
+                        key: '1', 
+                        label: 'Đánh dấu đã đọc',
+                        icon: <CheckOutlined />,
+                        onClick: () => {
+                          if (activeConversation) {
+                            markAsRead(activeConversation);
+                          }
+                        }
+                      },
+                      { 
+                        key: '2', 
+                        label: getCurrentConversation()?.isSaved ? 'Bỏ ghim' : 'Ghim trò chuyện',
+                        icon: <PushpinOutlined />,
+                        onClick: () => {
+                          if (activeConversation) {
+                            setConversations(prev => prev.map((conv: Conversation) => 
+                              conv.id === activeConversation 
+                                ? { ...conv, isSaved: !conv.isSaved } 
+                                : conv
+                            ));
+                          }
+                        }
+                      },
+                      { 
+                        key: '3', 
+                        label: 'Xóa trò chuyện',
+                        icon: <DeleteOutlined />,
+                        danger: true,
+                        onClick: () => {
+                          if (activeConversation) {
+                            setConversations(prev => 
+                              prev.filter((conv: Conversation) => conv.id !== activeConversation)
+                            );
+                            setActiveConversation(null);
+                          }
+                        }
+                      },
+                    ] 
+                  }} placement="bottomRight">
+                    <Button type="text" icon={<MoreOutlined />} />
+                  </Dropdown>
                 </div>
-              ))}
-            </div>
 
-            {/* Chat Input */}
-            <div className="p-4 bg-white border-t">
-              <div className="flex items-center gap-2">
-                <button className="p-2 hover:bg-gray-100 rounded-full">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </button>
-                <div className="flex-1 flex items-center gap-2 border rounded-lg px-3 py-2">
-                  <input
-                    type="text"
-                    placeholder="Type your message here ..."
-                    className="flex-1 outline-none"
-                    value={messageInput}
-                    onChange={(e) => setMessageInput(e.target.value)}
-                  />
-                  <button className="p-2 hover:bg-gray-100 rounded-full">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                    </svg>
-                  </button>
+                <div className="messages-container">
+                  {conversationMessages.map(msg => (
+                    <div 
+                      key={msg.id} 
+                      className={`message ${msg.senderId === 'owner' ? 'sent' : 'received'}`}
+                    >
+                      {msg.senderId !== 'owner' && (
+                        <Avatar 
+                          src={getCurrentConversation()?.avatar} 
+                          size="small"
+                          icon={<UserOutlined />}
+                        />
+                      )}
+                      <div className="message-content">
+                        <div className="message-bubble">{msg.content}</div>
+                        <div className="message-time">
+                          {new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          {msg.senderId === 'owner' && (
+                            <span className="message-status">
+                              {msg.isRead ? ' · Đã xem' : ''}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  <div ref={messagesEndRef} />
                 </div>
-                <button className="p-2 hover:bg-gray-100 rounded-full">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                  </svg>
-                </button>
-                <button className="p-2 hover:bg-gray-100 rounded-full">
-                  <svg className="w-6 h-6 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
-                  </svg>
-                </button>
+
+                <div className="chat-input-container">
+                  <Space className="input-actions">
+                    <Tooltip title="Gửi hình ảnh">
+                      <Button type="text" icon={<PictureOutlined />} />
+                    </Tooltip>
+                    <Tooltip title="Chèn biểu tượng cảm xúc">
+                      <Button type="text" icon={<SmileOutlined />} />
+                    </Tooltip>
+                  </Space>
+                  <Input 
+                    placeholder="Nhập tin nhắn..." 
+                    value={currentMessage}
+                    onChange={(e) => setCurrentMessage(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    suffix={
+                      <Button 
+                        type="text" 
+                        icon={<SendOutlined />} 
+                        onClick={handleSendMessage}
+                        disabled={!currentMessage.trim()}
+                        className="send-button"
+                      />
+                    }
+                  />
+                </div>
               </div>
-            </div>
-          </>
-        ) : (
-          <div className="flex-1 flex items-center justify-center text-gray-500">
-            Chọn một cuộc trò chuyện để bắt đầu
+            ) : (
+              <div className="empty-conversation">
+                <ShopOutlined className="empty-icon" />
+                <p>Chọn một cuộc trò chuyện để bắt đầu</p>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </div>
+      </Card>
     </div>
   );
 };

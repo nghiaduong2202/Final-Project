@@ -5,10 +5,24 @@ import { ICONS } from '@/constants/owner/sidebar/icons';
 interface SidebarProps {
   onMenuItemClick?: (itemId: string) => void;
   onToggle?: (collapsed: boolean) => void;
+  isMobile?: boolean;
+  autoCollapsed?: boolean;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ onMenuItemClick = () => {}, onToggle = () => {} }) => {
+const Sidebar: React.FC<SidebarProps> = ({ 
+  onMenuItemClick = () => {}, 
+  onToggle = () => {},
+  isMobile = false,
+  autoCollapsed = false
+}) => {
   const [isCollapsed, setIsCollapsed] = useState(() => {
+    // Nếu là mobile view, luôn mở rộng sidebar
+    if (isMobile) return false;
+
+    // Nếu kích thước màn hình cần tự động collapse
+    if (autoCollapsed) return true;
+    
+    // Trong các trường hợp khác, sử dụng giá trị đã lưu
     const saved = localStorage.getItem('sidebarCollapsed');
     return saved ? JSON.parse(saved) : false;
   });
@@ -16,19 +30,26 @@ const Sidebar: React.FC<SidebarProps> = ({ onMenuItemClick = () => {}, onToggle 
   const location = useLocation();
   const navigate = useNavigate();
 
+  // Theo dõi thay đổi và cập nhật trạng thái
   useEffect(() => {
-    localStorage.setItem('sidebarCollapsed', JSON.stringify(isCollapsed));
-  }, [isCollapsed]);
+    if (autoCollapsed && !isCollapsed) {
+      setIsCollapsed(true);
+    }
+  }, [autoCollapsed]);
+
+  useEffect(() => {
+    // Chỉ lưu trạng thái khi không phải ở chế độ mobile
+    if (!isMobile) {
+      localStorage.setItem('sidebarCollapsed', JSON.stringify(isCollapsed));
+    }
+  }, [isCollapsed, isMobile]);
 
   const toggleSidebar = () => {
-    setIsCollapsed(!isCollapsed);
-    onToggle(!isCollapsed);
-
-    // Emit custom event
-    const event = new CustomEvent('sidebarStateChange', {
-      detail: { collapsed: !isCollapsed }
-    });
-    window.dispatchEvent(event);
+    const newState = !isCollapsed;
+    setIsCollapsed(newState);
+    
+    // Gọi callback cho parent component
+    onToggle(newState);
   };
 
   const menuItems = [
@@ -72,19 +93,28 @@ const Sidebar: React.FC<SidebarProps> = ({ onMenuItemClick = () => {}, onToggle 
   };
 
   return (
-    <div className={`${isCollapsed ? 'w-20' : 'w-60'} fixed h-screen bg-white p-[10px] flex flex-col border-r border-[#d8d8d8] transition-all duration-300 ease-in-out`}>
+    <div className={`h-full bg-white p-[10px] flex flex-col border-r border-[#d8d8d8] sidebar-transition ${
+      isMobile ? 'w-full' : isCollapsed ? 'w-20' : 'w-60'
+    }`}>
       {/* Header - Fixed */}
       <div className="flex-shrink-0">
         {/* Toggle Sidebar */}
         <div className={`flex items-center ${isCollapsed ? 'justify-center h-[90px]' : 'px-[20px]'} pt-[10px] pb-[20px]`}>
-          <img 
-            src={ICONS.TOGGLE_SIDEBAR} 
-            alt="Toggle Sidebar" 
-            className="w-[30px] h-[20px] cursor-pointer"
-            onClick={toggleSidebar}
-          />
-          {!isCollapsed && (
-            <div className="border-0 bg-transparent cursor-pointer" onClick={() => navigate("/")}>
+          {!isMobile && (
+            <button 
+              onClick={toggleSidebar}
+              className="w-[30px] h-[20px] flex items-center justify-center border-0 bg-transparent cursor-pointer transition-transform hover:scale-110 focus:outline-none"
+              aria-label="Toggle sidebar"
+            >
+              <img 
+                src={ICONS.TOGGLE_SIDEBAR} 
+                alt="Toggle Sidebar" 
+                className="w-full h-full"
+              />
+            </button>
+          )}
+          {(!isCollapsed || isMobile) && (
+            <div className="border-0 bg-transparent cursor-pointer overflow-hidden transition-all duration-300 ease-in-out" onClick={() => navigate("/")}>
               <img src={ICONS.BRAND} alt="Brand" className="w-[120px] h-[60px] ml-[15px]" />
             </div>
           )}
@@ -93,7 +123,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onMenuItemClick = () => {}, onToggle 
       </div>
 
       {/* Scrollable Middle Section */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar">
         {/* Menu Items */}
         <div className="pt-1 pb-[8px] flex flex-col gap-1.5">
           {menuItems.map((item) => {
@@ -249,33 +279,36 @@ const Sidebar: React.FC<SidebarProps> = ({ onMenuItemClick = () => {}, onToggle 
         </div>
       </div>
 
-      {/* Footer - Fixed */}
-      <div className="flex-shrink-0">
-        <div className="w-full h-[1px] bg-[#e0e0e0]" />
-        {/* Bottom Items */}
-        <div className="pt-3.5 pb-3 flex flex-col gap-1">
-          {bottomItems.map((item) => {
-            const isActive = isActiveRoute(item.path);
-            return (
-              <div
-                key={item.id}
-                onClick={() => handleItemClick(item.path, item.id)}
-                className={`flex items-center ${isCollapsed ? 'justify-center' : 'px-5'} p-[10px] mb-2 rounded-[10px] cursor-pointer transition-colors w-full
-                  ${isActive ? 'bg-[#4880ff] text-white' : 'bg-white text-black hover:bg-[#f5f5f5]'}`}
-              >
-                <img 
-                  src={item.icon}
-                  alt={item.label}
-                  className={`w-[23px] h-[23px] ${!isCollapsed && 'mr-[10px]'} ${isActive ? 'brightness-0 invert' : ''} transition-transform duration-300`}
-                />
-                {!isCollapsed && (
-                  <span className="font-roboto text-lg font-semibold leading-[23px] whitespace-nowrap transition-transform duration-300">
-                    {item.label}
-                  </span>
-                )}
-              </div>
-            );
-          })}
+      {/* Bottom Sticky Menu Items */}
+      <div className="flex-shrink-0 pt-5">
+        <div className="border-t border-[#d8d8d8] pt-3">
+          {/* Bottom menu items - always displayed in full in mobile */}
+          <div className="w-full h-[1px] bg-[#e0e0e0]" />
+          {/* Bottom Items */}
+          <div className="pt-3.5 pb-3 flex flex-col gap-1">
+            {bottomItems.map((item) => {
+              const isActive = isActiveRoute(item.path);
+              return (
+                <div
+                  key={item.id}
+                  onClick={() => handleItemClick(item.path, item.id)}
+                  className={`flex items-center ${isCollapsed ? 'justify-center' : 'px-5'} p-[10px] mb-2 rounded-[10px] cursor-pointer transition-colors w-full
+                    ${isActive ? 'bg-[#4880ff] text-white' : 'bg-white text-black hover:bg-[#f5f5f5]'}`}
+                >
+                  <img 
+                    src={item.icon}
+                    alt={item.label}
+                    className={`w-[23px] h-[23px] ${!isCollapsed && 'mr-[10px]'} ${isActive ? 'brightness-0 invert' : ''} transition-transform duration-300`}
+                  />
+                  {!isCollapsed && (
+                    <span className="font-roboto text-lg font-semibold leading-[23px] whitespace-nowrap transition-transform duration-300">
+                      {item.label}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>

@@ -23,20 +23,20 @@ const VoucherEditModal: React.FC<VoucherEditModalProps> = ({
   onSave,
   submitting
 }) => {
-  // Tạo form instance ngay trong component
+  // Initialize form instance
   const [form] = Form.useForm();
   
-  // Theo dõi loại voucher với state của component
+  // Track voucher type with component state
   const [voucherType, setVoucherType] = useState<'cash' | 'percent'>('cash');
   
-  // Khởi tạo form chỉ khi modal đã hiển thị hoàn toàn với component đã mount
+  // Initialize form only when modal is fully displayed with mounted component
   useEffect(() => {
-    // Chỉ thực hiện khi modal hiển thị và có dữ liệu voucher
+    // Only execute when modal is shown and voucher data exists
     if (visible && voucher) {
-      // Gọi lệnh này trong queue của React để đảm bảo Form đã được render
+      // Run this command in React's queue to ensure Form has been rendered
       const timer = setTimeout(() => {
         try {
-          // Thiết lập giá trị cho form
+          // Set values for the form
           form.setFieldsValue({
             name: voucher.name,
             code: voucher.code,
@@ -50,31 +50,31 @@ const VoucherEditModal: React.FC<VoucherEditModalProps> = ({
             ],
             amount: voucher.amount
           });
-          // Cập nhật state cho loại voucher
+          // Update state for voucher type
           setVoucherType(voucher.voucherType);
         } catch (error) {
-          console.error('Lỗi khi thiết lập giá trị form:', error);
+          console.error('Error setting form values:', error);
         }
-      }, 300); // Thời gian đợi dài hơn để đảm bảo Form đã được render
+      }, 300); // Longer waiting time to ensure Form has been rendered
       
       return () => clearTimeout(timer);
     }
   }, [visible, voucher, form]);
   
-  // Reset form khi modal đóng
+  // Reset form when modal closes
   useEffect(() => {
     if (!visible) {
-      // Reset form và state
+      // Reset form and state
       form.resetFields();
       setVoucherType('cash');
     }
   }, [visible, form]);
 
-  // Xử lý submit form với xác nhận
+  // Handle form submission with confirmation
   const handleSubmit = () => {
     form.validateFields()
       .then(values => {
-        // Hiển thị popup xác nhận
+        // Show confirmation popup
         confirm({
           title: 'Xác nhận thay đổi thông tin',
           icon: <ExclamationCircleOutlined />,
@@ -82,16 +82,16 @@ const VoucherEditModal: React.FC<VoucherEditModalProps> = ({
           okText: 'Xác nhận',
           cancelText: 'Hủy',
           onOk() {
-            // Trích xuất ngày từ dateRange
+            // Extract date from dateRange
             const { dateRange, ...rest } = values;
             
-            // Xử lý giá trị maxDiscount cho loại voucher cash
+            // Process maxDiscount value for cash type
             const finalValues = {...rest};
             if (values.voucherType === 'cash') {
               finalValues.maxDiscount = values.discount;
             }
             
-            // Tạo dữ liệu để gửi
+            // Create data to send
             const voucherData: VoucherFormData = {
               ...finalValues,
               startDate: dateRange[0].format('YYYY-MM-DD'),
@@ -107,20 +107,20 @@ const VoucherEditModal: React.FC<VoucherEditModalProps> = ({
       });
   };
 
-  // Xử lý khi thay đổi loại voucher
+  // Handle when voucher type changes
   const handleVoucherTypeChange = (value: 'cash' | 'percent') => {
     setVoucherType(value);
     
-    // Nếu chọn loại "cash", tự động cập nhật maxDiscount = discount
+    // If "cash" is selected, automatically update maxDiscount = discount
     if (value === 'cash') {
       const currentDiscount = form.getFieldValue('discount');
       form.setFieldsValue({ maxDiscount: currentDiscount });
     }
   };
 
-  // Xử lý khi thay đổi giá trị giảm (discount)
+  // Handle when discount value changes
   const handleDiscountChange = (value: number | null) => {
-    // Nếu loại voucher là "cash", tự động cập nhật maxDiscount = discount
+    // If voucher type is "cash", automatically update maxDiscount = discount
     if (voucherType === 'cash' && value !== null) {
       form.setFieldsValue({ maxDiscount: value });
     }
@@ -155,6 +155,13 @@ const VoucherEditModal: React.FC<VoucherEditModalProps> = ({
           requiredMark={false}
           name="voucher_edit_form"
           preserve={false}
+          initialValues={{
+            voucherType: 'cash',
+            discount: 0,
+            minPrice: 0,
+            maxDiscount: 0,
+            amount: 0
+          }}
         >
           <Form.Item
             name="name"

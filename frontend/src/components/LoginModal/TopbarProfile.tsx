@@ -76,12 +76,7 @@ const TopbarProfile: React.FC = () => {
       key: 'messages',
       label: 'Tin nhắn',
       onClick: () => navigate('/user/messages')
-    },
-    {
-      key: 'notifications',
-      label: 'Thông báo',
-      onClick: () => navigate('/user/notifications')
-    },
+    },    
     {
       key: 'bookings',
       label: 'Lịch sử đặt sân',

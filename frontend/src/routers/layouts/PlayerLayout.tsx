@@ -3,6 +3,7 @@ import React, { Suspense } from 'react';
 import Header from '@/components/Player/Header';
 import Footer from '@/components/Player/Footer';
 import { useAppSelector } from '@/hooks/reduxHooks';
+import ChatWidget from '@/components/Chat/ChatWidget';
 
 const Loading = () => (
   <div className="flex items-center justify-center h-screen">
@@ -19,12 +20,13 @@ export const PlayerLayout: React.FC = () => {
   
   return (
     <Suspense fallback={<Loading />}>
-      <div className="font-main overflow-x-hidden relative">
+      <div className="font-main min-h-screen flex flex-col">
         <Header />
-        <main>        
-          <Outlet />           
-      </main>
+        <main className="flex-grow">
+          <Outlet />
+        </main>
         <Footer />
+        <ChatWidget />
       </div>
     </Suspense>
   );

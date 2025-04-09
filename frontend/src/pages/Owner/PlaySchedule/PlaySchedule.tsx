@@ -1,253 +1,446 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { 
+  Select, Button, Input, DatePicker, Space, Typography, 
+  Badge, Card, Tooltip, Modal, Table, Form, TimePicker 
+} from 'antd';
+import {
+  SearchOutlined, LeftOutlined, RightOutlined,
+  PlusOutlined, HistoryOutlined, ClockCircleOutlined, UserOutlined,
+  PhoneOutlined, StopOutlined
+} from '@ant-design/icons';
+import { mockBookingHistory } from '@/mocks/booking/bookingData';
+import dayjs from 'dayjs';
+import type { Dayjs } from 'dayjs';
+import { BookingStatus } from '@/types/booking.type';
+
+const { Title, Text } = Typography;
+const { Option } = Select;
+
+interface Venue {
+  id: number;
+  name: string;
+}
+
+interface Sport {
+  id: number;
+  name: string;
+}
+
+interface BookingSlot {
+  id: string;
+  time: string;
+  court: string;
+  customer: string;
+  phone: string;
+  status: 'booked' | 'available' | 'pending' | 'maintenance';
+  duration: number; // in hours
+}
 
 const PlaySchedule: React.FC = () => {
-  return <div>PlaySchedule</div>;
+  const navigate = useNavigate();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState<number>(0);
+  const isMobile = containerWidth < 640;
+  const isTablet = containerWidth >= 640 && containerWidth < 1024;
+  
+  // States for dropdowns
+  const [venues, setVenues] = useState<Venue[]>([
+    { id: 1, name: 'Sân bóng đá Hà Nội' },
+    { id: 2, name: 'Sân cầu lông Phạm Kha' }
+  ]);
+  const [sports, setSports] = useState<Sport[]>([
+    { id: 1, name: 'Bóng đá' },
+    { id: 2, name: 'Cầu lông' },
+    { id: 3, name: 'Tennis' }
+  ]);
+  const [selectedVenue, setSelectedVenue] = useState<number | null>(1);
+  const [selectedSport, setSelectedSport] = useState<number | null>(1);
+
+  // States for search and date
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedDate, setSelectedDate] = useState<Dayjs>(dayjs());
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [currentSlot, setCurrentSlot] = useState<BookingSlot | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+
+  // Mock data for booking slots
+  const [bookingSlots, setBookingSlots] = useState<BookingSlot[]>([
+    { id: 'bs1', time: '08:00', court: 'Sân 1', customer: 'Nguyễn Văn A', phone: '0901234567', status: 'booked', duration: 1 },
+    { id: 'bs2', time: '09:00', court: 'Sân 2', customer: 'Trần Thị B', phone: '0908765432', status: 'booked', duration: 2 },
+    { id: 'bs3', time: '10:00', court: 'Sân 3', customer: '', phone: '', status: 'available', duration: 1 },
+    { id: 'bs4', time: '14:00', court: 'Sân 1', customer: 'Lê Văn C', phone: '0912345678', status: 'pending', duration: 1 },
+    { id: 'bs5', time: '16:00', court: 'Sân 4', customer: '', phone: '', status: 'maintenance', duration: 3 },
+  ]);
+
+  // Time slots from 6:00 AM to 22:00 PM with 1-hour intervals
+  const timeSlots = Array.from({ length: 17 }, (_, i) => {
+    const hour = i + 6;
+    return `${hour.toString().padStart(2, '0')}:00`;
+  });
+
+  // Court names
+  const courts = ['Sân 1', 'Sân 2', 'Sân 3', 'Sân 4', 'Sân 5', 'Sân 6', 'Sân 7'];
+
+  useEffect(() => {
+    const updateWidth = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.offsetWidth);
+      }
+    };
+
+    updateWidth();
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
+  }, []);
+
+  useEffect(() => {
+    // In a real app, this would fetch data from the API
+    console.log('Fetching data for venue:', selectedVenue, 'and sport:', selectedSport, 'on date:', selectedDate.format('YYYY-MM-DD'));
+  }, [selectedVenue, selectedSport, selectedDate]);
+
+  const handleSearch = (value: string) => {
+    setSearchQuery(value);
+    // Filter slots based on search query
+    // In a real app, this would trigger an API call
+  };
+
+  const handleTodayClick = () => {
+    setSelectedDate(dayjs());
+  };
+
+  const handleBooking = () => {
+    setIsModalVisible(true);
+  };
+
+  const handleDateChange = (date: Dayjs | null) => {
+    if (date) {
+      setSelectedDate(date);
+    }
+  };
+
+  const handlePrevDay = () => {
+    setSelectedDate(selectedDate.subtract(1, 'day'));
+  };
+
+  const handleNextDay = () => {
+    setSelectedDate(selectedDate.add(1, 'day'));
+  };
+
+  const handleSlotClick = (time: string, court: string) => {
+    // Find if there's a booking for this slot
+    const slot = bookingSlots.find(
+      slot => slot.time === time && slot.court === court
+    );
+    
+    if (slot) {
+      setCurrentSlot(slot);
+    } else {
+      setCurrentSlot({
+        id: `new-${time}-${court}`,
+        time,
+        court,
+        customer: '',
+        phone: '',
+        status: 'available',
+        duration: 1
+      });
+    }
+    
+    setIsModalVisible(true);
+  };
+
+  const getCellStyle = (time: string, court: string) => {
+    const slot = bookingSlots.find(
+      slot => slot.time === time && slot.court === court
+    );
+    
+    if (!slot) return {};
+    
+    let backgroundColor = '';
+    let color = '';
+    
+    switch (slot.status) {
+      case 'booked':
+        backgroundColor = '#d6f5d6';
+        color = '#52c41a';
+        break;
+      case 'pending':
+        backgroundColor = '#fff7e6';
+        color = '#fa8c16';
+        break;
+      case 'maintenance':
+        backgroundColor = '#fff1f0';
+        color = '#f5222d';
+        break;
+      default:
+        backgroundColor = 'white';
+    }
+    
+    return {
+      backgroundColor,
+      color,
+      height: `${slot.duration * 40}px`,
+      position: 'relative' as const,
+      overflow: 'hidden'
+    };
+  };
+
+  // Filter bookings for history
+  const bookingHistory = mockBookingHistory.filter(booking => 
+    booking.facility.id === selectedVenue && booking.sportId === selectedSport
+  );
+
+  return (
+    <div ref={containerRef} className="p-3 sm:p-4 md:p-6 bg-gray-50 min-h-screen">
+      <Card className="mb-4 sm:mb-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 sm:mb-6">
+          <Title level={4} className="m-0 text-lg sm:text-xl">Lịch đặt sân</Title>
+          <Button
+            type="primary"
+            icon={<HistoryOutlined />}
+            onClick={() => setShowHistory(!showHistory)}
+            size={isMobile ? "middle" : "large"}
+          >
+            {showHistory ? 'Xem lịch' : 'Lịch sử đặt sân'}
+          </Button>
+        </div>
+
+        <div className="flex flex-col sm:flex-row justify-between gap-4 mb-4 sm:mb-6">
+          <Space direction="vertical" size="middle" className="flex-grow" style={{ maxWidth: '100%' }}>
+            <Select
+              placeholder="Chọn cơ sở hoạt động"
+              style={{ width: '100%' }}
+              value={selectedVenue || undefined}
+              onChange={setSelectedVenue}
+              size={isMobile ? "middle" : "large"}
+            >
+              {venues.map(venue => (
+                <Option key={venue.id} value={venue.id}>{venue.name}</Option>
+              ))}
+            </Select>
+            
+            <Select
+              placeholder="Chọn môn thể thao"
+              style={{ width: '100%' }}
+              value={selectedSport || undefined}
+              onChange={setSelectedSport}
+              size={isMobile ? "middle" : "large"}
+            >
+              {sports.map(sport => (
+                <Option key={sport.id} value={sport.id}>{sport.name}</Option>
+              ))}
+            </Select>
+          </Space>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-4 sm:mb-6">
+          <Input
+            placeholder="Tìm kiếm tên người chơi"
+            prefix={<SearchOutlined />}
+            style={{ maxWidth: '100%' }}
+            value={searchQuery}
+            onChange={e => handleSearch(e.target.value)}
+            size={isMobile ? "middle" : "large"}
+            className="flex-grow"
+          />
+          
+          <Space className="flex flex-wrap justify-center sm:justify-end gap-2">
+            <Button onClick={handleTodayClick} size={isMobile ? "middle" : "large"}>
+              Hôm nay
+            </Button>
+            
+            <Space size="small">
+              <Button icon={<LeftOutlined />} onClick={handlePrevDay} size={isMobile ? "middle" : "large"} />
+              <DatePicker 
+                value={selectedDate}
+                onChange={handleDateChange}
+                size={isMobile ? "middle" : "large"}
+                style={{ width: isMobile ? '120px' : '140px' }}
+              />
+              <Button icon={<RightOutlined />} onClick={handleNextDay} size={isMobile ? "middle" : "large"} />
+            </Space>
+          </Space>
+        </div>
+
+        {showHistory ? (
+          <div className="overflow-x-auto -mx-4 px-4 sm:-mx-0 sm:px-0">
+            <Table
+              dataSource={bookingHistory}
+              columns={[
+                {
+                  title: 'Thời gian',
+                  dataIndex: 'time',
+                  key: 'time',
+                  width: isMobile ? '120px' : '150px',
+                },
+                {
+                  title: 'Sân',
+                  dataIndex: 'court',
+                  key: 'court',
+                  width: isMobile ? '80px' : '100px',
+                },
+                {
+                  title: 'Khách hàng',
+                  dataIndex: 'customer',
+                  key: 'customer',
+                  width: isMobile ? '120px' : '150px',
+                },
+                {
+                  title: 'Số điện thoại',
+                  dataIndex: 'phone',
+                  key: 'phone',
+                  width: isMobile ? '120px' : '150px',
+                },
+                {
+                  title: 'Trạng thái',
+                  dataIndex: 'status',
+                  key: 'status',
+                  width: isMobile ? '100px' : '120px',
+                  render: (status) => (
+                    <Badge 
+                      status={status === 'completed' ? 'success' : 'processing'} 
+                      text={status === 'completed' ? 'Đã hoàn thành' : 'Đang chờ'}
+                    />
+                  ),
+                },
+              ]}
+              pagination={{
+                pageSize: isMobile ? 5 : 10,
+                showSizeChanger: false,
+                size: isMobile ? "small" : "default"
+              }}
+              size={isMobile ? "small" : "middle"}
+            />
+          </div>
+        ) : (
+          <div className="overflow-x-auto -mx-4 px-4 sm:-mx-0 sm:px-0">
+            <div className="min-w-[650px]">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr>
+                    <th className="p-2 border text-center" style={{ width: '80px' }}>Thời gian</th>
+                    {courts.map(court => (
+                      <th key={court} className="p-2 border text-center">{court}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {timeSlots.map(time => (
+                    <tr key={time}>
+                      <td className="p-2 border text-center font-medium">{time}</td>
+                      {courts.map(court => {
+                        const slot = bookingSlots.find(s => s.time === time && s.court === court);
+                        return (
+                          <td
+                            key={`${time}-${court}`}
+                            className="p-2 border cursor-pointer hover:bg-gray-50"
+                            style={getCellStyle(time, court)}
+                            onClick={() => handleSlotClick(time, court)}
+                          >
+                            {slot && (
+                              <div className="p-1">
+                                <div className="text-sm font-medium">{slot.customer}</div>
+                                <div className="text-xs">{slot.phone}</div>
+                                <div className="text-xs mt-1">
+                                  <Badge 
+                                    status={
+                                      slot.status === 'booked' ? 'success' :
+                                      slot.status === 'pending' ? 'warning' :
+                                      slot.status === 'maintenance' ? 'error' : 'default'
+                                    }
+                                    text={
+                                      slot.status === 'booked' ? 'Đã đặt' :
+                                      slot.status === 'pending' ? 'Chờ xác nhận' :
+                                      slot.status === 'maintenance' ? 'Bảo trì' : 'Trống'
+                                    }
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </Card>
+
+      {/* Booking Modal */}
+      <Modal
+        title="Đặt sân"
+        open={isModalVisible}
+        onCancel={() => setIsModalVisible(false)}
+        footer={null}
+        width={isMobile ? '95%' : 600}
+        styles={{ body: { padding: isMobile ? '16px' : '24px' } }}
+      >
+        {currentSlot && (
+          <div>
+            <div className="mb-4">
+              <Text strong className="mr-2">Sân:</Text>
+              <Text>{currentSlot.court}</Text>
+            </div>
+            <div className="mb-4">
+              <Text strong className="mr-2">Thời gian:</Text>
+              <Text>{selectedDate.format('DD/MM/YYYY')} | {currentSlot.time}</Text>
+            </div>
+            
+            {currentSlot.status === 'available' ? (
+              <Form layout="vertical">
+                <Form.Item label="Thông tin khách hàng" required>
+                  <Input placeholder="Họ tên khách hàng" prefix={<UserOutlined />} />
+                </Form.Item>
+                <Form.Item required>
+                  <Input placeholder="Số điện thoại" prefix={<PhoneOutlined />} />
+                </Form.Item>
+                <Form.Item label="Thời gian">
+                  <Space>
+                    <TimePicker format="HH:mm" defaultValue={dayjs(currentSlot.time, 'HH:mm')} />
+                    <Text>đến</Text>
+                    <TimePicker format="HH:mm" defaultValue={dayjs(currentSlot.time, 'HH:mm').add(1, 'hour')} />
+                  </Space>
+                </Form.Item>
+                <Form.Item label="Ghi chú">
+                  <Input.TextArea rows={3} placeholder="Nhập ghi chú nếu có" />
+                </Form.Item>
+              </Form>
+            ) : (
+              <>
+                <div className="mb-4">
+                  <Text strong className="mr-2">Trạng thái:</Text>
+                  {currentSlot.status === 'booked' && <Badge status="success" text="Đã xác nhận" />}
+                  {currentSlot.status === 'pending' && <Badge status="warning" text="Đang chờ xác nhận" />}
+                  {currentSlot.status === 'maintenance' && <Badge status="error" text="Bảo trì" />}
+                </div>
+                {(currentSlot.status === 'booked' || currentSlot.status === 'pending') && (
+                  <>
+                    <div className="mb-4">
+                      <Text strong className="mr-2">Khách hàng:</Text>
+                      <Text>{currentSlot.customer}</Text>
+                    </div>
+                    <div className="mb-4">
+                      <Text strong className="mr-2">Số điện thoại:</Text>
+                      <Text>{currentSlot.phone}</Text>
+                    </div>
+                    <div className="mb-4">
+                      <Text strong className="mr-2">Thời lượng:</Text>
+                      <Text>{currentSlot.duration} giờ</Text>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
 };
 
 export default PlaySchedule;
-
-
-// import React, { useState, useEffect } from 'react';
-// import { useNavigate } from 'react-router-dom';
-// import DatePicker from 'react-datepicker';
-// import "react-datepicker/dist/react-datepicker.css";
-// import { ICONS } from '@/constants/owner/Content/content';
-
-// interface ContentProps {
-//   style?: React.CSSProperties;
-// }
-
-// interface Venue {
-//   id: number;
-//   name: string;
-// }
-
-// interface Sport {
-//   id: number;
-//   name: string;
-// }
-
-// const PlaySchedule: React.FC<ContentProps> = () => {
-//   const navigate = useNavigate();
-  
-//   // States for dropdowns
-//   const [venues, setVenues] = useState<Venue[]>([]);
-//   const [sports, setSports] = useState<Sport[]>([]);
-//   const [selectedVenue, setSelectedVenue] = useState<number | null>(null);
-//   const [selectedSport, setSelectedSport] = useState<number | null>(null);
-
-//   // States for search and date
-//   const [searchQuery, setSearchQuery] = useState('');
-//   const [selectedDate, setSelectedDate] = useState(new Date());
-
-//   // Time slots from 6:00 AM to 22:00 PM with 30-minute intervals
-//   const timeSlots = Array.from({ length: 38 }, (_, i) => {
-//     const hour = Math.floor(i / 2) + 4;
-//     const minute = i % 2 === 0 ? '00' : '30';
-//     return `${hour.toString().padStart(2, '0')}:${minute}`;
-//   });
-
-//   // Handlers for API calls (to be implemented)
-//   const fetchVenues = async () => {
-//     // TODO: Implement API call
-//     setVenues([{ id: 1, name: 'Sân cầu lông Phạm Kha' }]);
-//   };
-
-//   const fetchSports = async () => {
-//     // TODO: Implement API call
-//     setSports([{ id: 1, name: 'Cầu lông' }]);
-//   };
-
-//   const handleSearch = (query: string) => {
-//     setSearchQuery(query);
-//     // TODO: Implement search logic
-//   };
-
-//   const handleTodayClick = () => {
-//     setSelectedDate(new Date());
-//   };
-
-//   const handleBooking = () => {
-//     // TODO: Navigate to booking page
-//     navigate('/booking');
-//   };
-
-//   useEffect(() => {
-//     fetchVenues();
-//     fetchSports();
-//   }, []);
-
-//   return (
-//     <div className="flex flex-col min-w-[320px] w-full bg-[#f5f6fa]">
-//       <div className="px-5 py-8 flex-grow">
-//         {/* Section 1: Dropdowns and Booking Button */}
-//         <div className="flex justify-between flex-wrap items-start gap-4 mb-8">
-//           <div className="flex flex-col gap-3.5 flex-grow max-w-[450px]">
-//             {/* Cơ sở hoạt động */}
-//             <div className="relative">
-//               <select 
-//                 className="w-full h-10 px-5 py-1 border-2 border-black/70 rounded-[15px] font-roboto text-base bg-white text-gray-700 font-medium appearance-none cursor-pointer hover:border-black focus:border-black focus:outline-none [&>*]:rounded-[10px]"
-//                 onChange={(e) => setSelectedVenue(Number(e.target.value))}
-//               >
-//                 <option value="" className="text-gray-500">Chọn cơ sở hoạt động</option>
-//                 {venues.map(venue => (
-//                   <option key={venue.id} value={venue.id} className="text-black">{venue.name}</option>
-//                 ))}
-//               </select>
-//               <img
-//                 src={ICONS.DROP_DOWN}
-//                 alt="dropdown" 
-//                 className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none rotate-180"
-//               />
-//             </div>            
-//             {/* Môn thể thao */}
-//             <div className="relative">
-//               <select 
-//                 className="w-full h-10 px-5 py-1 border-2 border-black/70 rounded-[15px] font-roboto text-base bg-white text-gray-700 font-medium appearance-none cursor-pointer hover:border-black focus:border-black focus:outline-none"
-//                 onChange={(e) => setSelectedSport(Number(e.target.value))}
-//               >
-//                 <option value="" className="text-gray-500">Chọn môn thể thao</option>
-//                 {sports.map(sport => (
-//                   <option key={sport.id} value={sport.id} className="text-black">{sport.name}</option>
-//                 ))}
-//               </select>
-//               <img
-//                 src={ICONS.DROP_DOWN}
-//                 alt="dropdown"
-//                 className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none rotate-180"
-//               />
-//             </div>
-//           </div>
-          
-//           {/* Đặt sân */}
-//           <button 
-//             onClick={handleBooking}
-//             className="px-4.5 py-2 bg-[#197dfe] text-white rounded font-roboto text-lg font-bold tracking-wider cursor-pointer mr-8 hover:bg-[#197dfe]/80"
-//           >
-//             Đặt sân
-//           </button>
-//         </div>
-
-//         {/* Section 2: Search, Today Button, and DatePicker */}
-//         <div className="flex flex-wrap items-center gap-4 mb-5">
-//           <div className="relative flex-grow max-w-[450px]">
-//             <input 
-//               type="text" 
-//               value={searchQuery}
-//               onChange={(e) => handleSearch(e.target.value)}
-//               placeholder="Tìm kiếm tên người chơi"
-//               className="w-full h-[40px] px-[18px] border border-[#d5d5d5] rounded-[19px] font-nunito text-base" 
-//             />
-//             <img 
-//               src={ICONS.SEARCH} 
-//               alt="Search"
-//               className="w-[22px] h-[22px] absolute right-[18px] top-1/2 -translate-y-1/2" 
-//             />
-//           </div>
-
-//           {/* Hôm nay */}
-//           <button 
-//             onClick={handleTodayClick}
-//             className="w-[110px] h-10 bg-white border border-black font-roboto text-base cursor-pointer rounded-[15px] hover:bg-gray-100"
-//           >
-//             Hôm nay
-//           </button>
-
-//           {/* DatePicker */}
-//           <div className="relative max-w-[270px] bg-white">
-//             <div className="flex items-center border border-black rounded-[15px] h-[40px] px-3">
-//               <img
-//                 src={ICONS.DROP_DOWN} 
-//                 alt="Previous day"
-//                 className="w-[13px] h-[8px] cursor-pointer -rotate-90"
-//                 onClick={() => {
-//                   const prevDay = new Date(selectedDate);
-//                   prevDay.setDate(prevDay.getDate() - 1);
-//                   setSelectedDate(prevDay);
-//                 }}
-//               />
-//               <div className="flex items-center justify-center">
-//                 <DatePicker
-//                   selected={selectedDate}
-//                   onChange={(date: Date | null) => date && setSelectedDate(date)}
-//                   dateFormat="dd/MM/yyyy"
-//                   className="max-w-[100px] text-center border-none focus:outline-none justify-center"
-//                 />
-//                 <img
-//                   src={ICONS.DATE_PICKER}
-//                   alt="Date picker"
-//                   className="w-[20px] h-[20px] cursor-pointer mr-2.5"
-//                   onClick={() => {
-//                     const datePickerInput = document.querySelector('.react-datepicker__input-container input');
-//                     if (datePickerInput) {
-//                       (datePickerInput as HTMLElement).click();
-//                     }
-//                   }}
-//                 />
-//               </div>
-//               <img
-//                   src={ICONS.DROP_DOWN}
-//                   alt="Next day" 
-//                   className="w-[13px] h-[8px] cursor-pointer rotate-90"
-//                   onClick={() => {
-//                     const nextDay = new Date(selectedDate);
-//                     nextDay.setDate(nextDay.getDate() + 1);
-//                     setSelectedDate(nextDay);
-//                   }}
-//                 />
-              
-//             </div>
-//           </div>
-//         </div>
-
-//         {/* History Link */}
-//         <div className="flex justify-end mb-5 mr-8">
-//           <a 
-//             href="/history-booking" 
-//             className="font-roboto text-sm font-bold text-[#f90000] underline cursor-pointer"
-//           >
-//             Lịch sử đặt sân
-//           </a>
-//         </div>
-
-//         {/* Calendar/Schedule Grid */}
-//         <div className="bg-white rounded-[20px] p-5 overflow-x-auto mr-3 w-full">
-//           <div className="sticky top-0 bg-white z-10">
-//             <div className="flex border-b border-[#e1e1e1]">
-//               <div className="w-[91px] h-[38px] flex items-center justify-center font-roboto text-sm font-medium border-r border-[#e1e1e1]">
-//                 Thời gian/Sân
-//               </div>
-//               {[1, 2, 3, 4, 5, 6, 7].map(court => (
-//                 <div key={court} className="w-[150px] h-[38px] font-semibold flex items-center justify-center border-r border-[#e1e1e1]">
-//                   <div className="flex items-center gap-[5px]">
-//                     <div className="w-2.5 h-2.5 bg-[#20b202] rounded-full"></div>
-//                     <span>Sân {court}</span>
-//                   </div>
-//                 </div>
-//               ))}
-//             </div>
-//           </div>
-
-//           <div className="time-slots max-h-[600px] overflow-y-auto">
-//             {timeSlots.map((time, index) => (
-//               <div key={index} className="flex border-b border-[#e1e1e1]">
-//                 <div className="w-[91px] h-[38px] flex items-center justify-center font-roboto text-sm border-r border-[#e1e1e1]">
-//                   {time}
-//                 </div>
-//                 {[1, 2, 3, 4, 5, 6, 7].map(court => (
-//                   <div 
-//                     key={`${time}-${court}`} 
-//                     className="w-[150px] h-[38px] flex items-center justify-center border-r border-[#e1e1e1] cursor-pointer hover:bg-gray-100"
-//                   />
-//                 ))}
-//               </div>
-//             ))}
-//           </div>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// };
-
-// export default PlaySchedule;
 
