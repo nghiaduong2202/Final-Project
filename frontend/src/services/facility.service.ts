@@ -30,9 +30,6 @@ class FacilityService {
       if (!userId) {
         throw new Error('User not authenticated');
       }
-
-      console.log(`Service: Fetching facilities for userId=${userId}, status=${status}, query=${query}`);
-
       // Prepare params object for API request
       const params: Record<string, string | number | undefined> = { 
         page, 
@@ -42,21 +39,13 @@ class FacilityService {
       // Only add status param if it's not 'all'
       if (status !== 'all') {
         params.status = status;
-      }
-      
+      }      
       // Only add query param if it's not empty
       if (query && query.trim() !== '') {
         params.query = query;
-      }
-      
-      console.log('Request params:', params);
-
+      }      
       // Call real API
       const response = await api.get(`/facility/owner/${userId}`, { params });
-
-      console.log('API response status:', response.status);
-      console.log('Total facilities received:', response.data.length || 0);
-
       // Format the response to match our expected structure
       const facilities = response.data;
       return {
@@ -87,14 +76,11 @@ class FacilityService {
   async createFacility(data: FormData | FacilityFormData): Promise<{ message: string }> {
     try {
       // If it's not a FormData object, we need to create one
-      let formDataToSend: FormData;
-      
+      let formDataToSend: FormData;      
       if (!(data instanceof FormData)) {
-        formDataToSend = new FormData();
-        
+        formDataToSend = new FormData();        
         // Add facility info as JSON
-        formDataToSend.append('facilityInfo', JSON.stringify(data.facilityInfo));
-        
+        formDataToSend.append('facilityInfo', JSON.stringify(data.facilityInfo));        
         // Add images
         data.imageFiles.forEach((file) => {
           formDataToSend.append('images', file);
@@ -103,8 +89,7 @@ class FacilityService {
         // Add certificate if exists
         if (data.certificateFile) {
           formDataToSend.append('certificate', data.certificateFile);
-        }
-        
+        }        
         // Add licenses if exist
         if (data.licenseFiles && data.licenseFiles.length > 0) {
           data.licenseFiles.forEach((licenseFile) => {
@@ -187,8 +172,7 @@ class FacilityService {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
-      });
-      
+      });      
       return response.data.url;
     } catch (error) {
       console.error('API call failed:', error);
@@ -265,7 +249,7 @@ class FacilityService {
   // Get facilities for dropdown
   async getFacilitiesDropdown(): Promise<FacilityDropdownItem[]> {
     try {
-      const response = await api.get('/facility/drop-down');
+      const response = await api.get('/facility/drop-down');      
       return response.data;
     } catch (error) {
       console.error('API call failed:', error);

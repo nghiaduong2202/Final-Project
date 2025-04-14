@@ -1,0 +1,167 @@
+/* Custom styles for carousel arrows */
+.custom-carousel .slick-prev,
+.custom-carousel .slick-next {
+  z-index: 10 !important;
+  width: 40px !important;
+  height: 40px !important;
+  background: white !important;
+  border-radius: 50% !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1) !important;
+  border: 1px solid #eee !important;
+  opacity: 0.9 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 0 !important; /* Reset font size */
+  line-height: 0 !important; /* Reset line height */
+  padding: 0 !important; /* Reset padding */
+  transform: none !important; /* Disable any transforms */
+  transition: all 0.3s ease !important;
+}
+
+.custom-carousel .slick-prev {
+  left: 0 !important;
+}
+
+.custom-carousel .slick-next {
+  right: 0 !important;
+}
+
+/* Completely hide default arrow elements */
+.custom-carousel .slick-prev::before,
+.custom-carousel .slick-next::before {
+  font-size: 24px !important;
+  font-weight: bold !important;
+  color: #555 !important;
+  opacity: 1 !important;
+  line-height: 1 !important;
+  text-align: center !important;
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  font-family: sans-serif !important; /* Use standard font instead of slick */
+  width: auto !important;
+  height: auto !important;
+}
+
+/* Custom angle bracket icons */
+.custom-carousel .slick-prev::before {
+  content: "<" !important; /* Angle bracket left */
+}
+
+.custom-carousel .slick-next::before {
+  content: ">" !important; /* Angle bracket right */
+}
+
+.custom-carousel .slick-prev:hover,
+.custom-carousel .slick-next:hover {
+  background: #f8f8f8 !important;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15) !important;
+  transform: scale(1.05) !important;
+}
+
+/* Hide any other elements that might appear */
+.custom-carousel .slick-arrow > * {
+  display: none !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .custom-carousel .slick-prev {
+    left: 0 !important;
+  }
+  
+  .custom-carousel .slick-next {
+    right: 0 !important;
+  }
+  
+  .custom-carousel {
+    padding: 0 8px !important;
+  }
+}
+
+/* Make sure arrows are always visible but hide any extraneous elements */
+.custom-carousel .slick-arrow {
+  opacity: 1 !important;
+  overflow: hidden !important;
+}
+
+/* Fix for Ant Design Carousel arrow positioning */
+.custom-carousel .slick-arrow.slick-prev,
+.custom-carousel .slick-arrow.slick-next {
+  margin-top: -20px !important;
+}
+
+/* Add styles for cards in carousel */
+.custom-carousel .ant-card {
+  background-color: #fff;
+  transition: all 0.3s ease;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.custom-carousel .ant-card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 12px !important;
+}
+
+/* Ensure card content fills available space */
+.custom-carousel .ant-card-body > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Tag styles for compact display */
+.custom-carousel .ant-tag {
+  margin-bottom: 0 !important;
+  padding: 0 6px !important;
+  font-size: 11px !important;
+}
+
+/* Make sure the slide has equal height */
+.custom-carousel .slick-slide {
+  height: auto;
+}
+
+.custom-carousel .slick-track {
+  display: flex;
+  align-items: stretch;
+}
+
+.custom-carousel .slick-slide > div {
+  height: 100%;
+}
+
+.custom-carousel .slick-slide > div > div {
+  height: 100%;
+}
+
+/* Card Meta Styling */
+.custom-carousel .ant-card-meta {
+  margin-bottom: 8px !important;
+}
+
+.custom-carousel .ant-card-meta-title {
+  margin-bottom: 4px !important;
+}
+
+.custom-carousel .ant-card-meta-description {
+  line-height: 1.3 !important;
+}
+
+/* Background style overrides for sections */
+.bg-gray-50 {
+  background-color: #f9fafb;
+}
+
+/* Make sure the parent containers don't allow horizontal overflow */
+.custom-carousel {
+  position: relative !important;
+  padding: 0 10px !important;
+  overflow: hidden !important;
+}

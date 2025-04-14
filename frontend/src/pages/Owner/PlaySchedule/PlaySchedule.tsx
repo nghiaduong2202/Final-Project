@@ -1,18 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { 
   Select, Button, Input, DatePicker, Space, Typography, 
-  Badge, Card, Tooltip, Modal, Table, Form, TimePicker 
+  Badge, Card, Modal, Table, Form, TimePicker 
 } from 'antd';
 import {
   SearchOutlined, LeftOutlined, RightOutlined,
-  PlusOutlined, HistoryOutlined, ClockCircleOutlined, UserOutlined,
-  PhoneOutlined, StopOutlined
+  HistoryOutlined, UserOutlined,
+  PhoneOutlined
 } from '@ant-design/icons';
 import { mockBookingHistory } from '@/mocks/booking/bookingData';
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
-import { BookingStatus } from '@/types/booking.type';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -38,11 +36,9 @@ interface BookingSlot {
 }
 
 const PlaySchedule: React.FC = () => {
-  const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState<number>(0);
-  const isMobile = containerWidth < 640;
-  const isTablet = containerWidth >= 640 && containerWidth < 1024;
+  const isMobile = containerWidth < 768;
   
   // States for dropdowns
   const [venues, setVenues] = useState<Venue[]>([
@@ -88,15 +84,13 @@ const PlaySchedule: React.FC = () => {
         setContainerWidth(containerRef.current.offsetWidth);
       }
     };
-
     updateWidth();
     window.addEventListener('resize', updateWidth);
     return () => window.removeEventListener('resize', updateWidth);
   }, []);
 
   useEffect(() => {
-    // In a real app, this would fetch data from the API
-    console.log('Fetching data for venue:', selectedVenue, 'and sport:', selectedSport, 'on date:', selectedDate.format('YYYY-MM-DD'));
+    // In a real app, this would fetch data from the API    
   }, [selectedVenue, selectedSport, selectedDate]);
 
   const handleSearch = (value: string) => {
@@ -107,10 +101,6 @@ const PlaySchedule: React.FC = () => {
 
   const handleTodayClick = () => {
     setSelectedDate(dayjs());
-  };
-
-  const handleBooking = () => {
-    setIsModalVisible(true);
   };
 
   const handleDateChange = (date: Dayjs | null) => {

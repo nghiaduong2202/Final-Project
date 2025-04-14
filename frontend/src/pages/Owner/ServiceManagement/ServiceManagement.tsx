@@ -84,6 +84,7 @@ const ServiceManagement: React.FC = () => {
         setFacilities(facilitiesData);
         
         // Fetch danh sách thể thao
+        // Đổi lấy danh sách thể thao từ api thành lấy từ getfacility
         const sportsData = await sportService.getSport();
         if (Array.isArray(sportsData) && sportsData.length > 0) {
           setSports(sportsData);
@@ -259,6 +260,7 @@ const ServiceManagement: React.FC = () => {
       setSubmitting(false);
     }
   };
+
 
   // Lấy tên thể thao từ ID
   const getSportName = (sportId: number): string => {

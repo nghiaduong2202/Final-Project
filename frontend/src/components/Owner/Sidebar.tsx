@@ -1,6 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ICONS } from '@/constants/owner/sidebar/icons';
+import { 
+  DashboardOutlined,
+  CalendarOutlined,
+  AppstoreOutlined,
+  FieldTimeOutlined,
+  ShoppingOutlined,
+  GiftOutlined,
+  NotificationOutlined,
+  MessageOutlined,
+  StarOutlined,
+  BarChartOutlined,
+  BankOutlined,
+  CustomerServiceOutlined,
+  DeleteOutlined,
+  LogoutOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
+  DownOutlined
+} from '@ant-design/icons';
 
 interface SidebarProps {
   onMenuItemClick?: (itemId: string) => void;
@@ -9,96 +28,206 @@ interface SidebarProps {
   autoCollapsed?: boolean;
 }
 
+interface MenuItem {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  path: string;
+  textColor?: string;
+  danger?: boolean;
+}
+
+interface MenuSection {
+  title: string;
+  items: MenuItem[];
+}
+
 const Sidebar: React.FC<SidebarProps> = ({ 
   onMenuItemClick = () => {}, 
   onToggle = () => {},
   isMobile = false,
   autoCollapsed = false
 }) => {
-  const [isCollapsed, setIsCollapsed] = useState(() => {
-    // Nếu là mobile view, luôn mở rộng sidebar
-    if (isMobile) return false;
+  const location = useLocation();
+  const navigate = useNavigate();
 
-    // Nếu kích thước màn hình cần tự động collapse
+  // Sidebar collapse state
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    if (isMobile) return false;
     if (autoCollapsed) return true;
-    
-    // Trong các trường hợp khác, sử dụng giá trị đã lưu
     const saved = localStorage.getItem('sidebarCollapsed');
     return saved ? JSON.parse(saved) : false;
   });
 
-  const location = useLocation();
-  const navigate = useNavigate();
+  // Section expansion states
+  const [isCustomerCareOpen, setCustomerCareOpen] = useState(false);
+  const [isFinanceOpen, setFinanceOpen] = useState(false);
+  const [activeItem, setActiveItem] = useState<string>('');
 
-  // Theo dõi thay đổi và cập nhật trạng thái
+  // Effect to handle auto collapse
   useEffect(() => {
     if (autoCollapsed && !isCollapsed) {
       setIsCollapsed(true);
     }
-  }, [autoCollapsed]);
+  }, [autoCollapsed, isCollapsed]);
 
+  // Effect to save collapse state
   useEffect(() => {
-    // Chỉ lưu trạng thái khi không phải ở chế độ mobile
     if (!isMobile) {
       localStorage.setItem('sidebarCollapsed', JSON.stringify(isCollapsed));
     }
   }, [isCollapsed, isMobile]);
 
+  // Toggle sidebar collapse
   const toggleSidebar = () => {
     const newState = !isCollapsed;
     setIsCollapsed(newState);
-    
-    // Gọi callback cho parent component
     onToggle(newState);
   };
 
-  const menuItems = [
-    { id: 'calendar', label: 'Lịch đặt sân', icon: ICONS.CALENDAR, activeIcon: ICONS.CALENDAR, path: "/owner" },
-    { id: 'facility', label: 'Quản lý cơ sở', icon: ICONS.FACILITY, activeIcon: ICONS.FACILITY, path: "/owner/facility-management" },
-    { id: 'field', label: 'Quản lý nhóm sân', icon: ICONS.FIELD, activeIcon: ICONS.FIELD, path: "/owner/field-group-management" },
-    { id: 'service', label: 'Quản lý dịch vụ', icon: ICONS.SERVICE, activeIcon: ICONS.SERVICE, path: "/owner/service-management" },
-    { id: 'voucher', label: 'Quản lý voucher', icon: ICONS.VOUCHER, activeIcon: ICONS.VOUCHER, path: "/owner/voucher-management" },
-    { id: 'ads', label: 'Quản lý sự kiện', icon: ICONS.EVENT, activeIcon: ICONS.EVENT, path: "/owner/event-management" },
-  ];
-
-  const customerCareItems = [
-    { id: 'chat', label: 'Quản lý chat', icon: ICONS.CHAT, activeIcon: ICONS.CHAT, path: "/owner/chat" },
-    { id: 'review', label: 'Quản lý đánh giá', icon: ICONS.REVIEW, activeIcon: ICONS.REVIEW, path: "/owner/review-management" },
-  ];
-
-  // Customer Care Section
-  const [isCustomerCareOpen, setCustomerCareOpen] = useState(false);
-
-  const financeItems = [
-    { id: 'report', label: 'Doanh thu', icon: ICONS.REVENUE, activeIcon: ICONS.REVENUE, path: "/owner/report-management" },
-    { id: 'bank', label: 'Ngân hàng', icon: ICONS.BANK, activeIcon: ICONS.BANK, path: "/owner/banking" },
-  ];
-
-  // Finance Section
-  const [isFinanceOpen, setFinanceOpen] = useState(false);
-
-  const bottomItems = [
-    { id: 'support', label: 'Hỗ trợ liên hệ', icon: ICONS.SUPPORT, activeIcon: ICONS.SUPPORT, path: "/*" },
-    { id: 'delete', label: 'Xóa tài khoản', icon: ICONS.DELETE, activeIcon: ICONS.DELETE, textColor: 'text-[#ff4b4b]', path: "/" },
-    { id: 'logout', label: 'Đăng xuất', icon: ICONS.LOGOUT, activeIcon: ICONS.LOGOUT, path: "/" },
-  ];
-
+  // Navigation handler
   const handleItemClick = (path: string, id: string) => {
+    setActiveItem(id);
     onMenuItemClick(id);
     navigate(path);
   };
 
-  const isActiveRoute = (path: string): boolean => {
-    return location.pathname === path;
+  // Check if route is active
+  const isActiveRoute = (path: string, id?: string): boolean => {
+    return activeItem === id || location.pathname === path;
+  };
+
+  // Menu definitions
+  const mainMenuItems: MenuItem[] = [
+    { id: 'dashboard', label: 'Trang chủ', icon: <DashboardOutlined />, path: "/owner" },
+    { id: 'calendar', label: 'Lịch đặt sân', icon: <CalendarOutlined />, path: "/owner/play-schedule" },
+    { id: 'facility', label: 'Quản lý cơ sở', icon: <AppstoreOutlined />, path: "/owner/facility-management" },
+    { id: 'field', label: 'Quản lý nhóm sân', icon: <FieldTimeOutlined />, path: "/owner/field-group-management" },
+    { id: 'service', label: 'Quản lý dịch vụ', icon: <ShoppingOutlined />, path: "/owner/service-management" },
+    { id: 'voucher', label: 'Quản lý voucher', icon: <GiftOutlined />, path: "/owner/voucher-management" },
+    { id: 'ads', label: 'Quản lý sự kiện', icon: <NotificationOutlined />, path: "/owner/event-management" },
+  ];
+
+  const menuSections: MenuSection[] = [
+    {
+      title: 'Chăm sóc khách hàng',
+      items: [
+        { id: 'chat', label: 'Quản lý chat', icon: <MessageOutlined />, path: "/owner/chat" },
+        { id: 'review', label: 'Quản lý đánh giá', icon: <StarOutlined />, path: "/owner/review-management" },
+      ]
+    },
+    {
+      title: 'Báo cáo tài chính',
+      items: [
+        { id: 'report', label: 'Báo cáo tài chính', icon: <BarChartOutlined />, path: "/owner/report-management" },
+        { id: 'bank', label: 'Ngân hàng', icon: <BankOutlined />, path: "/owner/banking" },
+      ]
+    }
+  ];
+
+  const bottomMenuItems: MenuItem[] = [
+    { id: 'support', label: 'Hỗ trợ liên hệ', icon: <CustomerServiceOutlined />, path: "/owner/contact-support" },
+    { id: 'delete', label: 'Xóa tài khoản', icon: <DeleteOutlined />, path: "/", danger: true },
+    { id: 'logout', label: 'Đăng xuất', icon: <LogoutOutlined />, path: "/" },
+  ];
+
+  // Render a menu item
+  const renderMenuItem = (item: MenuItem, showLabel: boolean = true) => {
+    const isActive = isActiveRoute(item.path, item.id);
+    const isDanger = item.danger;
+
+    return (
+      <div
+        key={item.id}
+        onClick={(e) => {
+          // Tạo hiệu ứng ripple khi click
+          const button = e.currentTarget;
+          const ripple = document.createElement('span');
+          const rect = button.getBoundingClientRect();
+          
+          const size = Math.max(rect.width, rect.height);
+          const x = e.clientX - rect.left - size / 2;
+          const y = e.clientY - rect.top - size / 2;
+          
+          ripple.style.width = ripple.style.height = `${size}px`;
+          ripple.style.left = `${x}px`;
+          ripple.style.top = `${y}px`;
+          ripple.className = 'ripple';
+          
+          button.appendChild(ripple);
+          
+          setTimeout(() => {
+            ripple.remove();
+            handleItemClick(item.path, item.id);
+          }, 200);
+        }}
+        className={`
+          flex items-center ${showLabel ? (isCollapsed ? 'justify-center' : 'px-5') : 'justify-center'} 
+          p-[10px] mb-2 rounded-[10px] cursor-pointer w-full h-[43px] relative overflow-hidden
+          ${isActive ? 'bg-[#4880ff] text-white' : isDanger ? 'text-[#ff4d4f]' : 'text-black'} 
+          ${!isActive && 'hover:bg-[#f5f5f5]'}
+          transition-all duration-100 ease-in-out
+        `}
+      >
+        <span className={`text-[23px] ${showLabel && !isCollapsed && 'mr-[10px]'} 
+          ${isActive ? 'text-white' : isDanger ? 'text-[#ff4d4f]' : ''} z-10`}
+        >
+          {item.icon}
+        </span>
+        {showLabel && !isCollapsed && (
+          <span className={`font-roboto text-lg font-semibold leading-[23px] whitespace-nowrap z-10
+            ${isActive ? 'text-white' : isDanger ? 'text-[#ff4d4f]' : 'text-black'}`}
+          >
+            {item.label}
+          </span>
+        )}
+      </div>
+    );
+  };
+
+  // Render a collapsible section
+  const renderSection = (section: MenuSection, index: number) => {
+    const isOpen = index === 0 ? isCustomerCareOpen : isFinanceOpen;
+    const toggleOpen = () => {
+      if (index === 0) {
+        setCustomerCareOpen(!isCustomerCareOpen);
+      } else {
+        setFinanceOpen(!isFinanceOpen);
+      }
+    };
+
+    return (
+      <div key={section.title} className="mt-1.5">
+        {!isCollapsed ? (
+          <>
+            <div 
+              className="flex justify-between items-center px-2 pt-2.5 pb-3.5 rounded-[10px] cursor-pointer hover:bg-[#f5f5f5] transition-colors duration-200"
+              onClick={toggleOpen}
+            >
+              <span className="font-semibold text-lg leading-[23px] text-black whitespace-nowrap">
+                {section.title}
+              </span>
+              <span className={`transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}>
+                <DownOutlined />
+              </span>
+            </div>
+            <div className={`overflow-hidden transition-all duration-300 ${isOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}>
+              {section.items.map(item => renderMenuItem(item))}
+            </div>
+          </>
+        ) : (
+          <>{section.items.map(item => renderMenuItem(item, false))}</>
+        )}
+      </div>
+    );
   };
 
   return (
-    <div className={`h-full bg-white p-[10px] flex flex-col border-r border-[#d8d8d8] sidebar-transition ${
-      isMobile ? 'w-full' : isCollapsed ? 'w-20' : 'w-60'
-    }`}>
-      {/* Header - Fixed */}
+    <div className={`h-full bg-white p-[10px] flex flex-col border-r border-[#d8d8d8] transition-all duration-300 ease-in-out
+      ${isMobile ? 'w-full' : isCollapsed ? 'w-20' : 'w-60'}`}
+    >
+      {/* Header */}
       <div className="flex-shrink-0">
-        {/* Toggle Sidebar */}
         <div className={`flex items-center ${isCollapsed ? 'justify-center h-[90px]' : 'px-[20px]'} pt-[10px] pb-[20px]`}>
           {!isMobile && (
             <button 
@@ -106,11 +235,10 @@ const Sidebar: React.FC<SidebarProps> = ({
               className="w-[30px] h-[20px] flex items-center justify-center border-0 bg-transparent cursor-pointer transition-transform hover:scale-110 focus:outline-none"
               aria-label="Toggle sidebar"
             >
-              <img 
-                src={ICONS.TOGGLE_SIDEBAR} 
-                alt="Toggle Sidebar" 
-                className="w-full h-full"
-              />
+              {isCollapsed ? 
+                <MenuUnfoldOutlined className="text-xl" /> : 
+                <MenuFoldOutlined className="text-xl" />
+              }
             </button>
           )}
           {(!isCollapsed || isMobile) && (
@@ -122,192 +250,30 @@ const Sidebar: React.FC<SidebarProps> = ({
         <div className="border-b border-[#d8d8d8] mb-5" />
       </div>
 
-      {/* Scrollable Middle Section */}
+      {/* Middle Scrollable Section */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar">
-        {/* Menu Items */}
+        {/* Main Menu Items */}
         <div className="pt-1 pb-[8px] flex flex-col gap-1.5">
-          {menuItems.map((item) => {
-            const isActive = isActiveRoute(item.path);
-            return (
-              <div
-                key={item.id}
-                onClick={() => handleItemClick(item.path, item.id)}
-                className={`flex items-center ${isCollapsed ? 'justify-center' : 'px-5'} p-[10px] mb-2 rounded-[10px] cursor-pointer w-full h-[43px]
-                  ${isActive ? 'bg-[#4880ff] text-white' : 'bg-white text-black hover:bg-[#f5f5f5]'}`}
-              >
-                <img 
-                  src={item.icon}
-                  alt={item.label}
-                  className={`w-[23px] h-[23px] ${!isCollapsed && 'mr-[10px]'} ${isActive ? 'brightness-0 invert' : ''} transition-transform duration-300`}
-                />
-                {!isCollapsed && (
-                  <span className="font-roboto text-lg font-semibold leading-[23px] whitespace-nowrap transition-transform duration-300">
-                    {item.label}
-                  </span>
-                )}
-              </div>
-            );
-          })}
+          {mainMenuItems.map(item => renderMenuItem(item))}
         </div>
 
         <div className="border-b border-[#d8d8d8]" />
 
-        {/* Customer Care Section */}
-        <div className="mt-1.5">
-          {!isCollapsed ? (
-            <>
-              <div 
-                className="flex justify-between items-center px-2 pt-2.5 pb-3.5 rounded-[10px] cursor-pointer"
-                onClick={() => setCustomerCareOpen(!isCustomerCareOpen)}
-              >
-                <span className="font-semibold text-lg leading-[23px] text-black whitespace-nowrap transition-transform duration-300">Chăm sóc khách hàng</span>
-                <img
-                  src={ICONS.DROPDOWN}
-                  alt="Dropdown"
-                  className={`w-[13px] h-[8px] transition-transform duration-300 ${isCustomerCareOpen ? 'rotate-180' : ''}`}
-                />
-              </div>
-              <div className={`overflow-hidden transition-all duration-300 ${isCustomerCareOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}>
-                {customerCareItems.map((item) => {
-                  const isActive = isActiveRoute(item.path);
-                  return (
-                    <div
-                      key={item.id}
-                      onClick={() => handleItemClick(item.path, item.id)}
-                      className={`flex items-center px-5 p-[10px] mb-2 rounded-[10px] cursor-pointer transition-colors w-full
-                        ${isActive ? 'bg-[#4880ff] text-white' : 'bg-white text-black hover:bg-[#f5f5f5]'}`}
-                    >
-                      <img 
-                        src={item.icon}
-                        alt={item.label}
-                        className={`w-[23px] h-[23px] mr-[10px] ${isActive ? 'brightness-0 invert' : ''} transition-transform duration-300`}
-                      />
-                      <span className="font-roboto text-lg font-semibold leading-[23px] whitespace-nowrap transition-transform duration-300">
-                        {item.label}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          ) : (
-            <>
-              {customerCareItems.map((item) => {
-                const isActive = isActiveRoute(item.path);
-                return (
-                  <div
-                    key={item.id}
-                    onClick={() => handleItemClick(item.path, item.id)}
-                    className={`flex items-center justify-center p-[10px] mb-2 rounded-[10px] cursor-pointer transition-colors w-full
-                      ${isActive ? 'bg-[#4880ff] text-white' : 'bg-white text-black hover:bg-[#f5f5f5]'}`}
-                  >
-                    <img 
-                      src={item.icon}
-                      alt={item.label}
-                      className={`w-[23px] h-[23px] ${isActive ? 'brightness-0 invert' : ''}`}
-                    />
-                  </div>
-                );
-              })}
-            </>
-          )}
-        </div>
-
-        <div className="border-b border-[#d8d8d8]" />
-
-        {/* Finance Section */}
-        <div className="mt-1.5">
-          {!isCollapsed ? ( 
-            <>
-              <div 
-                className="flex justify-between items-center px-2 pt-2.5 pb-3.5 rounded-[10px] cursor-pointer"
-                onClick={() => setFinanceOpen(!isFinanceOpen)}
-          >
-            <span className="font-semibold text-lg leading-[23px] text-black whitespace-nowrap transition-transform duration-300">Báo cáo tài chính</span>
-            <img
-              src={ICONS.DROPDOWN}
-              alt="Dropdown"
-              className={`w-[13px] h-[8px] transition-transform duration-300 ${isFinanceOpen ? 'rotate-180' : ''}`}
-            />
-          </div>
-          <div className={`overflow-hidden transition-all duration-300 ${isFinanceOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}>
-          {financeItems.map((item) => {
-            const isActive = isActiveRoute(item.path);
-            return (
-              <div
-                key={item.id}
-                onClick={() => handleItemClick(item.path, item.id)}
-                className={`flex items-center ${isCollapsed ? 'justify-center' : 'px-5'} p-[10px] mb-2 rounded-[10px] cursor-pointer transition-colors w-full
-                  ${isActive ? 'bg-[#4880ff] text-white' : 'bg-white text-black hover:bg-[#f5f5f5]'}`}
-              >
-                <img 
-                  src={item.icon}
-                  alt={item.label}
-                  className={`w-[23px] h-[23px] ${!isCollapsed && 'mr-[10px]'} ${isActive ? 'brightness-0 invert' : ''} transition-transform duration-300`}
-                />
-                {!isCollapsed && (
-                  <span className="font-roboto text-lg font-semibold leading-[23px] whitespace-nowrap transition-transform duration-300">
-                    {item.label}
-                  </span>
-                )}
-              </div>
-                );
-              })}            
-          </div>
-          </>
-          ) : (
-            <>
-              {financeItems.map((item) => {
-                const isActive = isActiveRoute(item.path);  
-                return (
-                  <div
-                    key={item.id}
-                    onClick={() => handleItemClick(item.path, item.id)}
-                    className={`flex items-center justify-center p-[10px] mb-2 rounded-[10px] cursor-pointer transition-colors w-full
-                      ${isActive ? 'bg-[#4880ff] text-white' : 'bg-white text-black hover:bg-[#f5f5f5]'}`}
-                  >
-                    <img 
-                      src={item.icon}
-                      alt={item.label}
-                      className={`w-[23px] h-[23px] ${isActive ? 'brightness-0 invert' : ''}`}
-                    />
-                  </div>
-                );
-              })}
-            </>
-          )}    
-        </div>
+        {/* Collapsible Sections */}
+        {menuSections.map((section, index) => (
+          <React.Fragment key={section.title}>
+            {renderSection(section, index)}
+            {index < menuSections.length - 1 && <div className="border-b border-[#d8d8d8]" />}
+          </React.Fragment>
+        ))}
       </div>
 
-      {/* Bottom Sticky Menu Items */}
+      {/* Bottom Menu */}
       <div className="flex-shrink-0 pt-5">
         <div className="border-t border-[#d8d8d8] pt-3">
-          {/* Bottom menu items - always displayed in full in mobile */}
           <div className="w-full h-[1px] bg-[#e0e0e0]" />
-          {/* Bottom Items */}
           <div className="pt-3.5 pb-3 flex flex-col gap-1">
-            {bottomItems.map((item) => {
-              const isActive = isActiveRoute(item.path);
-              return (
-                <div
-                  key={item.id}
-                  onClick={() => handleItemClick(item.path, item.id)}
-                  className={`flex items-center ${isCollapsed ? 'justify-center' : 'px-5'} p-[10px] mb-2 rounded-[10px] cursor-pointer transition-colors w-full
-                    ${isActive ? 'bg-[#4880ff] text-white' : 'bg-white text-black hover:bg-[#f5f5f5]'}`}
-                >
-                  <img 
-                    src={item.icon}
-                    alt={item.label}
-                    className={`w-[23px] h-[23px] ${!isCollapsed && 'mr-[10px]'} ${isActive ? 'brightness-0 invert' : ''} transition-transform duration-300`}
-                  />
-                  {!isCollapsed && (
-                    <span className="font-roboto text-lg font-semibold leading-[23px] whitespace-nowrap transition-transform duration-300">
-                      {item.label}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
+            {bottomMenuItems.map(item => renderMenuItem(item))}
           </div>
         </div>
       </div>
@@ -316,3 +282,4 @@ const Sidebar: React.FC<SidebarProps> = ({
 };
 
 export default Sidebar;
+

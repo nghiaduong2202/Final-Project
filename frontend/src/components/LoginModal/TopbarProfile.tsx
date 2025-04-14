@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Dropdown, Avatar, Button, MenuProps } from 'antd';
-import { UserOutlined, LogoutOutlined } from '@ant-design/icons';
+import { UserOutlined, LogoutOutlined, DashboardOutlined, MessageOutlined, CalendarOutlined, StarOutlined } from '@ant-design/icons';
 import { useAppSelector, useAppDispatch } from '@/hooks/reduxHooks';
 import { logout, resetAuthChecks } from '@/store/slices/userSlice';
 import LoginModal from './LoginModal';
@@ -53,37 +53,26 @@ const TopbarProfile: React.FC = () => {
     },
     ...(user?.role === 'owner' ? [{
       key: 'owner-dashboard',
+      icon: <DashboardOutlined />,
       label: 'Trang chủ chủ sân',
       onClick: () => navigate('/owner')
-    },
-    {
-      key: 'owner-notifications',
-      label: 'Thông báo',
-      onClick: () => navigate('/owner/notifications')
-    },
-    {
-      key: 'owner-messages',
-      label: 'Tin nhắn',
-      onClick: () => navigate('/owner/messages')
-    },
-    {
-      key: 'owner-revenue',
-      label: 'Doanh thu',
-      onClick: () => navigate('/owner/revenue')
-    }  
+    }    
     ] : []),
     ...(user?.role === 'player' ? [{
       key: 'messages',
+      icon: <MessageOutlined />,
       label: 'Tin nhắn',
-      onClick: () => navigate('/user/messages')
+      onClick: () => navigate('/user/chat')
     },    
     {
       key: 'bookings',
+      icon: <CalendarOutlined />,
       label: 'Lịch sử đặt sân',
       onClick: () => navigate('/user/history-booking')
     },
     {
       key: 'favorite',
+      icon: <StarOutlined />,
       label: 'Danh sách yêu thích',
       onClick: () => navigate('/user/favorite')
     }
@@ -119,14 +108,15 @@ const TopbarProfile: React.FC = () => {
   };
 
   return (
-    <div className="ml-2">
+    <div>
       {isAuthenticated ? (
         <Dropdown menu={{ items: userMenuItems }} trigger={['click']} placement="bottomRight">
-          <div className="flex items-center cursor-pointer">
+          <div className="flex items-center cursor-pointer h-10 px-2">
             <Avatar 
               src={user?.avatarUrl} 
               icon={!user?.avatarUrl && <UserOutlined />} 
               className="mr-2"
+              size="default"
             />
             <span className="text-sm font-medium hidden md:inline">
               {user?.name}
@@ -134,17 +124,17 @@ const TopbarProfile: React.FC = () => {
           </div>
         </Dropdown>
       ) : (
-        <div className="flex gap-2">
+        <div className="flex gap-1 h-10 items-center">
           <Button 
             type="text" 
-            size="small" 
+            className="h-9"
             onClick={handleLoginClick}
           >
             Đăng nhập
           </Button>
           <Button 
             type="primary" 
-            size="small" 
+            className="h-9"
             onClick={handleRegisterClick}
           >
             Đăng ký

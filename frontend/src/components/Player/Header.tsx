@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Select, Dropdown, Button, Badge, Popover, Input, Space, Divider, Modal } from 'antd';
 import { 
   BellOutlined, QuestionCircleOutlined, GlobalOutlined, DownOutlined, 
-  SearchOutlined, LoginOutlined
+  SearchOutlined, LoginOutlined, TrophyOutlined
 } from '@ant-design/icons';
 import TopbarProfile from '@/components/LoginModal/TopbarProfile';
 import Logo from '@/assets/Logo.svg';
@@ -185,14 +185,6 @@ const Header = () => {
           Câu hỏi thường gặp
         </a>
       )
-    },
-    {
-      key: 'events',
-      label: (
-        <a href="/events" target="_blank" rel="noopener noreferrer">
-          Sự kiện & Giải đấu
-        </a>
-      )
     }
   ];
 
@@ -345,7 +337,7 @@ const Header = () => {
           </div>
           
           {/* Right side items */}
-          <div className="flex items-center space-x-2 md:space-x-4">
+          <div className="flex items-center space-x-1 md:space-x-2">
             {/* Search */}
             <Popover 
               content={searchContent} 
@@ -356,10 +348,10 @@ const Header = () => {
             >
               <Button 
                 type="text" 
-                className="flex items-center text-sm px-3 h-9"
+                className="flex items-center justify-center text-sm px-3 h-10"
               >
-                <SearchOutlined className="text-lg md:mr-1" />
-                <span className="hidden md:inline">Tìm kiếm</span>
+                <SearchOutlined className="text-lg" />
+                <span className="hidden md:inline ml-1">Tìm kiếm</span>
               </Button>
             </Popover>
 
@@ -372,11 +364,11 @@ const Header = () => {
             >
               <Button 
                 type="text" 
-                className="flex items-center text-sm px-3 h-9 relative" 
+                className="flex items-center justify-center text-sm px-3 h-10" 
                 onClick={handleNotificationClick}
               >
                 <span className="relative">
-                  <BellOutlined className="text-lg md:mr-1" />
+                  <BellOutlined className="text-lg" />
                   {isAuthenticated && (
                     <Badge 
                       count={3} 
@@ -385,16 +377,35 @@ const Header = () => {
                     />
                   )}
                 </span>
-                <span className="hidden md:inline">Thông báo</span>
+                <span className="hidden md:inline ml-1">Thông báo</span>
               </Button>
             </Dropdown>
+
+            {/* Events & Tournaments */}
+            <a 
+              href="/events" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="no-underline"
+            >
+              <Button 
+                type="text" 
+                className="flex items-center justify-center text-sm px-3 h-10"
+              >
+                <TrophyOutlined className="text-lg" />
+                <span className="hidden md:inline ml-1">Sự kiện & Giải đấu</span>
+              </Button>
+            </a>
 
             {/* Support */}
             <div className="hidden md:block">
               <Dropdown menu={{ items: supportItems }} placement="bottomRight">
-                <Button type="text" className="flex items-center text-sm px-3 h-9">
-                  <QuestionCircleOutlined className="text-lg mr-1" />
-                  <span>Hỗ trợ</span>
+                <Button 
+                  type="text" 
+                  className="flex items-center justify-center text-sm px-3 h-10"
+                >
+                  <QuestionCircleOutlined className="text-lg" />
+                  <span className="ml-1">Hỗ trợ</span>
                 </Button>
               </Dropdown>
             </div>
@@ -402,13 +413,16 @@ const Header = () => {
             {/* Language selector */}
             <div className="hidden md:block">
               <Dropdown menu={{ items: languageItems }} placement="bottomRight">
-                <Button type="text" className="flex items-center text-sm px-3 h-9">
-                  <GlobalOutlined className="text-lg mr-1" />
-                  <span>{language === 'vi' ? 'Tiếng Việt' : 'English'}</span>
+                <Button 
+                  type="text" 
+                  className="flex items-center justify-center text-sm px-3 h-10"
+                >
+                  <GlobalOutlined className="text-lg" />
+                  <span className="ml-1">{language === 'vi' ? 'Tiếng Việt' : 'English'}</span>
                   <DownOutlined className="text-xs ml-1" />
                 </Button>
               </Dropdown>
-          </div>
+            </div>
           
             {/* User Profile - keep this last as it's different */}
             <TopbarProfile />

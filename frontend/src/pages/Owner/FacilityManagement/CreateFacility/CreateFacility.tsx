@@ -5,17 +5,15 @@ import {
   Typography, 
   Steps, 
   Card, 
-  message
+  message,
+  Form
 } from 'antd';
 import { 
   ArrowLeftOutlined, 
-  SaveOutlined, 
   PictureOutlined, 
   AppstoreOutlined, 
   SafetyCertificateOutlined, 
-  RightOutlined, 
-  LeftOutlined,
-  InfoCircleOutlined
+  InfoCircleOutlined,
 } from '@ant-design/icons';
 import { FacilityFormData } from '@/types/facility.type';
 import { Sport } from '@/types/sport.type';
@@ -43,6 +41,7 @@ const CreateFacility: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [allSports, setAllSports] = useState<Sport[]>([]);
   const basicInfoFormRef = useRef<BasicInfoFormRef>(null);
+  const [basicInfoForm] = Form.useForm();
   const [formData, setFormData] = useState<FacilityFormData>({
     facilityInfo: {
       name: '',
@@ -95,18 +94,6 @@ const CreateFacility: React.FC = () => {
     } catch (error) {
       console.error('Error fetching sports:', error);
       message.error('Không thể tải dữ liệu môn thể thao');
-      
-      // Use mock data as fallback
-      const mockSports: Sport[] = [
-        { id: 1, name: 'football' },
-        { id: 2, name: 'tennis' },
-        { id: 3, name: 'futsal' },
-        { id: 4, name: 'basketball' },
-        { id: 5, name: 'badminton' },
-        { id: 6, name: 'swimming' },
-        { id: 7, name: 'golf' }
-      ];
-      setAllSports(mockSports);
     }
   };
 
@@ -132,40 +119,96 @@ const CreateFacility: React.FC = () => {
       content: (props: StepComponentProps) => <VerificationDocuments
         formData={props.formData}
         updateFormData={props.updateFormData}
+        allSports={props.allSports}
       />
     }
   ];
 
   const next = async () => {
     try {
-      // Validation for each step
       if (current === 0) {
         // Validate basic info form và lấy dữ liệu
         if (basicInfoFormRef.current) {
           const values = await basicInfoFormRef.current.validateFields();
+          
+          // Xác định số ca dựa trên khung giờ đã nhập
+          let numberOfShifts = 1;
+          if (values.openTime2 && values.closeTime2) {
+            numberOfShifts = values.openTime3 && values.closeTime3 ? 3 : 2;
+          }
+          
+          // Đảm bảo có đủ thông tin location trước khi chuyển bước
+          if (!values.provinceCode || !values.districtCode || !values.wardCode) {
+            message.error('Vui lòng nhập đầy đủ thông tin địa chỉ của cơ sở');
+            return;
+          }
+          
+          // Lấy tên tỉnh, huyện, xã từ values hoặc từ formData hiện tại
+          let provinceName = '';
+          let districtName = '';
+          let wardName = '';
+          let fullLocation = '';
+          
+          // Sử dụng trực tiếp dữ liệu từ formData đã được cập nhật bởi BasicInfoForm
+          if (formData.facilityInfo) {
+            provinceName = formData.facilityInfo.city || '';
+            districtName = formData.facilityInfo.district || '';
+            wardName = formData.facilityInfo.ward || '';
+            
+            // Kiểm tra xem đã có location trong formData chưa
+            if (formData.facilityInfo.location) {
+              fullLocation = formData.facilityInfo.location;
+              console.log("Sử dụng location từ formData:", fullLocation);
+            }
+          }
+          
+          // Nếu không có location trong formData, tạo mới từ các thành phần
+          if (!fullLocation && provinceName && districtName && wardName) {
+            const detailAddress = values.detailAddress || '';
+            if (detailAddress) {
+              fullLocation = `${detailAddress}, ${wardName}, ${districtName}, ${provinceName}`;
+            } else {
+              fullLocation = `${wardName}, ${districtName}, ${provinceName}`;
+            }
+            console.log("Tạo location mới:", fullLocation);
+          }
+          
+          // Không hiển thị lỗi nếu có đủ thông tin địa chỉ, chỉ log cảnh báo
+          if (!fullLocation) {
+            console.warn('Không thể tạo địa chỉ đầy đủ từ các thành phần.');
+            // Tạo location mặc định từ các thành phần hiện có
+            if (provinceName && districtName && wardName) {
+              fullLocation = `${wardName}, ${districtName}, ${provinceName}`;
+              console.log("Tạo location mặc định:", fullLocation);
+            }
+          }
+          
           // Lưu dữ liệu từ form vào state formData
           const facilityInfo = {
             ...formData.facilityInfo,
             name: values.name,
             description: values.description,
-            numberOfShifts: values.numberOfShifts,
+            numberOfShifts: numberOfShifts,
             provinceCode: values.provinceCode,
             districtCode: values.districtCode,
             wardCode: values.wardCode,
-            location: values.detailAddress,
+            detailAddress: values.detailAddress || '',
+            // Sử dụng location đã tạo hoặc từ formData
+            location: fullLocation || formData.facilityInfo.location || '',
             openTime1: values.openTime1 ? values.openTime1.format('HH:mm') : '',
             closeTime1: values.closeTime1 ? values.closeTime1.format('HH:mm') : '',
-            openTime2: values.numberOfShifts >= 2 && values.openTime2 ? values.openTime2.format('HH:mm') : '',
-            closeTime2: values.numberOfShifts >= 2 && values.closeTime2 ? values.closeTime2.format('HH:mm') : '',
-            openTime3: values.numberOfShifts >= 3 && values.openTime3 ? values.openTime3.format('HH:mm') : '',
-            closeTime3: values.numberOfShifts >= 3 && values.closeTime3 ? values.closeTime3.format('HH:mm') : ''
+            openTime2: values.openTime2 ? values.openTime2.format('HH:mm') : '',
+            closeTime2: values.closeTime2 ? values.closeTime2.format('HH:mm') : '',
+            openTime3: values.openTime3 ? values.openTime3.format('HH:mm') : '',
+            closeTime3: values.closeTime3 ? values.closeTime3.format('HH:mm') : ''
           };
           
           // Cập nhật formData với dữ liệu mới
           updateFormData({ facilityInfo });
           
           // Log để kiểm tra dữ liệu
-          console.log("Đã cập nhật formData với thông tin cơ bản:", facilityInfo);
+          console.log("Thông tin đầy đủ của facilityInfo:", facilityInfo);
+          console.log("Kiểm tra location:", facilityInfo.location);
         }
       } else if (current === 1) {
         // Validate images
@@ -218,19 +261,19 @@ const CreateFacility: React.FC = () => {
       setCurrent(0); // Quay lại bước 1
       return;
     }
-
+      
     if (!formData.facilityInfo.location) {
       message.error('Vui lòng nhập địa chỉ cơ sở');
       setCurrent(0); // Quay lại bước 1
       return;
     }
-
+      
     if (!formData.facilityInfo.openTime1 || !formData.facilityInfo.closeTime1) {
       message.error('Vui lòng nhập giờ mở cửa và đóng cửa');
       setCurrent(0); // Quay lại bước 1
       return;
     }
-    
+      
     try {
       setSubmitting(true);
       
@@ -283,10 +326,15 @@ const CreateFacility: React.FC = () => {
             dimension: group.dimension,
             surface: group.surface,
             basePrice: group.basePrice,
-            peakStartTime1: formatTimeString(group.peakStartTime1 || ""),
-            peakEndTime1: formatTimeString(group.peakEndTime1 || ""),
-            priceIncrease1: group.priceIncrease1,
             sportIds: group.sportIds,
+            // numberOfPeaks: group.numberOfPeaks || 0,
+            // Chỉ thêm các trường thời gian nếu chúng tồn tại
+            ...(group.peakStartTime1 && group.peakEndTime1 ? { 
+              peakStartTime1: formatTimeString(group.peakStartTime1),
+              peakEndTime1: formatTimeString(group.peakEndTime1),
+              priceIncrease1: group.priceIncrease1 || 0
+            } : {}),
+            
             // Thêm các trường thời gian khác nếu chúng tồn tại
             ...(group.peakStartTime2 ? { peakStartTime2: formatTimeString(group.peakStartTime2) } : {}),
             ...(group.peakEndTime2 ? { peakEndTime2: formatTimeString(group.peakEndTime2) } : {}),
@@ -327,15 +375,19 @@ const CreateFacility: React.FC = () => {
         formDataForApi.append('images', file);
       });
       
-      // Add certificate
-      formDataForApi.append('certificate', formData.certificateFile);
+      // Add certificate and license files
+      if (formData.certificateFile) {
+        formDataForApi.append('certificate', formData.certificateFile);
+      }
       
-      // Add licenses
+      // Thêm license (giấy phép cho từng môn thể thao)
       if (formData.licenseFiles && formData.licenseFiles.length > 0) {
-        formData.licenseFiles.forEach((license) => {
-          formDataForApi.append('licenses', license.file);
+        formData.licenseFiles.forEach((licenseItem) => {
+          if (licenseItem.file) {
+            formDataForApi.append('licenses', licenseItem.file);
+          }
         });
-        
+      
         // Thêm mapping sportIds cho licenses
         const sportLicenses = {
           sportIds: formData.licenseFiles.map(license => license.sportId)
@@ -345,17 +397,28 @@ const CreateFacility: React.FC = () => {
         formDataForApi.append('sportLicenses', JSON.stringify({}));
       }
       
-      // Submit to API
-      const response = await facilityService.createFacility(formDataForApi);
-      
-      if (response) {
-        message.success('Tạo cơ sở thành công!');
-        navigate('/owner/facility-management');
+      // Send to server
+      try {
+        const response = await facilityService.createFacility(formDataForApi);
+        console.log("API Response:", response);
+        
+        if (response && response.message) {
+          message.success('Đã tạo cơ sở thành công!');
+          
+          // Redirect to facility management
+          setTimeout(() => {
+            navigate('/owner/facility-management');
+          }, 100);
+        }
+      } catch (error) {
+        console.error("Lỗi từ API:", error);         
+          message.error('Có lỗi xảy ra khi tạo cơ sở. Vui lòng thử lại sau.');        
+      } finally {
+        setSubmitting(false);
       }
     } catch (error) {
-      console.error('Failed to create facility:', error);
-      message.error('Không thể tạo cơ sở mới. Vui lòng thử lại sau.');
-    } finally {
+      console.error("Lỗi khi xử lý form:", error);
+      message.error('Có lỗi xảy ra khi xử lý dữ liệu. Vui lòng thử lại.');
       setSubmitting(false);
     }
   };
@@ -394,6 +457,7 @@ const CreateFacility: React.FC = () => {
                 formData={formData}
                 updateFormData={updateFormData}
                 allSports={allSports}
+                form={basicInfoForm}
               />
             )}
             {current === 1 && (
@@ -413,21 +477,23 @@ const CreateFacility: React.FC = () => {
               <VerificationDocuments
                 formData={formData}
                 updateFormData={updateFormData}
+                allSports={allSports}
               />
             )}
           </Card>
         </div>
 
-        <div className="steps-action flex justify-between">
+        <div className="steps-action mt-6 flex justify-between">
           {current > 0 && (
             <Button 
-              icon={<LeftOutlined />}
+              style={{ margin: '0 8px' }} 
               onClick={prev}
               size="large"
             >
               Quay lại
             </Button>
           )}
+          
           {current < steps.length - 1 && (
             <Button 
               type="primary" 
@@ -435,9 +501,10 @@ const CreateFacility: React.FC = () => {
               size="large"
               className="ml-auto"
             >
-              Tiếp tục <RightOutlined />
+              Tiếp theo
             </Button>
           )}
+          
           {current === steps.length - 1 && (
             <Button 
               type="primary" 
@@ -445,9 +512,8 @@ const CreateFacility: React.FC = () => {
               loading={submitting}
               size="large"
               className="ml-auto"
-              icon={<SaveOutlined />}
             >
-              Hoàn thành
+              Hoàn tất
             </Button>
           )}
         </div>

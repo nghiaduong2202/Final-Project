@@ -1,0 +1,111 @@
+/* ResultSearch.css */
+
+/* Styling for filters container */
+.ant-checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ant-checkbox-wrapper {
+  margin-left: 0 !important;
+}
+
+/* Card styling */
+.ant-card {
+  transition: all 0.3s;
+  height: 100%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.ant-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.ant-card-body {
+  padding: 14px !important;
+}
+
+/* Tag styling */
+.ant-tag {
+  margin-right: 6px;
+  margin-bottom: 6px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+/* Rate styling */
+.ant-rate {
+  font-size: 16px;
+}
+
+/* Pagination styling */
+.ant-pagination {
+  margin-top: 24px;
+  margin-bottom: 40px;
+}
+
+.ant-pagination-item {
+  border-radius: 4px;
+}
+
+.ant-pagination-item-active {
+  font-weight: 600;
+}
+
+/* Empty state styling */
+.ant-empty {
+  margin: 32px 0;
+}
+
+/* Breadcrumb styling */
+.ant-breadcrumb {
+  margin-bottom: 16px;
+}
+
+/* General layout */
+.ant-checkbox-group .ant-checkbox-wrapper {
+  margin-bottom: 8px;
+}
+
+.ant-slider-tooltip {
+  z-index: 1000;
+}
+
+/* Enhanced contrast for filter sections */
+.ant-divider {
+  border-color: #d9d9d9;
+}
+
+.ant-checkbox-checked .ant-checkbox-inner {
+  background-color: #1890ff;
+  border-color: #1890ff;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .ant-card-body {
+    padding: 12px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .ant-card-body {
+    padding: 10px !important;
+  }
+  
+  .ant-pagination-options {
+    display: none !important;
+  }
+  
+  .ant-divider {
+    margin: 12px 0;
+  }
+}
+
+@media (max-width: 576px) {
+  .ant-card-cover img {
+    height: 160px;
+  }
+} 

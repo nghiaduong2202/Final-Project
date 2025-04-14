@@ -39,6 +39,7 @@ export interface Facility {
       firstName: string;
       lastName: string;
       email: string;
+      phoneNumber: string;
     };
     minPrice: number;
     maxPrice: number;
@@ -62,6 +63,7 @@ export interface FacilityInfo {
     ward: string;
     wardCode: string;
     location: string;
+    detailAddress?: string;
   }
   
 // Type cho form data khi tạo mới cơ sở - cấu trúc 4 bước

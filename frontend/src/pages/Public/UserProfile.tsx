@@ -1,29 +1,28 @@
 import React, { useState } from 'react';
-import { useAppSelector, useAppDispatch } from '@/hooks/reduxHooks';
+import { useNavigate } from 'react-router-dom';
+import {
+  Typography, Card, Avatar, Button, Tabs, Form, Upload, Input,
+  Select, message, DatePicker, Row, Col, Spin, Tag, Alert, Divider
+} from 'antd';
+import {
+  UserOutlined, EditOutlined, ManOutlined, WomanOutlined,
+  CalendarOutlined, MailOutlined, PhoneOutlined, BankOutlined,
+  UploadOutlined, HeartOutlined, CloseOutlined
+} from '@ant-design/icons';
+import moment from 'moment';
+import type { Moment } from 'moment';
+import type { TabsProps } from 'antd';
+import { useAppDispatch, useAppSelector } from '@/hooks/reduxHooks';
+import { login } from '@/store/slices/userSlice';
 import { authService } from '@/services/auth.service';
 import { UpdateInfo } from '@/types/user.type';
-import { login } from '@/store/slices/userSlice';
-import { 
-  Card, Avatar, Typography, Divider, Row, Col, Spin, Alert, Button, Form, Input, 
-  Select, DatePicker, message, Tabs, Upload, Tag, ConfigProvider, List, Empty, Tooltip, Rate
-} from 'antd';
-import type { TabsProps } from 'antd';
-import { 
-  UserOutlined, MailOutlined, PhoneOutlined, CalendarOutlined, BankOutlined, 
-  EditOutlined, SaveOutlined, CloseOutlined, UploadOutlined, ManOutlined, WomanOutlined,
-  HeartOutlined, DeleteOutlined, EnvironmentOutlined, ClockCircleOutlined
-} from '@ant-design/icons';
-import moment, { Moment } from 'moment';
-import locale from 'antd/es/date-picker/locale/vi_VN';
 import _ from 'lodash';
+import locale from 'antd/es/date-picker/locale/vi_VN';
 
-// Cấu hình moment để sử dụng tiếng Việt
-moment.locale('vi');
-
-const { Title, Text, Paragraph } = Typography;
+const { Title, Text } = Typography;
 const { Option } = Select;
 
-// Định nghĩa kiểu dữ liệu cho form
+// Định nghĩa interface cho form
 interface ProfileFormValues {
   name: string;
   email: string;
@@ -33,41 +32,8 @@ interface ProfileFormValues {
   bankAccount?: string;
 }
 
-// Mock data cho sân yêu thích
-const mockFavoriteFacilities = [
-  {
-    id: 'facility-1',
-    name: 'Sân bóng đá mini TDT Arena',
-    location: 'Quận 7, TP.HCM',
-    rating: 4.8,
-    image: 'https://placehold.co/300x200/orange/white?text=TDT+Arena',
-    sports: ['Bóng đá', 'Futsal'],
-    openTime: '07:00',
-    closeTime: '22:00'
-  },
-  {
-    id: 'facility-2',
-    name: 'Sân bóng rổ Star Basketball Court',
-    location: 'Quận 1, TP.HCM',
-    rating: 4.5,
-    image: 'https://placehold.co/300x200/blue/white?text=Star+Basketball',
-    sports: ['Bóng rổ'],
-    openTime: '06:00',
-    closeTime: '21:00'
-  },
-  {
-    id: 'facility-3',
-    name: 'Sân cầu lông Thống Nhất',
-    location: 'Quận 10, TP.HCM',
-    rating: 4.2,
-    image: 'https://placehold.co/300x200/green/white?text=Badminton+Court',
-    sports: ['Cầu lông'],
-    openTime: '08:00',
-    closeTime: '23:00'
-  }
-];
-
 const UserProfile: React.FC = () => {
+  const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { user, isLoading, error } = useAppSelector((state) => state.user);
   const [form] = Form.useForm();
@@ -76,9 +42,6 @@ const UserProfile: React.FC = () => {
   const [uploadLoading, setUploadLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('1');
   const [initialValues, setInitialValues] = useState<ProfileFormValues | null>(null);
-
-  // State for favorite facilities
-  const [favoriteFacilities, setFavoriteFacilities] = useState(mockFavoriteFacilities);
 
   // Helper function to format dates
   const formatDate = (dateString: string) => {
@@ -207,21 +170,9 @@ const UserProfile: React.FC = () => {
     return false; // Prevent auto upload
   };
 
-  // Handle remove favorite facility
-  const handleRemoveFavorite = (facilityId: string) => {
-    // In real application, this would make an API call
-    message.success('Đã xóa sân khỏi danh sách yêu thích');
-    setFavoriteFacilities(prev => prev.filter(item => item.id !== facilityId));
-  };
-
-  // Handle view facility details
-  const handleViewFacility = (facilityId: string) => {
-    window.location.href = `/facility/${facilityId}`;
-  };
-
   if (isLoading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+      <div className="flex justify-center items-center h-screen">
         <Spin size="large" tip="Đang tải thông tin..." />
       </div>
     );
@@ -229,7 +180,7 @@ const UserProfile: React.FC = () => {
 
   if (error) {
     return (
-      <div style={{ padding: '20px' }}>
+      <div className="max-w-4xl mx-auto px-4 py-8">
         <Alert
           message="Lỗi Tải Thông Tin"
           description={error}
@@ -242,7 +193,7 @@ const UserProfile: React.FC = () => {
 
   if (!user) {
     return (
-      <div style={{ padding: '20px' }}>
+      <div className="max-w-4xl mx-auto px-4 py-8">
         <Alert
           message="Chưa Đăng Nhập"
           description="Vui lòng đăng nhập để xem thông tin cá nhân"
@@ -256,9 +207,9 @@ const UserProfile: React.FC = () => {
   // Get role color and text
   const getRoleDisplay = () => {
     if (user.role === 'owner') {
-      return <Tag color="#f50" style={{ fontSize: '14px', padding: '2px 10px' }}>Chủ Sân</Tag>;
+      return <Tag color="#f50">Chủ Sân</Tag>;
     } else {
-      return <Tag color="#108ee9" style={{ fontSize: '14px', padding: '2px 10px' }}>Người Chơi</Tag>;
+      return <Tag color="#108ee9">Người Chơi</Tag>;
     }
   };
 
@@ -277,297 +228,241 @@ const UserProfile: React.FC = () => {
   const tabItems: TabsProps['items'] = [
     {
       key: '1',
-      label: 'Thông Tin Cá Nhân',
+      label: (
+        <span>
+          <UserOutlined className="mr-1" /> Thông Tin Cá Nhân
+        </span>
+      ),
       children: (
-        <Row gutter={[24, 24]} style={{ marginTop: '16px' }}>
-          <Col xs={24} sm={12}>
-            <div className="info-item">
-              <UserOutlined className="info-icon" />
-              <div>
-                <Text type="secondary" style={{ fontSize: '13px' }}>Họ và Tên</Text>
-                <Paragraph strong style={{ margin: '4px 0 0', fontSize: '15px' }}>{user.name}</Paragraph>
+        <div className="py-5">
+          <Row gutter={[32, 24]}>
+            <Col xs={24} md={8}>
+              <div className="mb-6">
+                <Text type="secondary">Họ và Tên</Text>
+                <div className="mt-1">
+                  <UserOutlined className="mr-2 text-gray-500" />
+                  <Text strong>{user.name}</Text>
+                </div>
               </div>
-            </div>
-          </Col>
-          <Col xs={24} sm={12}>
-            <div className="info-item">
-              {user.gender === 'male' ? <ManOutlined className="info-icon" /> : 
-                user.gender === 'female' ? <WomanOutlined className="info-icon" /> : 
-                <UserOutlined className="info-icon" />}
-              <div>
-                <Text type="secondary" style={{ fontSize: '13px' }}>Giới Tính</Text>
-                <Paragraph strong style={{ margin: '4px 0 0', fontSize: '15px' }}>
-                  {translateGender(user.gender)}
-                </Paragraph>
+            </Col>
+            <Col xs={24} md={8}>
+              <div className="mb-6">
+                <Text type="secondary">Giới Tính</Text>
+                <div className="mt-1">
+                  {user.gender === 'male' ? <ManOutlined className="mr-2 text-gray-500" /> : 
+                    user.gender === 'female' ? <WomanOutlined className="mr-2 text-gray-500" /> : 
+                    <UserOutlined className="mr-2 text-gray-500" />}
+                  <Text strong>{translateGender(user.gender)}</Text>
+                </div>
               </div>
-            </div>
-          </Col>
-          <Col xs={24} sm={12}>
-            <div className="info-item">
-              <CalendarOutlined className="info-icon" />
-              <div>
-                <Text type="secondary" style={{ fontSize: '13px' }}>Ngày Sinh</Text>
-                <Paragraph strong style={{ margin: '4px 0 0', fontSize: '15px' }}>
-                  {user.dob ? formatDate(user.dob) : 'Chưa cập nhật'}
-                </Paragraph>
+            </Col>
+            <Col xs={24} md={8}>
+              <div className="mb-6">
+                <Text type="secondary">Ngày Sinh</Text>
+                <div className="mt-1">
+                  <CalendarOutlined className="mr-2 text-gray-500" />
+                  <Text strong>{user.dob ? formatDate(user.dob) : 'Chưa cập nhật'}</Text>
+                </div>
               </div>
-            </div>
-          </Col>
-        </Row>
+            </Col>
+            {/* <Col xs={24} md={8}>
+              <div className="mb-6">
+                <Text type="secondary">Vai Trò</Text>
+                <div className="mt-1 flex items-center">
+                  <span className="mr-2">{getRoleDisplay()}</span>
+                </div>
+              </div>
+            </Col> */}
+            {user.role === 'player' && (
+              <Col xs={24}>
+                <div className="mt-4">
+                  <Button 
+                    type="primary" 
+                    icon={<HeartOutlined />} 
+                    onClick={() => navigate('/user/favorite')}
+                  >
+                    Xem danh sách sân yêu thích
+                  </Button>
+                </div>
+              </Col>
+            )}
+          </Row>
+        </div>
       ),
     },
     {
       key: '2',
-      label: 'Thông Tin Liên Hệ',
+      label: (
+        <span>
+          <MailOutlined className="mr-1" /> Thông Tin Liên Hệ
+        </span>
+      ),
       children: (
-        <Row gutter={[24, 24]} style={{ marginTop: '16px' }}>
-          <Col xs={24} sm={12}>
-            <div className="info-item">
-              <MailOutlined className="info-icon" />
-              <div>
-                <Text type="secondary" style={{ fontSize: '13px' }}>Email</Text>
-                <Paragraph strong style={{ margin: '4px 0 0', fontSize: '15px' }}>{user.email}</Paragraph>
+        <div className="py-5">
+          <Row gutter={[32, 24]}>
+            <Col xs={24} md={12}>
+              <div className="mb-6">
+                <Text type="secondary">Email</Text>
+                <div className="mt-1">
+                  <MailOutlined className="mr-2 text-gray-500" />
+                  <Text strong copyable>{user.email}</Text>
+                </div>
               </div>
-            </div>
-          </Col>
-          <Col xs={24} sm={12}>
-            <div className="info-item">
-              <PhoneOutlined className="info-icon" />
-              <div>
-                <Text type="secondary" style={{ fontSize: '13px' }}>Số Điện Thoại</Text>
-                <Paragraph strong style={{ margin: '4px 0 0', fontSize: '15px' }}>
-                  {user.phoneNumber || 'Chưa cập nhật'}
-                </Paragraph>
+            </Col>
+            <Col xs={24} md={12}>
+              <div className="mb-6">
+                <Text type="secondary">Số Điện Thoại</Text>
+                <div className="mt-1">
+                  <PhoneOutlined className="mr-2 text-gray-500" />
+                  <Text strong>{user.phoneNumber || 'Chưa cập nhật'}</Text>
+                </div>
               </div>
-            </div>
-          </Col>
-        </Row>
+            </Col>
+          </Row>
+        </div>
       ),
     },
     {
       key: '3',
-      label: 'Thông Tin Tài Khoản',
-      children: (
-        <Row gutter={[24, 24]} style={{ marginTop: '16px' }}>
-          <Col xs={24} sm={12}>
-            <div className="info-item">
-              <BankOutlined className="info-icon" />
-              <div>
-                <Text type="secondary" style={{ fontSize: '13px' }}>Tài Khoản Ngân Hàng</Text>
-                <Paragraph strong style={{ margin: '4px 0 0', fontSize: '15px' }}>
-                  {user.bankAccount || 'Chưa cập nhật'}
-                </Paragraph>
-              </div>
-            </div>
-          </Col>
-        </Row>
-      ),
-    },
-    {
-      key: '4',
       label: (
         <span>
-          <HeartOutlined /> Sân Yêu Thích
+          <BankOutlined className="mr-1" /> Thông Tin Tài Khoản
         </span>
       ),
       children: (
-        <div style={{ marginTop: '16px' }}>
-          {favoriteFacilities.length > 0 ? (
-            <List
-              grid={{ 
-                gutter: 16,
-                xs: 1,
-                sm: 2,
-                md: 2,
-                lg: 3,
-                xl: 3,
-                xxl: 3,
-              }}
-              dataSource={favoriteFacilities}
-              renderItem={(item) => (
-                <List.Item>
-                  <Card
-                    hoverable
-                    cover={<img alt={item.name} src={item.image} style={{ height: 160, objectFit: 'cover' }} />}
-                    actions={[
-                      <Tooltip title="Xem chi tiết">
-                        <Button type="text" icon={<EditOutlined />} onClick={() => handleViewFacility(item.id)} />
-                      </Tooltip>,
-                      <Tooltip title="Xóa khỏi yêu thích">
-                        <Button 
-                          type="text" 
-                          danger 
-                          icon={<DeleteOutlined />} 
-                          onClick={() => handleRemoveFavorite(item.id)} 
-                        />
-                      </Tooltip>
-                    ]}
-                  >
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-gray-600 text-xs sm:text-sm">
-                        <ClockCircleOutlined className="mr-1" />
-                        {item.openTime} - {item.closeTime}
-                      </span>
-                      <div className="flex items-center">
-                        <Rate disabled defaultValue={item.rating} className="text-xs" />
-                        <span className="ml-1 text-gray-500 text-xs">
-                          {item.rating}
-                        </span>
-                      </div>
-                    </div>
-                    <Card.Meta
-                      title={item.name}
-                      description={
-                        <>
-                          <div className="flex items-center mb-2">
-                            <EnvironmentOutlined style={{ marginRight: 8, color: '#1890ff' }} />
-                            <Text ellipsis style={{ fontSize: '12px' }}>{item.location}</Text>
-                          </div>
-                          <div>
-                            {item.sports.map(sport => (
-                              <Tag key={sport} color="blue" style={{ marginBottom: 5 }}>{sport}</Tag>
-                            ))}
-                          </div>
-                        </>
-                      }
-                    />
-                  </Card>
-                </List.Item>
-              )}
-            />
-          ) : (
-            <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description={
-                <div>
-                  <p>Bạn chưa có sân yêu thích nào</p>
-                  <Button
-                    type="primary"
-                    icon={<HeartOutlined />}
-                    onClick={() => window.location.href = '/result-search'}
-                    style={{ marginTop: 16 }}
-                  >
-                    Tìm sân ngay
-                  </Button>
+        <div className="py-5">
+          <Row gutter={[32, 24]}>
+            <Col xs={24}>
+              <div className="mb-6">
+                <Text type="secondary">Tài Khoản Ngân Hàng</Text>
+                <div className="mt-1">
+                  <BankOutlined className="mr-2 text-gray-500" />
+                  <Text strong>{user.bankAccount || 'Chưa cập nhật'}</Text>
                 </div>
-              }
-            />
-          )}
+              </div>
+            </Col>
+          </Row>
         </div>
       ),
     }
   ];
 
-  // Profile view (not editing)
+  // Function to render profile view with tabs
   const ProfileView = () => (
-    <Card 
-      className="profile-card"
-      variant="outlined"
-      style={{ 
-        boxShadow: '0 1px 2px rgba(0,0,0,0.1)', 
-        borderRadius: '8px',
-        marginBottom: '20px' 
-      }}
-    >
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        marginBottom: '24px',
-        flexDirection: 'column',
-        textAlign: 'center' 
-      }}>
-        <div style={{ position: 'relative', marginBottom: '16px' }}>
-          <Avatar 
-            size={120} 
-            icon={<UserOutlined />} 
-            src={user.avatarUrl} 
-            style={{ 
-              border: '4px solid #f0f0f0',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
-            }}
-          />
-          <Upload
-            showUploadList={false}
-            beforeUpload={beforeUpload}
-            accept="image/*"
-          >
-            <Button
-              icon={<UploadOutlined />}
-              shape="circle"
-              type="primary"
-              size="small"
-              loading={uploadLoading}
-              style={{ 
-                position: 'absolute', 
-                bottom: 0, 
-                right: 0, 
-                boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
-              }}
-            />
-          </Upload>
+    <div>
+      <Card>
+        <div className="flex flex-col md:flex-row md:items-end mb-6">
+          {/* Khối avatar và thông tin cá nhân */}
+          <div className="flex flex-col md:flex-row md:items-end flex-grow">
+            {/* Avatar */}
+            <div className="relative mb-4 md:mb-0">
+              <Avatar
+                src={user.avatarUrl}
+                icon={!user.avatarUrl && <UserOutlined />}
+                size={90}
+                style={{ border: '1px solid #f0f0f0' }}
+              />
+              <Upload
+                showUploadList={false}
+                beforeUpload={beforeUpload}
+                accept="image/*"
+              >
+                <Button 
+                  size="small"
+                  icon={<UploadOutlined />}
+                  className="absolute bottom-0 right-0"
+                  loading={uploadLoading}
+                />
+              </Upload>
+            </div>
+            
+            {/* Thông tin người dùng */}
+            <div className="md:ml-6 text-center md:text-left md:self-end">
+              <div className="flex items-center justify-center md:justify-start">
+                <Title level={3} className="m-0" style={{ marginBottom: '0' }}>{user.name}</Title>
+                <div className="ml-3">{getRoleDisplay()}</div>
+              </div>
+              <Text type="secondary">{user.email}</Text>
+            </div>
+          </div>
+          
+          {/* Nút chỉnh sửa */}
+          <div className="w-full md:w-auto flex justify-center md:justify-end mt-4 md:mt-0 md:self-end">
+            <Button 
+              type="primary" 
+              onClick={startEditing} 
+              icon={<EditOutlined />}
+            >
+              Chỉnh Sửa Thông Tin
+            </Button>
+          </div>
         </div>
-        <div>
-          <Title level={3} style={{ margin: '8px 0', fontWeight: 600 }}>{user.name}</Title>
-          <div style={{ marginTop: '5px' }}>{getRoleDisplay()}</div>
-        </div>
-      </div>
-      
-      <Divider style={{ margin: '16px 0' }} />
-      
-      <Tabs 
-        activeKey={activeTab} 
-        onChange={setActiveTab}
-        centered
-        type="card"
-        items={tabItems}
-      />
-      
-      <div style={{ textAlign: 'center', marginTop: '24px' }}>
-        <Button 
-          type="primary" 
-          icon={<EditOutlined />} 
-          onClick={startEditing}
-          size="large"
-          style={{ borderRadius: '4px' }}
-        >
-          Chỉnh Sửa Thông Tin
-        </Button>
-      </div>
-    </Card>
+        
+        <Divider />
+        
+        <Tabs 
+          items={tabItems} 
+          defaultActiveKey="1" 
+          activeKey={activeTab}
+          onChange={setActiveTab}
+        />
+      </Card>
+    </div>
   );
 
-  // Edit profile form
+  // Function to render edit form
   const EditProfileForm = () => (
-    <Card 
-      variant="outlined"
-      style={{ 
-        boxShadow: '0 1px 2px rgba(0,0,0,0.1)', 
-        borderRadius: '8px'
-      }}
+    <Card
+      title="Chỉnh Sửa Thông Tin Cá Nhân"
+      extra={
+        <Button 
+          onClick={cancelEditing}
+          icon={<CloseOutlined />}
+        >
+          Hủy
+        </Button>
+      }
     >
-      <Title level={4} style={{ marginBottom: '24px' }}>Chỉnh Sửa Thông Tin</Title>
-      
       <Form
         form={form}
         layout="vertical"
         onFinish={onFinish}
-        initialValues={{
-          name: user.name,
-          email: user.email,
-          phoneNumber: user.phoneNumber,
-          gender: user.gender,
-          dob: user.dob ? moment(user.dob) : undefined,
-          bankAccount: user.bankAccount || '',
-        }}
       >
+        <div className="text-center mb-6">
+          <Avatar
+            src={user.avatarUrl}
+            icon={!user.avatarUrl && <UserOutlined />}
+            size={100}
+            style={{ marginBottom: '16px' }}
+          />
+          <div>
+            <Upload
+              name="avatar"
+              showUploadList={false}
+              beforeUpload={beforeUpload}
+              accept="image/*"
+            >
+              <Button 
+                icon={<UploadOutlined />} 
+                loading={uploadLoading}
+              >
+                Thay đổi ảnh
+              </Button>
+            </Upload>
+          </div>
+        </div>
+        
         <Row gutter={24}>
           <Col xs={24} md={12}>
             <Form.Item
               name="name"
               label="Họ và Tên"
-              rules={[{ required: true, message: 'Vui lòng nhập họ và tên' }]}
+              rules={[
+                { required: true, message: 'Vui lòng nhập họ và tên' },
+                { min: 2, message: 'Tên phải có ít nhất 2 ký tự' }
+              ]}
             >
-              <Input prefix={<UserOutlined />} placeholder="Họ và tên" />
+              <Input placeholder="Nhập họ và tên" />
             </Form.Item>
           </Col>
           
@@ -577,10 +472,10 @@ const UserProfile: React.FC = () => {
               label="Email"
               rules={[
                 { required: true, message: 'Vui lòng nhập email' },
-                { type: 'email', message: 'Vui lòng nhập email hợp lệ' }
+                { type: 'email', message: 'Email không hợp lệ' }
               ]}
             >
-              <Input prefix={<MailOutlined />} placeholder="Email" />
+              <Input disabled />
             </Form.Item>
           </Col>
           
@@ -588,9 +483,11 @@ const UserProfile: React.FC = () => {
             <Form.Item
               name="phoneNumber"
               label="Số Điện Thoại"
-              rules={[{ required: true, message: 'Vui lòng nhập số điện thoại' }]}
+              rules={[
+                { pattern: /^[0-9]+$/, message: 'Số điện thoại chỉ bao gồm các chữ số' }
+              ]}
             >
-              <Input prefix={<PhoneOutlined />} placeholder="Số điện thoại" />
+              <Input placeholder="Nhập số điện thoại" />
             </Form.Item>
           </Col>
           
@@ -612,18 +509,12 @@ const UserProfile: React.FC = () => {
               name="dob"
               label="Ngày Sinh"
             >
-              <ConfigProvider>
-                <DatePicker 
-                  style={{ width: '100%' }} 
-                  format="DD/MM/YYYY"
-                  placeholder="Chọn ngày sinh"
-                  locale={locale}
-                  disabledDate={(current) => current && current > moment().endOf('day')}
-                  allowClear={true}
-                  inputReadOnly={true}
-                  popupStyle={{ width: '300px' }}
-                />
-              </ConfigProvider>
+              <DatePicker 
+                style={{ width: '100%' }} 
+                format="DD/MM/YYYY"
+                locale={locale}
+                placeholder="Chọn ngày sinh"
+              />
             </Form.Item>
           </Col>
           
@@ -632,25 +523,16 @@ const UserProfile: React.FC = () => {
               name="bankAccount"
               label="Tài Khoản Ngân Hàng"
             >
-              <Input prefix={<BankOutlined />} placeholder="Số tài khoản ngân hàng" />
+              <Input placeholder="Nhập số tài khoản ngân hàng" />
             </Form.Item>
           </Col>
         </Row>
         
-        <Form.Item style={{ marginTop: '24px', textAlign: 'right' }}>
-          <Button 
-            onClick={cancelEditing} 
-            style={{ marginRight: '10px' }}
-            icon={<CloseOutlined />}
-          >
+        <Form.Item className="text-right mt-4">
+          <Button onClick={cancelEditing} className="mr-3">
             Hủy
           </Button>
-          <Button 
-            type="primary" 
-            htmlType="submit" 
-            loading={submitLoading}
-            icon={<SaveOutlined />}
-          >
+          <Button type="primary" htmlType="submit" loading={submitLoading}>
             Lưu Thay Đổi
           </Button>
         </Form.Item>
@@ -659,61 +541,10 @@ const UserProfile: React.FC = () => {
   );
 
   return (
-    <div className="profile-container" style={{ 
-      padding: '30px 20px', 
-      maxWidth: '900px', 
-      margin: '0 auto',
-      background: '#f9f9f9'
-    }}>
-      <style>
-        {`
-          .profile-container {
-            background-color: #f9f9f9;
-          }
-          
-          .profile-card {
-            transition: all 0.3s ease;
-          }
-          
-          .profile-card:hover {
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-          }
-          
-          .info-item {
-            display: flex;
-            align-items: flex-start;
-            background: #f9fafc;
-            padding: 12px 16px;
-            border-radius: 8px;
-            height: 100%;
-            transition: all 0.3s ease;
-          }
-          
-          .info-item:hover {
-            background: #f0f5ff;
-          }
-          
-          .info-icon {
-            font-size: 20px;
-            margin-right: 12px;
-            color: #1890ff;
-            background: rgba(24, 144, 255, 0.1);
-            padding: 8px;
-            border-radius: 8px;
-          }
-        `}
-      </style>
-      
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center',
-        marginBottom: '20px'
-      }}>
-        <Title level={2} style={{ margin: 0 }}>Thông Tin Cá Nhân</Title>
+    <div className="p-6">
+      <div className="max-w-4xl mx-auto">
+        {isEditing ? <EditProfileForm /> : <ProfileView />}
       </div>
-      
-      {isEditing ? <EditProfileForm /> : <ProfileView />}
     </div>
   );
 };

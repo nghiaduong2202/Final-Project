@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Button, 
   Card, 
@@ -6,11 +6,14 @@ import {
   Image, 
   Radio,
   Typography,
-  Alert
+  Alert,
+  Divider,
+  Tooltip
 } from 'antd';
 import { 
   UploadOutlined, 
-  DeleteOutlined
+  DeleteOutlined,
+  PictureOutlined
 } from '@ant-design/icons';
 import { FacilityFormData } from '@/types/facility.type';
 
@@ -30,15 +33,17 @@ const ImagesUpload: React.FC<ImagesUploadProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Khởi tạo preview URLs từ formData
-  React.useEffect(() => {
+  useEffect(() => {
     if (formData.imageFiles.length > 0) {
       const urls = formData.imageFiles.map(file => URL.createObjectURL(file));
       setPreviewUrls(urls);
+    } else {
+      setPreviewUrls([]);
     }
   }, [formData.imageFiles]);
 
   // Cleanup preview URLs khi component unmount
-  React.useEffect(() => {
+  useEffect(() => {
     return () => {
       previewUrls.forEach(url => URL.revokeObjectURL(url));
     };
@@ -62,10 +67,16 @@ const ImagesUpload: React.FC<ImagesUploadProps> = ({
     });
 
     if (validFiles.length > 0) {
+      // Tạo mảng ảnh mới từ những ảnh hiện có và ảnh mới tải lên
+      const updatedFiles = [...formData.imageFiles, ...validFiles];
+      
+      // Cập nhật previewUrls
       const newPreviewUrls = validFiles.map(file => URL.createObjectURL(file));
       setPreviewUrls(prev => [...prev, ...newPreviewUrls]);
+      
+      // Cập nhật formData
       updateFormData({
-        imageFiles: [...formData.imageFiles, ...validFiles]
+        imageFiles: updatedFiles
       });
     }
   };
@@ -83,23 +94,57 @@ const ImagesUpload: React.FC<ImagesUploadProps> = ({
     
     // Cập nhật state
     setPreviewUrls(newPreviewUrls);
-    updateFormData({ imageFiles: newFiles });
     
-    // Nếu xóa ảnh bìa, chọn ảnh đầu tiên làm ảnh bìa
+    // Nếu xóa ảnh bìa hoặc xóa ảnh trước ảnh bìa, cập nhật lại coverImageIndex
     if (index === coverImageIndex && newFiles.length > 0) {
       setCoverImageIndex(0);
+    } else if (index < coverImageIndex && coverImageIndex > 0) {
+      setCoverImageIndex(coverImageIndex - 1);
     }
+    
+    // Cập nhật formData với ảnh mới
+    updateFormData({ 
+      imageFiles: newFiles
+    });
   };
 
   const handleCoverImageChange = (index: number) => {
+    if (index === coverImageIndex) return; // Không cần thay đổi nếu đã là ảnh bìa
+    
+    // Cập nhật state hiển thị
     setCoverImageIndex(index);
+    
+    // Lấy bản sao của mảng ảnh hiện tại
+    const updatedFiles = [...formData.imageFiles];
+    const updatedPreviewUrls = [...previewUrls];
+    
+    // Lấy ảnh được chọn làm ảnh bìa
+    const coverImage = updatedFiles[index];
+    const coverPreviewUrl = updatedPreviewUrls[index];
+    
+    // Xóa ảnh đó khỏi vị trí hiện tại
+    updatedFiles.splice(index, 1);
+    updatedPreviewUrls.splice(index, 1);
+    
+    // Thêm ảnh vào đầu mảng
+    updatedFiles.unshift(coverImage);
+    updatedPreviewUrls.unshift(coverPreviewUrl);
+    
+    // Cập nhật state
+    setCoverImageIndex(0); // Sau khi sắp xếp lại, ảnh bìa luôn ở vị trí đầu tiên
+    setPreviewUrls(updatedPreviewUrls);
+    
+    // Cập nhật formData
+    updateFormData({
+      imageFiles: updatedFiles
+    });
   };
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
       <Title level={4}>Hình ảnh cơ sở</Title>
-      <Text type="secondary" className="mb-6 block">
-        Tải lên hình ảnh của cơ sở (tối đa 5 ảnh, mỗi ảnh không quá 5MB)
+      <Text type="secondary" className="mb-4 block">
+        Tải lên hình ảnh của cơ sở (tối đa 10 ảnh, mỗi ảnh không quá 5MB)
       </Text>
 
       <div className="mb-6">
@@ -115,10 +160,16 @@ const ImagesUpload: React.FC<ImagesUploadProps> = ({
           type="primary"
           icon={<UploadOutlined />}
           onClick={() => fileInputRef.current?.click()}
-          disabled={formData.imageFiles.length >= 5}
+          disabled={formData.imageFiles.length >= 10}
+          size="large"
+          className="mb-4"
         >
           Tải lên ảnh
         </Button>
+        
+        <Text type="secondary" className="ml-4">
+          Đã tải lên: {formData.imageFiles.length}/10 ảnh
+        </Text>
       </div>
 
       {formData.imageFiles.length === 0 && (
@@ -131,38 +182,58 @@ const ImagesUpload: React.FC<ImagesUploadProps> = ({
         />
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {previewUrls.map((url, index) => (
           <Card
             key={index}
             hoverable
-            className="relative"
-            cover={
-              <div className="relative aspect-square">
-                <Image
-                  src={url}
-                  alt={`Preview ${index + 1}`}
-                  className="w-full h-full object-cover"
+            className="overflow-hidden transition-all duration-300 hover:shadow-lg"
+            style={{ padding: '4px' }}
+          >
+            {/* Phần ảnh với kích thước cố định */}
+            <div className="w-full h-32 overflow-hidden ">
+              <Image
+                src={url}
+                alt={`Preview ${index + 1}`}
+                className="w-full h-full object-cover rounded"
+                preview={{ mask: <div className="flex items-center justify-center"><PictureOutlined className="text-xl mr-1" /> Xem ảnh</div> }}
+                style={{ height: '90%', width: '100%' }}
+              />
+            </div>
+            
+            <Divider style={{ margin: '8px 0' }} />
+            
+            {/* Phần điều khiển bên dưới ảnh */}
+            <div className="flex justify-between items-center px-1">
+              <Radio
+                checked={coverImageIndex === index}
+                onChange={() => handleCoverImageChange(index)}
+              >
+                Ảnh bìa
+              </Radio>
+              
+              <Tooltip title="Xóa ảnh">
+                <Button
+                  type="text"
+                  danger
+                  icon={<DeleteOutlined />}
+                  onClick={() => handleRemoveImage(index)}
                 />
-                <div className="absolute top-2 right-2">
-                  <Button
-                    type="text"
-                    danger
-                    icon={<DeleteOutlined />}
-                    onClick={() => handleRemoveImage(index)}
-                  />
-                </div>
-                <div className="absolute bottom-2 left-2">
-                  <Radio
-                    checked={coverImageIndex === index}
-                    onChange={() => handleCoverImageChange(index)}
-                  >
-                    Ảnh bìa
-                  </Radio>
-                </div>
+              </Tooltip>
+            </div>
+            
+            {/* Hiển thị chỉ số của ảnh */}
+            <div className="absolute top-2 left-2 bg-black bg-opacity-60 text-white px-2 py-1 rounded text-xs">
+              {index + 1}/{previewUrls.length}
+            </div>
+            
+            {/* Đánh dấu ảnh bìa */}
+            {coverImageIndex === index && (
+              <div className="absolute top-2 right-2 bg-blue-500 text-white px-2 py-1 rounded text-xs">
+                Ảnh bìa
               </div>
-            }
-          />
+            )}
+          </Card>
         ))}
       </div>
     </div>

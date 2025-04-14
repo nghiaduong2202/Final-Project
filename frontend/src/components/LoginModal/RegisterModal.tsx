@@ -20,9 +20,10 @@ const RegisterModal: React.FC<RegisterModalProps> = ({
   const dispatch = useAppDispatch();
   const { isLoading, error } = useAppSelector(state => state.user);
 
-  const handleRegister = async (values: RegisterData) => {
+  const handleRegister = async (values: RegisterData & { retypePassword: string }) => {
     try {
-      await dispatch(register(values)).unwrap();
+      const { retypePassword, ...registerData } = values;
+      await dispatch(register(registerData)).unwrap();
       // message.success('Đăng ký tài khoản thành công!');
       if (onSuccess) {
         onSuccess();

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
+import React, { useState, useEffect, forwardRef, useImperativeHandle, useRef, useMemo } from 'react';
 import { 
   Form, 
   Input, 
@@ -10,21 +10,25 @@ import {
   Col,
   Alert,
   Spin,
-  Button
+  Button,
+  FormInstance
 } from 'antd';
 import { FacilityFormData, FacilityInfo, Province, District, Ward } from '@/types/facility.type';
 import dayjs from 'dayjs';
 import axios from 'axios';
 import { facilityService } from '@/services/facility.service';
+import { PlusOutlined, MinusCircleOutlined } from '@ant-design/icons';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
 const { TextArea } = Input;
+const { RangePicker } = TimePicker;
 
 interface BasicInfoFormProps {
   formData: FacilityFormData;
   updateFormData: (data: Partial<FacilityFormData>) => void;
   allSports: { id: number; name: string }[];
+  form?: FormInstance<BasicInfoFormValues>;
 }
 
 export interface BasicInfoFormRef {
@@ -35,7 +39,6 @@ export interface BasicInfoFormRef {
 interface BasicInfoFormValues {
   name: string;
   description: string;
-  numberOfShifts: number;
   provinceCode: string;
   districtCode: string;
   wardCode: string;
@@ -48,125 +51,237 @@ interface BasicInfoFormValues {
   closeTime3?: dayjs.Dayjs | null;
 }
 
+// Component con để hiển thị địa chỉ đầy đủ
+const FullAddressDisplay: React.FC<{
+  detailAddress?: string;
+  provinceCode?: string;
+  districtCode?: string;
+  wardCode?: string;
+  provinces: Province[];
+  districts: District[];
+  wards: Ward[];
+}> = ({ detailAddress, provinceCode, districtCode, wardCode, provinces, districts, wards }) => {
+  // Tính toán địa chỉ đầy đủ
+  const fullAddress = useMemo(() => {
+    if (!provinceCode || !districtCode || !wardCode) return null;
+    
+    // Lấy thông tin tên tỉnh, huyện, xã
+    let provinceName = '';
+    let districtName = '';
+    let wardName = '';
+    
+    const province = provinces.find(p => p.code?.toString() === provinceCode);
+    if (province) provinceName = province.name;
+    
+    const district = districts.find(d => d.code?.toString() === districtCode);
+    if (district) districtName = district.name;
+    
+    const ward = wards.find(w => w.code?.toString() === wardCode);
+    if (ward) wardName = ward.name;
+    
+    // Nếu không có đủ thông tin, không hiển thị
+    if (!provinceName || !districtName || !wardName) return null;
+    
+    // Tạo địa chỉ đầy đủ
+    return detailAddress 
+      ? `${detailAddress}, ${wardName}, ${districtName}, ${provinceName}`
+      : `${wardName}, ${districtName}, ${provinceName}`;
+  }, [detailAddress, provinceCode, districtCode, wardCode, provinces, districts, wards]);
+  
+  // Không hiển thị gì nếu không có đủ thông tin
+  if (!fullAddress) return null;
+  
+  return (
+    <Alert
+      message="Địa chỉ đầy đủ"
+      description={fullAddress}
+      type="info"
+      showIcon
+      className=""
+    />
+  );
+};
+
 const BasicInfoForm = forwardRef<BasicInfoFormRef, BasicInfoFormProps>(({ 
   formData, 
-  updateFormData
+  updateFormData,
+  form: externalForm
 }, ref) => {
-  const [form] = Form.useForm<BasicInfoFormValues>();
+  // Tạo form instance nội bộ, luôn gọi hook ở đây
+  const [internalForm] = Form.useForm<BasicInfoFormValues>();
+  // Xác định form nào sẽ được sử dụng
+  const form = externalForm || internalForm;
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [districts, setDistricts] = useState<District[]>([]);
   const [wards, setWards] = useState<Ward[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
-  const [numberOfShifts, setNumberOfShifts] = useState<number>(
+  const [visibleShifts, setVisibleShifts] = useState<number>(
     formData.facilityInfo?.numberOfShifts || 1
   );
+  
+  // Thêm debounce timer reference
+  const submitTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [shouldPreventSubmit, setShouldPreventSubmit] = useState(false);
   
   // Expose form methods to parent
   useImperativeHandle(ref, () => ({
     validateFields: async () => {
-      const values = await form.validateFields();
-      // Khi validate, đồng thời cập nhật formData
-      await handleSubmit(values);
-      return values;
+      try {
+        const values = await form.validateFields();
+        
+        // Kiểm tra tên cơ sở đã tồn tại hay chưa
+        const name = values.name;
+        if (name) {
+          try {
+            const response = await facilityService.checkFacilityNameExists(name);
+            if (response.exists) {
+              form.setFields([
+                {
+                  name: 'name',
+                  errors: ['Tên cơ sở đã tồn tại']
+                }
+              ]);
+              return Promise.reject('Tên cơ sở đã tồn tại');
+            }
+          } catch (error) {
+            console.error('Error checking facility name:', error);
+            form.setFields([
+              {
+                name: 'name',
+                errors: ['Không thể kiểm tra tên cơ sở. Vui lòng thử lại sau.']
+              }
+            ]);
+            return Promise.reject('Không thể kiểm tra tên cơ sở');
+          }
+        }
+        
+        // Khi validate thành công, đồng thời cập nhật formData
+        await submitFormData(values);
+        return values;
+      } catch (error) {
+        return Promise.reject(error);
+      }
     }
   }));
   
-  // Fetch provinces on mount
+  // Fetch provinces on mount - tải trước tất cả dữ liệu địa phương
   useEffect(() => {
-    fetchProvinces();
+    const fetchAllData = async () => {
+      try {
+        setLoading(true);
+        // Fetch tất cả tỉnh thành
+        const provinceResponse = await axios.get('https://provinces.open-api.vn/api/p');
+        setProvinces(provinceResponse.data);
+        
+        // Nếu đã có provinceCode trong formData, fetch districts
+        if (formData.facilityInfo?.provinceCode) {
+          const districtResponse = await axios.get(`https://provinces.open-api.vn/api/p/${formData.facilityInfo.provinceCode}?depth=2`);
+          setDistricts(districtResponse.data.districts);
+          
+          // Nếu đã có districtCode trong formData, fetch wards
+          if (formData.facilityInfo?.districtCode) {
+            const wardResponse = await axios.get(`https://provinces.open-api.vn/api/d/${formData.facilityInfo.districtCode}?depth=2`);
+            setWards(wardResponse.data.wards);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching location data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchAllData();
   }, []);
   
-  // Load districts if province is selected
+  // Init form values from formData (khi component được tạo hoặc khi formData thay đổi) 
   useEffect(() => {
-    if (formData.facilityInfo?.provinceCode) {
-      fetchDistricts(formData.facilityInfo.provinceCode);
-    }
-  }, [formData.facilityInfo?.provinceCode]);
-  
-  // Load wards if district is selected
-  useEffect(() => {
-    if (formData.facilityInfo?.districtCode) {
-      fetchWards(formData.facilityInfo.districtCode);
-    }
-  }, [formData.facilityInfo?.districtCode]);
-  
-  // Fetch provinces from API
-  const fetchProvinces = async () => {
-    try {
-      setLoading(true);
-      const response = await axios.get('https://provinces.open-api.vn/api/p/');
-      setProvinces(response.data);
-    } catch (error) {
-      console.error('Error fetching provinces:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  // Fetch districts from API
-  const fetchDistricts = async (provinceCode: string) => {
-    try {
-      setLoading(true);
-      const response = await axios.get(`https://provinces.open-api.vn/api/p/${provinceCode}?depth=2`);
-      setDistricts(response.data.districts);
-    } catch (error) {
-      console.error('Error fetching districts:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  // Fetch wards from API
-  const fetchWards = async (districtCode: string) => {
-    try {
-      setLoading(true);
-      const response = await axios.get(`https://provinces.open-api.vn/api/d/${districtCode}?depth=2`);
-      setWards(response.data.wards);
-    } catch (error) {
-      console.error('Error fetching wards:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  // Khởi tạo form với dữ liệu có sẵn
-  useEffect(() => {
+    // Khởi tạo initial values khi formData thay đổi
     if (formData.facilityInfo) {
-      const info = formData.facilityInfo;
-      form.setFieldsValue({
-        name: info.name,
-        description: info.description,
-        numberOfShifts: info.numberOfShifts,
-        provinceCode: info.provinceCode,
-        districtCode: info.districtCode,
-        wardCode: info.wardCode,
-        detailAddress: info.location,
-        openTime1: info.openTime1 ? dayjs(info.openTime1, 'HH:mm') : null,
-        closeTime1: info.closeTime1 ? dayjs(info.closeTime1, 'HH:mm') : null,
-        openTime2: info.openTime2 ? dayjs(info.openTime2, 'HH:mm') : null,
-        closeTime2: info.closeTime2 ? dayjs(info.closeTime2, 'HH:mm') : null,
-        openTime3: info.openTime3 ? dayjs(info.openTime3, 'HH:mm') : null,
-        closeTime3: info.closeTime3 ? dayjs(info.closeTime3, 'HH:mm') : null,
-      });
+      const { 
+        name, 
+        description, 
+        openTime1, 
+        closeTime1, 
+        openTime2, 
+        closeTime2, 
+        openTime3, 
+        closeTime3,
+        provinceCode,
+        districtCode,
+        wardCode,
+        detailAddress
+      } = formData.facilityInfo;
       
-      setNumberOfShifts(info.numberOfShifts);
+      // Tạo object chứa các giá trị cần cập nhật
+      const initialValues: Partial<BasicInfoFormValues> = { 
+        name, 
+        description,
+        provinceCode,
+        districtCode,
+        wardCode,
+        detailAddress
+      };
+      
+      // Format thời gian từ string sang dayjs
+      if (openTime1) initialValues.openTime1 = dayjs(openTime1, "HH:mm");
+      if (closeTime1) initialValues.closeTime1 = dayjs(closeTime1, "HH:mm");
+      if (openTime2) initialValues.openTime2 = dayjs(openTime2, "HH:mm");
+      if (closeTime2) initialValues.closeTime2 = dayjs(closeTime2, "HH:mm");
+      if (openTime3) initialValues.openTime3 = dayjs(openTime3, "HH:mm");
+      if (closeTime3) initialValues.closeTime3 = dayjs(closeTime3, "HH:mm");
+      
+      // Cập nhật số ca làm việc
+      let shifts = 1;
+      if (openTime2 && closeTime2) shifts = openTime3 && closeTime3 ? 3 : 2;
+      setVisibleShifts(shifts);
+      
+      // Set form values
+      form.setFieldsValue(initialValues);
+      
+      // Log ra console để debug
+      console.log("Khởi tạo form với giá trị:", initialValues);
     }
   }, [formData, form]);
   
-  // Theo dõi thay đổi form và tự động lưu
-  const handleFormValuesChange = (_changedValues: Partial<BasicInfoFormValues>, allValues: BasicInfoFormValues) => {
-    // Chỉ cập nhật khi đã có thông tin cơ bản
-    if (allValues.name && allValues.description) {
-      const timer = setTimeout(() => {
-        handleSubmit(allValues);
-      }, 500);
-      
-      return () => clearTimeout(timer);
+  // Hàm prefetch districts khi province thay đổi
+  const handleProvinceChange = async (value: string) => {
+    try {
+      setShouldPreventSubmit(true);
+      const response = await axios.get(`https://provinces.open-api.vn/api/p/${value}?depth=2`);
+      setDistricts(response.data.districts);
+      setWards([]);
+      form.setFieldsValue({ 
+        districtCode: undefined,
+        wardCode: undefined
+      });
+      setTimeout(() => setShouldPreventSubmit(false), 100);
+    } catch (error) {
+      console.error('Error fetching districts:', error);
+      setShouldPreventSubmit(false);
     }
   };
   
-  // Handle form submission
-  const handleSubmit = async (values: BasicInfoFormValues) => {
+  // Hàm prefetch wards khi district thay đổi
+  const handleDistrictChange = async (value: string) => {
+    try {
+      setShouldPreventSubmit(true);
+      const response = await axios.get(`https://provinces.open-api.vn/api/d/${value}?depth=2`);
+      setWards(response.data.wards);
+      form.setFieldsValue({ 
+        wardCode: undefined
+      });
+      setTimeout(() => setShouldPreventSubmit(false), 100);
+    } catch (error) {
+      console.error('Error fetching wards:', error);
+      setShouldPreventSubmit(false);
+    }
+  };
+  
+  // Hàm riêng cho việc submit form data
+  const submitFormData = async (values: BasicInfoFormValues) => {
+    if (shouldPreventSubmit) return;
+    
     try {
       // Get province, district, and ward names
       let provinceName = '';
@@ -191,25 +306,58 @@ const BasicInfoForm = forwardRef<BasicInfoFormRef, BasicInfoFormProps>(({
         wardName = ward.name;
       }
       
+      // Tạo địa chỉ đầy đủ (bắt buộc phải có giá trị)
+      const detailAddress = values.detailAddress || '';
+      
+      // Tạo địa chỉ đầy đủ - đảm bảo location luôn có giá trị khi có đủ thông tin địa chỉ
+      let fullLocation = '';
+      if (provinceName && districtName && wardName) {
+        if (detailAddress) {
+          fullLocation = `${detailAddress}, ${wardName}, ${districtName}, ${provinceName}`;
+        } else {
+          fullLocation = `${wardName}, ${districtName}, ${provinceName}`;
+        }
+      }
+      
+      // Lấy thông tin hiện tại từ formData để tránh mất dữ liệu
+      const currentInfo = formData.facilityInfo || {};
+      
       // Format facility info
       const facilityInfo: FacilityInfo = {
-        name: values.name,
-        description: values.description,
-        numberOfShifts: values.numberOfShifts,
+        // Giữ nguyên các giá trị cũ nếu không có giá trị mới
+        name: values.name || currentInfo.name || '',
+        description: values.description || currentInfo.description || '',
+        numberOfShifts: visibleShifts,
         city: provinceName,
         provinceCode: values.provinceCode,
         district: districtName,
         districtCode: values.districtCode,
         ward: wardName,
         wardCode: values.wardCode,
-        location: values.detailAddress,
-        openTime1: values.openTime1 ? values.openTime1.format('HH:mm') : '',
-        closeTime1: values.closeTime1 ? values.closeTime1.format('HH:mm') : '',
-        openTime2: values.numberOfShifts >= 2 ? values.openTime2?.format('HH:mm') || '' : '',
-        closeTime2: values.numberOfShifts >= 2 ? values.closeTime2?.format('HH:mm') || '' : '',
-        openTime3: values.numberOfShifts >= 3 ? values.openTime3?.format('HH:mm') || '' : '',
-        closeTime3: values.numberOfShifts >= 3 ? values.closeTime3?.format('HH:mm') || '' : ''
+        // Đảm bảo location luôn có giá trị
+        location: fullLocation || currentInfo.location || '',
+        // Thêm detailAddress vào facilityInfo để lưu lại
+        detailAddress: detailAddress,
+        openTime1: values.openTime1 ? values.openTime1.format('HH:mm') : currentInfo.openTime1 || '',
+        closeTime1: values.closeTime1 ? values.closeTime1.format('HH:mm') : currentInfo.closeTime1 || '',
+        openTime2: (visibleShifts >= 2 && values.openTime2) ? values.openTime2.format('HH:mm') : currentInfo.openTime2 || '',
+        closeTime2: (visibleShifts >= 2 && values.closeTime2) ? values.closeTime2.format('HH:mm') : currentInfo.closeTime2 || '',
+        openTime3: (visibleShifts >= 3 && values.openTime3) ? values.openTime3.format('HH:mm') : currentInfo.openTime3 || '',
+        closeTime3: (visibleShifts >= 3 && values.closeTime3) ? values.closeTime3.format('HH:mm') : currentInfo.closeTime3 || ''
       };
+      
+      // Log chi tiết về địa chỉ được tạo
+      console.log("Thông tin địa chỉ từ Basic Info Form:", {
+        detailAddress,
+        fullLocation,
+        provinceName,
+        districtName,
+        wardName,
+        finalLocation: facilityInfo.location, // Giá trị location cuối cùng được sử dụng
+        provinceCode: values.provinceCode,
+        districtCode: values.districtCode,
+        wardCode: values.wardCode,
+      });
       
       // Update form data with new facility info
       updateFormData({ facilityInfo });
@@ -219,109 +367,109 @@ const BasicInfoForm = forwardRef<BasicInfoFormRef, BasicInfoFormProps>(({
     }
   };
   
-  // Handle province change
-  const handleProvinceChange = (value: string) => {
-    fetchDistricts(value);
-    form.setFieldsValue({ 
-      districtCode: undefined,
-      wardCode: undefined
-    });
-  };
-  
-  // Handle district change
-  const handleDistrictChange = (value: string) => {
-    fetchWards(value);
-    form.setFieldsValue({ 
-      wardCode: undefined
-    });
-  };
-  
-  // Handle change number of shifts
-  const handleShiftChange = (value: number | null) => {
-    if (value) {
-      setNumberOfShifts(value);
+  // Theo dõi thay đổi form và tự động lưu với debounce
+  const handleFormValuesChange = (_changedValues: Partial<BasicInfoFormValues>, allValues: BasicInfoFormValues) => {
+    // Không cập nhật nếu đang trong trạng thái ngăn submit
+    if (shouldPreventSubmit) return;
+    
+    // Theo dõi các thay đổi liên quan đến địa chỉ để cập nhật sớm
+    if (_changedValues.provinceCode || _changedValues.districtCode || 
+        _changedValues.wardCode || _changedValues.detailAddress) {
+      
+      // Cập nhật ngay lập tức nếu thay đổi các trường liên quan đến địa chỉ
+      if (allValues.provinceCode && allValues.districtCode && allValues.wardCode) {
+        // Hủy timer trước đó nếu có
+        if (submitTimerRef.current) {
+          clearTimeout(submitTimerRef.current);
+          submitTimerRef.current = null;
+        }
+        
+        // Cập nhật ngay lập tức
+        submitFormData(allValues);
+      }
+    }
+    // Chỉ cập nhật form data nếu có đủ thông tin cơ bản và sử dụng debounce
+    else if (allValues.name || allValues.description) {
+      // Hủy timer trước đó nếu có
+      if (submitTimerRef.current) {
+        clearTimeout(submitTimerRef.current);
+      }
+      
+      // Đặt timer mới với độ trễ ngắn hơn
+      submitTimerRef.current = setTimeout(() => {
+        submitFormData(allValues);
+        submitTimerRef.current = null;
+      }, 500); // Giảm thời gian delay để cập nhật thường xuyên hơn
     }
   };
+  
+  // Xử lý khi thay đổi timeRange
+  const handleTimeRangeChange = (index: number, times: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null) => {
+    if (!times) return;
+    
+    const [start, end] = times;
+    if (!start || !end) return;
 
-  // Custom validator for facility name uniqueness
-  const validateFacilityName = async (_rule: unknown, value: string) => {
-    if (!value) {
-      return Promise.resolve(); // Let the required rule handle empty value
+    // Dựa vào index để xác định ca nào đang được thay đổi
+    if (index === 1) {
+      form.setFieldsValue({
+        openTime1: start,
+        closeTime1: end
+      });
+    } else if (index === 2) {
+      form.setFieldsValue({
+        openTime2: start,
+        closeTime2: end
+      });
+    } else if (index === 3) {
+      form.setFieldsValue({
+        openTime3: start,
+        closeTime3: end
+      });
+    }
+  };
+  
+  // Tiện ích để lấy giá trị timeRange từ open/close time
+  const getTimeRange = (shiftIndex: number): [dayjs.Dayjs | null, dayjs.Dayjs | null] | undefined => {
+    const values = form.getFieldsValue();
+    
+    if (shiftIndex === 1 && values.openTime1 && values.closeTime1) {
+      return [values.openTime1, values.closeTime1];
+    } else if (shiftIndex === 2 && values.openTime2 && values.closeTime2) {
+      return [values.openTime2, values.closeTime2];  
+    } else if (shiftIndex === 3 && values.openTime3 && values.closeTime3) {
+      return [values.openTime3, values.closeTime3];
     }
     
-    try {
-      const response = await facilityService.checkFacilityNameExists(value);
-      if (response.exists) {
-        return Promise.reject('Tên cơ sở đã tồn tại');
-      }
-      return Promise.resolve();
-    } catch (error) {
-      console.error('Error checking facility name:', error);
-      return Promise.reject('Không thể kiểm tra tên cơ sở. Vui lòng thử lại sau.');
+    return undefined;
+  };
+  
+  // Thêm ca làm việc tiếp theo
+  const addShift = () => {
+    if (visibleShifts < 3) {
+      setVisibleShifts(visibleShifts + 1);
     }
   };
-
-  // Custom validator for operating hours
-  const validateOperatingHours = async (_rule: unknown, value: dayjs.Dayjs | null, field: string) => {
-    if (!value) {
-      return Promise.resolve(); // Let the required rule handle empty value
+  
+  // Xóa ca làm việc
+  const removeShift = (shiftNumber: number) => {
+    if (shiftNumber === 2) {
+      // Xóa ca 2
+      form.setFieldsValue({
+        openTime2: null,
+        closeTime2: null,
+        openTime3: null,
+        closeTime3: null
+      });
+      setVisibleShifts(1);
+    } else if (shiftNumber === 3) {
+      // Xóa ca 3
+      form.setFieldsValue({
+        openTime3: null,
+        closeTime3: null
+      });
+      setVisibleShifts(2);
     }
-
-    // Get current form values without triggering validation
-    const values = form.getFieldsValue();
-    const { numberOfShifts, openTime1, closeTime1, openTime2, closeTime2, openTime3, closeTime3 } = values;
-
-    // Validate first shift
-    if (field === 'openTime1' || field === 'closeTime1') {
-      if (!openTime1 || !closeTime1) {
-        return Promise.resolve(); // Let the required rule handle empty values
-      }
-      if (openTime1.isAfter(closeTime1)) {
-        return Promise.reject('Giờ đóng cửa phải sau giờ mở cửa');
-      }
-    }
-
-    // Validate second shift if exists
-    if (numberOfShifts >= 2) {
-      if (field === 'openTime2') {
-        if (!closeTime1) {
-          return Promise.resolve(); // Let the required rule handle empty values
-        }
-        if (value.isBefore(closeTime1)) {
-          return Promise.reject('Giờ mở cửa ca 2 phải sau giờ đóng cửa ca 1');
-        }
-      }
-      if (field === 'closeTime2') {
-        if (!openTime2 || !closeTime2) {
-          return Promise.resolve(); // Let the required rule handle empty values
-        }
-        if (openTime2.isAfter(closeTime2)) {
-          return Promise.reject('Giờ đóng cửa phải sau giờ mở cửa');
-        }
-      }
-    }
-
-    // Validate third shift if exists
-    if (numberOfShifts >= 3) {
-      if (field === 'openTime3') {
-        if (!closeTime2) {
-          return Promise.resolve(); // Let the required rule handle empty values
-        }
-        if (value.isBefore(closeTime2)) {
-          return Promise.reject('Giờ mở cửa ca 3 phải sau giờ đóng cửa ca 2');
-        }
-      }
-      if (field === 'closeTime3') {
-        if (!openTime3 || !closeTime3) {
-          return Promise.resolve(); // Let the required rule handle empty values
-        }
-        if (openTime3.isAfter(closeTime3)) {
-          return Promise.reject('Giờ đóng cửa phải sau giờ mở cửa');
-        }
-      }
-    }
-
-    return Promise.resolve();
   };
 
   return (
@@ -336,12 +484,8 @@ const BasicInfoForm = forwardRef<BasicInfoFormRef, BasicInfoFormProps>(({
       <Form
         form={form}
         layout="vertical"
-        onFinish={handleSubmit}
+        onFinish={submitFormData}
         name="basicInfoForm"
-        initialValues={{
-          numberOfShifts: 1
-        }}
-        validateTrigger={['onBlur']}
         validateMessages={{
           required: 'Vui lòng nhập ${label}',
           types: {
@@ -360,10 +504,8 @@ const BasicInfoForm = forwardRef<BasicInfoFormRef, BasicInfoFormProps>(({
               name="name"
               label="Tên cơ sở"
               rules={[
-                { required: true },
-                { validator: validateFacilityName }
+                { required: true }
               ]}
-              validateTrigger={['onBlur', 'onChange']}
             >
               <Input placeholder="Nhập tên cơ sở" />
             </Form.Item>
@@ -381,110 +523,214 @@ const BasicInfoForm = forwardRef<BasicInfoFormRef, BasicInfoFormProps>(({
         
         <Title level={5} className="mt-4">Giờ hoạt động</Title>
         
+        <Row className="mb-2">
+          <Col span={24}>
+            <div className="flex items-center">
+              <Text>Số ca trong ngày: {visibleShifts}</Text>
+            </div>
+          </Col>
+        </Row>
+        
+        {/* Ca 1 - luôn hiển thị */}
         <Row gutter={16} className="mb-4">
           <Col span={24}>
             <Form.Item
-              name="numberOfShifts"
-              label="Số ca trong ngày"
-              rules={[{ required: true }]}
-              validateTrigger={['onBlur', 'onChange']}
+              label={<span className="font-medium">Khung giờ hoạt động (Ca 1)</span>}
+              required
+              className="mb-1"
             >
-              <Select onChange={handleShiftChange}>
-                <Option value={1}>1 ca</Option>
-                <Option value={2}>2 ca</Option>
-                <Option value={3}>3 ca</Option>
-              </Select>
+              <div className="flex items-center">
+                <Form.Item
+                  name="timeRange1"
+                  className="mb-0 flex-grow"
+                  rules={[
+                    { 
+                      validator: async (_, value) => {
+                        if (!value || !value[0] || !value[1]) {
+                          return Promise.reject('Vui lòng chọn giờ hoạt động');
+                        }
+                        const openTime = value[0];
+                        const closeTime = value[1];
+                        if (openTime.isAfter(closeTime)) {
+                          return Promise.reject('Giờ đóng cửa phải sau giờ mở cửa');
+                        }
+                        return Promise.resolve();
+                      }
+                    }
+                  ]}
+                  getValueProps={() => {
+                    return { value: getTimeRange(1) };
+                  }}
+                >
+                  <RangePicker
+                    format="HH:mm"
+                    className="w-full"
+                    placeholder={['Giờ mở cửa', 'Giờ đóng cửa']}
+                    minuteStep={30}
+                    onChange={(times) => handleTimeRangeChange(1, times as [dayjs.Dayjs | null, dayjs.Dayjs | null])}
+                  />
+                </Form.Item>
+                
+                {/* Hidden fields to store values for API compatibility */}
+                <Form.Item name="openTime1" hidden>
+                  <Input />
+                </Form.Item>
+                <Form.Item name="closeTime1" hidden>
+                  <Input />
+                </Form.Item>
+              </div>
             </Form.Item>
           </Col>
         </Row>
         
-        <Row gutter={16} className="mb-4">
-          <Col span={12}>
-            <Form.Item
-              name="openTime1"
-              label="Giờ mở cửa (Ca 1)"
-              rules={[
-                { required: true },
-                { validator: (_, value) => validateOperatingHours(_, value, 'openTime1') }
-              ]}
-              validateTrigger={['onBlur', 'onChange']}
-            >
-              <TimePicker format="HH:mm" className="w-full" />
-            </Form.Item>
-          </Col>
-          <Col span={12}>
-            <Form.Item
-              name="closeTime1"
-              label="Giờ đóng cửa (Ca 1)"
-              rules={[
-                { required: true },
-                { validator: (_, value) => validateOperatingHours(_, value, 'closeTime1') }
-              ]}
-              validateTrigger={['onBlur', 'onChange']}
-            >
-              <TimePicker format="HH:mm" className="w-full" />
-            </Form.Item>
-          </Col>
-        </Row>
-        
-        {numberOfShifts >= 2 && (
+        {/* Ca 2 - hiển thị khi visibleShifts >= 2 */}
+        {visibleShifts >= 2 && (
           <Row gutter={16} className="mb-4">
-            <Col span={12}>
+            <Col span={23}>
               <Form.Item
-                name="openTime2"
-                label="Giờ mở cửa (Ca 2)"
-                rules={[
-                  { required: true },
-                  { validator: (_, value) => validateOperatingHours(_, value, 'openTime2') }
-                ]}
-                validateTrigger={['onBlur', 'onChange']}
+                label={<span className="font-medium">Khung giờ hoạt động (Ca 2)</span>}
+                required
+                className="mb-1"
               >
-                <TimePicker format="HH:mm" className="w-full" />
+                <div className="flex items-center">
+                  <Form.Item
+                    name="timeRange2"
+                    className="mb-0 flex-grow"
+                    rules={[
+                      { 
+                        validator: async (_, value) => {
+                          if (!value || !value[0] || !value[1]) {
+                            return Promise.reject('Vui lòng chọn giờ hoạt động');
+                          }
+                          const values = form.getFieldsValue();
+                          const closeTime1 = values.closeTime1;
+                          const openTime = value[0];
+                          const closeTime = value[1];
+                          
+                          if (closeTime1 && openTime.isBefore(closeTime1)) {
+                            return Promise.reject('Giờ mở cửa ca 2 phải sau giờ đóng cửa ca 1');
+                          }
+                          if (openTime.isAfter(closeTime)) {
+                            return Promise.reject('Giờ đóng cửa phải sau giờ mở cửa');
+                          }
+                          return Promise.resolve();
+                        }
+                      }
+                    ]}
+                    getValueProps={() => {
+                      return { value: getTimeRange(2) };
+                    }}
+                  >
+                    <RangePicker
+                      format="HH:mm"
+                      className="w-full"
+                      placeholder={['Giờ mở cửa', 'Giờ đóng cửa']}
+                      minuteStep={30}
+                      onChange={(times) => handleTimeRangeChange(2, times as [dayjs.Dayjs | null, dayjs.Dayjs | null])}
+                    />
+                  </Form.Item>
+                  
+                  {/* Hidden fields to store values for API compatibility */}
+                  <Form.Item name="openTime2" hidden>
+                    <Input />
+                  </Form.Item>
+                  <Form.Item name="closeTime2" hidden>
+                    <Input />
+                  </Form.Item>
+                </div>
               </Form.Item>
             </Col>
-            <Col span={12}>
-              <Form.Item
-                name="closeTime2"
-                label="Giờ đóng cửa (Ca 2)"
-                rules={[
-                  { required: true },
-                  { validator: (_, value) => validateOperatingHours(_, value, 'closeTime2') }
-                ]}
-                validateTrigger={['onBlur', 'onChange']}
-              >
-                <TimePicker format="HH:mm" className="w-full" />
-              </Form.Item>
+            <Col span={1} className="flex items-center mt-8">
+              <Button 
+                type="text" 
+                danger 
+                icon={<MinusCircleOutlined />} 
+                onClick={() => removeShift(2)}
+              />
             </Col>
           </Row>
         )}
         
-        {numberOfShifts >= 3 && (
+        {/* Ca 3 - hiển thị khi visibleShifts >= 3 */}
+        {visibleShifts >= 3 && (
           <Row gutter={16} className="mb-4">
-            <Col span={12}>
+            <Col span={23}>
               <Form.Item
-                name="openTime3"
-                label="Giờ mở cửa (Ca 3)"
-                rules={[
-                  { required: true },
-                  { validator: (_, value) => validateOperatingHours(_, value, 'openTime3') }
-                ]}
-                validateTrigger={['onBlur', 'onChange']}
+                label={<span className="font-medium">Khung giờ hoạt động (Ca 3)</span>}
+                required
+                className="mb-1"
               >
-                <TimePicker format="HH:mm" className="w-full" />
+                <div className="flex items-center">
+                  <Form.Item
+                    name="timeRange3"
+                    className="mb-0 flex-grow"
+                    rules={[
+                      { 
+                        validator: async (_, value) => {
+                          if (!value || !value[0] || !value[1]) {
+                            return Promise.reject('Vui lòng chọn giờ hoạt động');
+                          }
+                          const values = form.getFieldsValue();
+                          const closeTime2 = values.closeTime2;
+                          const openTime = value[0];
+                          const closeTime = value[1];
+                          
+                          if (closeTime2 && openTime.isBefore(closeTime2)) {
+                            return Promise.reject('Giờ mở cửa ca 3 phải sau giờ đóng cửa ca 2');
+                          }
+                          if (openTime.isAfter(closeTime)) {
+                            return Promise.reject('Giờ đóng cửa phải sau giờ mở cửa');
+                          }
+                          return Promise.resolve();
+                        }
+                      }
+                    ]}
+                    getValueProps={() => {
+                      return { value: getTimeRange(3) };
+                    }}
+                  >
+                    <RangePicker
+                      format="HH:mm"
+                      className="w-full"
+                      placeholder={['Giờ mở cửa', 'Giờ đóng cửa']}
+                      minuteStep={30}
+                      onChange={(times) => handleTimeRangeChange(3, times as [dayjs.Dayjs | null, dayjs.Dayjs | null])}
+                    />
+                  </Form.Item>
+                  
+                  {/* Hidden fields to store values for API compatibility */}
+                  <Form.Item name="openTime3" hidden>
+                    <Input />
+                  </Form.Item>
+                  <Form.Item name="closeTime3" hidden>
+                    <Input />
+                  </Form.Item>
+                </div>
               </Form.Item>
             </Col>
-            <Col span={12}>
-              <Form.Item
-                name="closeTime3"
-                label="Giờ đóng cửa (Ca 3)"
-                rules={[
-                  { required: true },
-                  { validator: (_, value) => validateOperatingHours(_, value, 'closeTime3') }
-                ]}
-                validateTrigger={['onBlur', 'onChange']}
+            <Col span={1} className="flex items-center mt-8">
+              <Button 
+                type="text" 
+                danger 
+                icon={<MinusCircleOutlined />} 
+                onClick={() => removeShift(3)}
+              />
+            </Col>
+          </Row>
+        )}
+        
+        {/* Button thêm ca - đặt sau ca cuối cùng */}
+        {visibleShifts < 3 && (
+          <Row className="mb-4">
+            <Col span={24}>
+              <Button 
+                type="dashed" 
+                onClick={addShift} 
+                icon={<PlusOutlined />}
+                className="w-full"
               >
-                <TimePicker format="HH:mm" className="w-full" />
-              </Form.Item>
+                Thêm khung giờ hoạt động
+              </Button>
             </Col>
           </Row>
         )}
@@ -497,7 +743,6 @@ const BasicInfoForm = forwardRef<BasicInfoFormRef, BasicInfoFormProps>(({
               name="provinceCode"
               label="Tỉnh/Thành phố"
               rules={[{ required: true }]}
-              validateTrigger={['onBlur', 'onChange']}
             >
               <Select 
                 placeholder="Chọn tỉnh/thành phố"
@@ -518,7 +763,6 @@ const BasicInfoForm = forwardRef<BasicInfoFormRef, BasicInfoFormProps>(({
               name="districtCode"
               label="Quận/Huyện"
               rules={[{ required: true }]}
-              validateTrigger={['onBlur', 'onChange']}
             >
               <Select 
                 placeholder="Chọn quận/huyện"
@@ -540,7 +784,6 @@ const BasicInfoForm = forwardRef<BasicInfoFormRef, BasicInfoFormProps>(({
               name="wardCode"
               label="Phường/Xã"
               rules={[{ required: true }]}
-              validateTrigger={['onBlur', 'onChange']}
             >
               <Select 
                 placeholder="Chọn phường/xã" 
@@ -563,33 +806,22 @@ const BasicInfoForm = forwardRef<BasicInfoFormRef, BasicInfoFormProps>(({
               name="detailAddress"
               label="Địa chỉ chi tiết"
               rules={[{ required: true }]}
-              validateTrigger={['onBlur', 'onChange']}
             >
               <Input placeholder="Số nhà, tên đường..." />
             </Form.Item>
           </Col>
         </Row>
         
-        {/* Preview full address if all components are selected */}
-        {form.getFieldValue('provinceCode') && 
-         form.getFieldValue('districtCode') && 
-         form.getFieldValue('wardCode') && 
-         form.getFieldValue('detailAddress') && (
-          <Alert
-            message="Địa chỉ đầy đủ"
-            description={
-              <div>
-                {form.getFieldValue('detailAddress')}, 
-                {wards.find(w => w.code.toString() === form.getFieldValue('wardCode'))?.name || ''}, 
-                {districts.find(d => d.code.toString() === form.getFieldValue('districtCode'))?.name || ''}, 
-                {provinces.find(p => p.code.toString() === form.getFieldValue('provinceCode'))?.name || ''}
-              </div>
-            }
-            type="info"
-            showIcon
-            className="mb-6"
-          />
-        )}
+        {/* Sử dụng component con để hiển thị địa chỉ đầy đủ */}
+        <FullAddressDisplay
+          detailAddress={form.getFieldValue('detailAddress')}
+          provinceCode={form.getFieldValue('provinceCode')}
+          districtCode={form.getFieldValue('districtCode')}
+          wardCode={form.getFieldValue('wardCode')}
+          provinces={provinces}
+          districts={districts}
+          wards={wards}          
+        />
         
         {/* Remove handleSubmit from form submission */}
         <Form.Item>

@@ -17,7 +17,7 @@ export const mockFacilitiesDropdown = [
 ];
   
 // Mock facilities data
-export const mockFacilities: Facility[] = [
+export const mockFacilities: Facility[] = [ 
   {
     id: '1',
     name: 'Sân Bóng Đá Mini Thủ Đô',
@@ -54,7 +54,10 @@ export const mockFacilities: Facility[] = [
       temporary: '',
       facilityId: '1',
       sportId: 1
-    }]
+    }],
+    minPrice: 100000,
+    maxPrice: 150000,
+    fieldGroups: mockFieldGroups.filter(fg => fg.facilityId === '1')
   },
   {
     id: '2',
@@ -91,7 +94,10 @@ export const mockFacilities: Facility[] = [
       temporary: '',
       facilityId: '2',
       sportId: 2
-    }]
+    }],
+    minPrice: 120000,
+    maxPrice: 180000,
+    fieldGroups: mockFieldGroups.filter(fg => fg.facilityId === '2')
   },
   {
     id: '3',
@@ -130,7 +136,10 @@ export const mockFacilities: Facility[] = [
       temporary: 'https://example.com/licenses/temp-3.pdf',
       facilityId: '3',
       sportId: 4
-    }]
+    }],
+    minPrice: 90000,
+    maxPrice: 130000,
+    fieldGroups: []
   },
   {
     id: '4',
@@ -167,7 +176,10 @@ export const mockFacilities: Facility[] = [
       temporary: '',
       facilityId: '4',
       sportId: 7
-    }]
+    }],
+    minPrice: 350000,
+    maxPrice: 500000,
+    fieldGroups: []
   },
   {
     id: '5',
@@ -204,7 +216,10 @@ export const mockFacilities: Facility[] = [
       temporary: 'https://example.com/licenses/temp-5.pdf',
       facilityId: '5',
       sportId: 3
-    }]
+    }],
+    minPrice: 110000,
+    maxPrice: 160000,
+    fieldGroups: []
   },
   {
     id: '6',
@@ -241,7 +256,10 @@ export const mockFacilities: Facility[] = [
       temporary: '',
       facilityId: '6',
       sportId: 6
-    }]
+    }],
+    minPrice: 80000,
+    maxPrice: 120000,
+    fieldGroups: []
   }
 ];
 

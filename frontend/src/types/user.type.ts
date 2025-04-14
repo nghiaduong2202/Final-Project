@@ -36,8 +36,7 @@ export interface RegisterData {
   name: string;
   phoneNumber: string;  
   role: string;
-  password: string; 
-  retypePassword: string;
+  password: string;   
 }
 
 export interface UpdateInfo {

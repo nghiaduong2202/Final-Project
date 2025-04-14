@@ -21,10 +21,10 @@ import BookingPage from '@/pages/Player/Booking/Booking';
 import HistoryBooking from '@/pages/Player/HistoryBooking/HistoryBooking';
 import BookingDetail from '@/pages/Player/BookingDetail/BookingDetail';
 import BookingReview from '@/pages/Player/BookingReview/BookingReview';
-// import ResultBookingVNPay from '@/pages/Player/ResultBookingVNPay';
+import FavoriteList from '@/pages/Player/FavoriteList/FavoriteList';
 
 // Owner pages
-import PlaySchedule from '@/pages/Owner/PlaySchedule/PLaySchedule';
+import PlaySchedule from '@/pages/Owner/PlaySchedule/PlaySchedule';
 import Dashboard from '@/pages/Owner/Dashboard/Dashboard';
 import SupportContact from '@/pages/Owner/SupportContact/SupportContact';
 
@@ -51,9 +51,6 @@ import ReportManagement from '@/pages/Owner/ReportManagement/ReportManagement';
 
 import ReviewManagement from '@/pages/Owner/ReviewManagement/ReviewManagement';
 
-
-
-
 const AppRouter: React.FC = () => {
 
   return (
@@ -79,8 +76,8 @@ const AppRouter: React.FC = () => {
         <Route path='/user/booking/:facilityId' element={<BookingPage />} />
         <Route path='/user/history-booking' element={<HistoryBooking />} />
         <Route path='/user/booking/detail/:bookingId' element={<BookingDetail />} />
-        <Route path='/user/booking/review/:bookingId' element={<BookingReview />} />        
-        {/* <Route path='/user/booking/result-booking-vnpay' element={<ResultBookingVNPay />} /> */}
+        <Route path='/user/booking/review/:bookingId' element={<BookingReview />} />
+        <Route path='/user/favorite' element={<FavoriteList />} />        
         <Route path='/user/profile' element={<UserProfile />} />
       </Route>
 
@@ -90,8 +87,8 @@ const AppRouter: React.FC = () => {
           <OwnerLayout />
         </ProtectedRoute>
       }>
-        <Route path='/owner' element={<PlaySchedule />} />
-        <Route path='/owner/dashboard' element={<Dashboard />} />
+        <Route path='/owner/play-schedule' element={<PlaySchedule />} />
+        <Route path='/owner' element={<Dashboard />} />
 
         <Route path='/owner/facility-management' element={<FacilityManagement />} />
         <Route path='/owner/create-facility' element={<CreateFacility />} />           
@@ -113,7 +110,7 @@ const AppRouter: React.FC = () => {
         <Route path='/owner/banking' element={<Banking />} />
 
         <Route path='/owner/chat' element={<ChatManagement />} />
-        <Route path='/owner/support' element={<SupportContact />} />
+        <Route path='/owner/contact-support' element={<SupportContact />} />
 
         <Route path='/owner/report-management' element={<ReportManagement />} />           
                 

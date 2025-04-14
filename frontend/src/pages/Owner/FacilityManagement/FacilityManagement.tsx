@@ -66,7 +66,6 @@ const FacilityManagement: React.FC = () => {
 
     // Cập nhật ban đầu
     updateWidth();
-
     // Theo dõi thay đổi kích thước
     window.addEventListener('resize', updateWidth);
     return () => window.removeEventListener('resize', updateWidth);
@@ -86,14 +85,10 @@ const FacilityManagement: React.FC = () => {
   // Hàm filter facilities theo status ở phía client
   const filterFacilitiesByStatus = () => {
     if (!facilities || facilities.length === 0) return;
-    
-    console.log(`Filtering facilities client-side by status: ${activeFilter}`);
-    
     if (activeFilter === 'all') {
       setFilteredFacilities(facilities);
     } else {
       const filtered = facilities.filter(facility => facility.status === activeFilter);
-      console.log(`Found ${filtered.length} facilities with status ${activeFilter}`);
       setFilteredFacilities(filtered);
     }
   };
@@ -107,28 +102,18 @@ const FacilityManagement: React.FC = () => {
       if (!userId) {
         message.error('Không thể xác định người dùng hiện tại, vui lòng đăng nhập lại');
         return;
-      }
-      
-      console.log(`Fetching all facilities, query: "${query}", page: ${page}, pageSize: ${pageSize}`);
-      
+      }            
       // Gọi API không có tham số status để lấy tất cả dữ liệu
-      const response = await facilityService.getMyFacilities(page, pageSize, 'all', query);
-      
-      console.log('API response:', response);
-      
+      const response = await facilityService.getMyFacilities(page, pageSize, 'all', query);      
       // Kiểm tra xem response có dữ liệu không
       if (!response.data && !Array.isArray(response)) {
-        console.error('API response does not contain data');
         setFacilities([]);
         setFilteredFacilities([]);
         setTotalItems(0);
         return;
-      }
-      
+      }      
       // Lưu tất cả dữ liệu vào state facilities
-      const facilitiesData = response.data || response;
-      console.log(`Received ${facilitiesData.length} total facilities`);
-      
+      const facilitiesData = response.data || response;      
       setFacilities(facilitiesData);
       setTotalItems(response.total || facilitiesData.length);
       
@@ -137,11 +122,10 @@ const FacilityManagement: React.FC = () => {
         setFilteredFacilities(facilitiesData);
       } else {
         const filtered = facilitiesData.filter(facility => facility.status === activeFilter);
-        console.log(`Filtered to ${filtered.length} facilities with status ${activeFilter}`);
         setFilteredFacilities(filtered);
       }
     } catch (error) {
-      console.error('Failed to fetch facilities:', error);
+      console.error('Failed to fetch facilities:', error);  
       message.error('Không thể tải danh sách cơ sở');
       setFacilities([]);
       setFilteredFacilities([]);
@@ -171,10 +155,8 @@ const FacilityManagement: React.FC = () => {
   }));
   
   const handleFilterClick = (filter: string) => {
-    console.log(`Filter changed to: ${filter}`);
     setActiveFilter(filter);
     setCurrentPage(1); // Reset về trang đầu tiên khi thay đổi filter
-    // Không cần gọi lại API, chỉ cần filter dữ liệu đã có
   };
   
   const handleCreateFacility = () => {
@@ -451,7 +433,7 @@ const FacilityManagement: React.FC = () => {
                   }
                 </span>
               }
-              imageStyle={{ height: containerWidth < 640 ? 80 : 100 }}
+              styles={{ image: { height: containerWidth < 640 ? 80 : 100 } }}
             >
               {!searchQuery && activeFilter === 'all' && facilities.length === 0 && (
                 <Button 
