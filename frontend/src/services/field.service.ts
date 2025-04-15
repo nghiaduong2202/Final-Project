@@ -1,5 +1,5 @@
 import api from './api';
-import { FieldGroup, FieldGroupFormData } from '@/types/field.type';
+import { Field, FieldGroup, FieldGroupFormData } from '@/types/field.type';
 
 // API Endpoints for Field and Field Group management
 export const fieldService = { 
@@ -162,6 +162,17 @@ export const fieldService = {
       return response.data;
     } catch (error) {
       console.error('Error creating fields:', error);
+      throw error;
+    }
+  },
+
+  // update field
+  async updateField(fieldId: number, fieldData: Partial<Field>): Promise<{ message: string }> {
+    try {
+      const response = await api.patch(`/field/${fieldId}`, fieldData);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating field:', error);
       throw error;
     }
   }

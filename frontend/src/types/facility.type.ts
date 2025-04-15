@@ -22,7 +22,7 @@ export interface Facility {
     sports: Sport[];
     status: 'pending' | 'active' | 'unactive' | 'closed' | 'banned';
     avgRating: number;
-    numberOfRatings: number;
+    numberOfRating: number;
     imagesUrl: string[];
     createdAt: string;
     updatedAt: string;
@@ -33,7 +33,7 @@ export interface Facility {
     services?: Service[];
     events?: Event[];
     vouchers?: Voucher[];
-    verificationHistory?: VerificationHistoryItem[];
+    approvals?: Approval[];
     owner?: {
       id: string;
       firstName: string;
@@ -99,19 +99,20 @@ export interface Certificate {
     facilityId?: string;
     sportId?: number;
   }
+  
 
-  export interface VerificationHistoryItem {
+  export interface Approval {
     id: string;
-    facilityId: string;
-    field: string;
-    oldValue: string;
-    newValue: string;
-    status: 'approved' | 'pending' | 'rejected';
-    requestDate: string;
-    updatedDate?: string;
-    note?: string;
+    type: 'facility' | 'facility_name' | 'certificate' | 'license';
+    status: 'pending' | 'approved' | 'rejected';
+    name: string | null;
+    certifiacte: string | null;
+    license: string | null;
+    sport: Sport | null;
+    note: string | null;
+    createdAt: string;
+    updatedAt: string;
   }
-
 
   export interface Province {
     code: string | number;

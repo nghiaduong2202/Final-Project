@@ -71,6 +71,7 @@ const FieldGroupsForm: React.FC<FieldGroupsFormProps> = ({
   const [editingIndex, setEditingIndex] = useState<number>(-1);
   const [loading, setLoading] = useState<boolean>(false);
   const [showCompositeSport, setShowCompositeSport] = useState<boolean>(false);
+  const [isCreatingCompositeSport, setIsCreatingCompositeSport] = useState<boolean>(false);
 
   // Load data from formData
   useEffect(() => {
@@ -138,6 +139,11 @@ const FieldGroupsForm: React.FC<FieldGroupsFormProps> = ({
         id: 999, // Use ID 999 just for UI display in FieldGroupForm
         name: COMPOSITE_SPORT_NAME
       };
+      
+      // Đánh dấu đang tạo sân tổng hợp
+      setIsCreatingCompositeSport(true);
+    } else {
+      setIsCreatingCompositeSport(false);
     }
     
     if (!sport) return;
@@ -200,13 +206,30 @@ const FieldGroupsForm: React.FC<FieldGroupsFormProps> = ({
   
   // Handle field group save
   const handleFieldGroupSave = (fieldGroupData: FieldGroupFormData) => {
-    if (fieldGroupData.sportIds.length === 0) {
-      message.error('Vui lòng chọn ít nhất một loại hình thể thao.');
-      return;
+    // Kiểm tra xem đây có phải là sân tổng hợp không (có ID 999)
+    const isCompositeSportType = currentSport?.id === 999;
+
+    // Lọc bỏ ID ảo 999 ra khỏi sportIds
+    const cleanedSportIds = fieldGroupData.sportIds.filter(id => id !== 999);
+    
+    // Kiểm tra sportIds sau khi đã lọc
+    if (cleanedSportIds.length === 0) {
+      // Nếu đây là sân tổng hợp, hiển thị thông báo yêu cầu chọn ít nhất một môn thể thao
+      if (isCompositeSportType) {
+        message.error('Vui lòng chọn ít nhất một loại hình thể thao cho sân tổng hợp.');
+        return;
+      } 
+      // Nếu không phải sân tổng hợp, thêm môn thể thao mặc định (sport.id của môn thể thao hiện tại)
+      else if (currentSport && currentSport.id !== 999) {
+        fieldGroupData.sportIds = [currentSport.id];
+      } else {
+        message.error('Vui lòng chọn ít nhất một loại hình thể thao.');
+        return;
+      }
     }
     
     // Check if this is a composite field group
-    const isComposite = fieldGroupData.sportIds.length > 1;
+    const isComposite = cleanedSportIds.length > 1;
     if (isComposite && !showCompositeSport) {
       setShowCompositeSport(true);
     }
@@ -214,7 +237,7 @@ const FieldGroupsForm: React.FC<FieldGroupsFormProps> = ({
     // Ensure we're not storing any temporary ID like 999 in the actual data
     const cleanedFieldGroupData = {
       ...fieldGroupData,
-      sportIds: fieldGroupData.sportIds.filter(id => id !== 999)
+      sportIds: cleanedSportIds
     };
     
     // Kiểm tra trùng lặp nhóm sân
@@ -371,6 +394,24 @@ const FieldGroupsForm: React.FC<FieldGroupsFormProps> = ({
         message.success('Đã xóa nhóm sân');
       }
     });
+  };
+
+  // Hàm truyền danh sách sportIds vào component FieldGroupForm
+  const getSportIdsForFieldGroupForm = () => {
+    // Nếu đang tạo sân tổng hợp, trả về mảng rỗng để cho phép
+    // người dùng chọn môn thể thao trong form
+    if (isCreatingCompositeSport || currentSport?.id === 999) {
+      return [];
+    }
+    
+    // Nếu là môn thể thao thông thường, trả về ID của môn thể thao đó
+    return currentSport ? [currentSport.id] : [];
+  };
+
+  // Khi đóng modal, cần reset lại isCreatingCompositeSport
+  const handleCloseFieldGroupModal = () => {
+    setIsFieldGroupModalVisible(false);
+    setIsCreatingCompositeSport(false);
   };
 
   return (
@@ -649,7 +690,7 @@ const FieldGroupsForm: React.FC<FieldGroupsFormProps> = ({
       <Modal
         title={editingFieldGroup ? "Chỉnh sửa nhóm sân" : "Thêm nhóm sân mới"}
         open={isFieldGroupModalVisible}
-        onCancel={() => setIsFieldGroupModalVisible(false)}
+        onCancel={handleCloseFieldGroupModal}
         footer={null}
         width={800}
         destroyOnClose
@@ -657,11 +698,11 @@ const FieldGroupsForm: React.FC<FieldGroupsFormProps> = ({
         {currentSport && (
           <FieldGroupForm
             open={isFieldGroupModalVisible}
-            onClose={() => setIsFieldGroupModalVisible(false)}
+            onClose={handleCloseFieldGroupModal}
             onSave={handleFieldGroupSave}
             sport={currentSport || allSports[0]}
             allSports={allSports}
-            selectedSportIds={currentSport?.id === 999 ? selectedSports.map(s => s.id) : []}
+            selectedSportIds={getSportIdsForFieldGroupForm()}
             editingFieldGroup={editingFieldGroup || undefined}
           />
         )}

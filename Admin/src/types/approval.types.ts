@@ -1,37 +1,52 @@
 export interface Approval {
     id: string;
-    type: 'facility_registration' | 'facility_name_change' | 'business_license';
+    type: 'facility' | 'facility_name' | 'certificate' | 'license';
     status: 'pending' | 'approved' | 'rejected';
-    requestedBy: {
+    name: string | null;
+    certifiacte: string | null;
+    license: string | null;
+    sport: {
+      id: number;
+      name: string;
+    } | null;
+    note: string | null;
+    createdAt: string;
+    updatedAt: string;
+    facility?: {
       id: string;
       name: string;
-      email: string;
-    };
-    createdAt: string;
-    facilityId?: string; // For facility-related approvals
-    facilityName?: string; // For facility name change
-    details: {
       description: string;
-      documents: {
-        type: 'business_registration' | 'business_license';
-        name: string;
-        url: string;
-        sportType?: string; // For business licenses
-      }[];
-      facilityInfo?: {
-        name: string;
-        address: string;
-        description: string;
-        images: string[];
-        // Add other facility details as needed
+      openTime1: string;
+      closeTime1: string;
+      openTime2: string | null;
+      closeTime2: string | null;
+      openTime3: string | null;
+      closeTime3: string | null;
+      numberOfShifts: number;
+      location: string;
+      status: string;
+      avgRating: number;
+      numberOfRating: number;
+      imagesUrl: string[];
+      createdAt: string;
+      updatedAt: string;
+      certificate?: {
+        facilityId: string;
+        verified: string | null;
+        temporary: string | null;
       };
+      licenses?: Array<{
+        facilityId: string;
+        sportId: number;
+        verified: string | null;
+        temporary?: string | null;
+      }>;
     };
-    rejectionReason?: string;
   }
   
   export interface ApprovalFilter {
     status?: 'pending' | 'approved' | 'rejected';
-    type?: 'facility_registration' | 'facility_name_change' | 'business_license';
+    type?: 'facility' | 'facility_name' | 'certificate' | 'license';
     search?: string;
     page?: number;
     limit?: number;

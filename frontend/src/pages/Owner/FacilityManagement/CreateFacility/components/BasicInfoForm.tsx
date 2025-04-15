@@ -237,10 +237,7 @@ const BasicInfoForm = forwardRef<BasicInfoFormRef, BasicInfoFormProps>(({
       setVisibleShifts(shifts);
       
       // Set form values
-      form.setFieldsValue(initialValues);
-      
-      // Log ra console để debug
-      console.log("Khởi tạo form với giá trị:", initialValues);
+      form.setFieldsValue(initialValues);           
     }
   }, [formData, form]);
   
@@ -361,7 +358,7 @@ const BasicInfoForm = forwardRef<BasicInfoFormRef, BasicInfoFormProps>(({
       
       // Update form data with new facility info
       updateFormData({ facilityInfo });
-      console.log("Đã cập nhật facilityInfo:", facilityInfo);
+     
     } catch (error) {
       console.error('Error processing form submission:', error);
     }

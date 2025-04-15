@@ -441,7 +441,7 @@ const VerificationDocuments: React.FC<VerificationDocumentsProps> = ({
       
       {/* Modal xem trước hình ảnh */}
       <Modal
-        visible={previewVisible}
+        open={previewVisible}
         title={previewTitle}
         footer={null}
         onCancel={() => setPreviewVisible(false)}
