@@ -3,6 +3,8 @@ import { Form, Card, Col, Select, DatePicker, TimePicker, Tag, FormInstance, But
 import { CalendarOutlined, InfoCircleOutlined, EyeOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { RecurringType, BookingFormData } from '@/types/booking.type';
+import { getSportNameInVietnamese } from '@/utils/translateSport';
+import OperatingHoursDisplay from '@/components/shared/OperatingHoursDisplay';
 
 const { Option } = Select;
 const { RangePicker } = TimePicker;
@@ -23,6 +25,15 @@ interface BookingStepInfoProps {
   maxBookingDate: dayjs.Dayjs;
   customRecurringOptions?: { value: string; label: string; type: RecurringType }[];
   onRecurringOptionChange?: (value: string) => void;
+  validateTimeRange?: (rule: unknown, timeRange: [dayjs.Dayjs, dayjs.Dayjs] | null) => Promise<void>;
+  operatingTimes?: {
+    openTime1: string | null;
+    closeTime1: string | null;
+    openTime2: string | null;
+    closeTime2: string | null;
+    openTime3: string | null;
+    closeTime3: string | null;
+  };
 }
 
 const BookingStepInfo: React.FC<BookingStepInfoProps> = ({
@@ -39,7 +50,9 @@ const BookingStepInfo: React.FC<BookingStepInfoProps> = ({
   getWeekdayName,
   maxBookingDate,
   customRecurringOptions,
-  onRecurringOptionChange
+  onRecurringOptionChange,
+  validateTimeRange,
+  operatingTimes
 }) => {
   const [showAllDates, setShowAllDates] = useState(false);
   const [recurringOption, setRecurringOption] = useState(formData.recurringOption || 'none');
@@ -372,7 +385,7 @@ const BookingStepInfo: React.FC<BookingStepInfoProps> = ({
           >
             <Select placeholder="Chọn loại hình thể thao">
               {sports.map(sport => (
-                <Option key={sport.id} value={sport.id}>{sport.name}</Option>
+                <Option key={sport.id} value={sport.id}>{getSportNameInVietnamese(sport.name)}</Option>
               ))}
             </Select>
           </Form.Item>
@@ -413,7 +426,10 @@ const BookingStepInfo: React.FC<BookingStepInfoProps> = ({
             <Form.Item
               name="timeRange"
               label="Thời gian chơi"
-              rules={[{ required: true, message: 'Vui lòng chọn thời gian' }]}
+              rules={[
+                { required: true, message: 'Vui lòng chọn thời gian' },
+                ...(validateTimeRange ? [{ validator: validateTimeRange }] : [])
+              ]}
             >
               <RangePicker 
                 className="w-full" 
@@ -422,6 +438,21 @@ const BookingStepInfo: React.FC<BookingStepInfoProps> = ({
                 onChange={handleTimeRangeChange}
               />
             </Form.Item>
+            
+            {/* Hiển thị thông tin giờ hoạt động của cơ sở */}
+            {operatingTimes && operatingTimes.openTime1 && operatingTimes.closeTime1 && (
+              <div className="text-gray-500 text-xs mb-4">
+                <OperatingHoursDisplay 
+                  facility={operatingTimes as any} 
+                  showIcon={true}
+                  className="text-gray-600"
+                />
+                <div className="mt-1 text-xs italic">
+                  <InfoCircleOutlined className="mr-1" />
+                  Bạn chỉ có thể đặt sân trong khung giờ hoạt động của cơ sở
+                </div>
+              </div>
+            )}
             
             <Form.Item
               label="Đặt sân định kỳ"

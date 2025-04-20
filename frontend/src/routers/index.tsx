@@ -22,6 +22,7 @@ import HistoryBooking from '@/pages/Player/HistoryBooking/HistoryBooking';
 import BookingDetail from '@/pages/Player/BookingDetail/BookingDetail';
 import BookingReview from '@/pages/Player/BookingReview/BookingReview';
 import FavoriteList from '@/pages/Player/FavoriteList/FavoriteList';
+import ResultBookingVNPay from '@/pages/Player/Booking/ResultBookingVNPay';
 
 // Owner pages
 import PlaySchedule from '@/pages/Owner/PlaySchedule/PlaySchedule';
@@ -51,6 +52,7 @@ import ReportManagement from '@/pages/Owner/ReportManagement/ReportManagement';
 
 import ReviewManagement from '@/pages/Owner/ReviewManagement/ReviewManagement';
 
+
 const AppRouter: React.FC = () => {
 
   return (
@@ -74,6 +76,7 @@ const AppRouter: React.FC = () => {
         </ProtectedRoute>
       }>
         <Route path='/user/booking/:facilityId' element={<BookingPage />} />
+        <Route path='/user/booking/result-booking-vnpay' element={<ResultBookingVNPay />} />
         <Route path='/user/history-booking' element={<HistoryBooking />} />
         <Route path='/user/booking/detail/:bookingId' element={<BookingDetail />} />
         <Route path='/user/booking/review/:bookingId' element={<BookingReview />} />

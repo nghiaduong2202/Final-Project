@@ -2,16 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { 
   Card, Row, Col, Statistic, Typography, Table, DatePicker, 
   Button, Space, Progress, Badge, Avatar, Tabs, Tag,
-  Select, Input, Form, Rate, Modal, Grid
+  Select, Input, Form, Rate, Modal, Grid, message, Popover
 } from 'antd';
 import {
   StarOutlined, MessageOutlined, UserOutlined, 
   ArrowUpOutlined, ReloadOutlined,
-  CommentOutlined, LikeOutlined
+  CommentOutlined, LikeOutlined,
+  CalendarOutlined
 } from '@ant-design/icons';
 import { Line, Pie } from '@ant-design/charts';
 import dayjs from 'dayjs';
 import type { TableProps } from 'antd';
+import { facilityService, FacilityDropdownItem } from '@/services/facility.service';
+import { reviewService } from '@/services/review.service';
+import { review as Review, BookingSlot } from '@/types/review.type';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
@@ -19,10 +23,18 @@ const { RangePicker } = DatePicker;
 const { TextArea } = Input;
 const { useBreakpoint } = Grid;
 
+// Local Storage key
+const SELECTED_FACILITY_KEY = 'owner_selected_facility_review_id';
+
 // Interfaces
-interface Facility {
-  id: string;
-  name: string;
+interface RatingItem {
+  rating: number;
+  count: number;
+}
+
+interface ReviewTrendItem {
+  date: string;
+  count: number;
 }
 
 interface ReviewStats {
@@ -35,153 +47,19 @@ interface ReviewStats {
   reviewTrend: ReviewTrendItem[];
 }
 
-interface RatingItem {
-  rating: number;
-  count: number;
-}
-
-interface ReviewTrendItem {
-  date: string;
-  count: number;
-}
-
-interface Review {
-  id: string;
-  userName: string;
-  userAvatar: string;
-  bookingId: string;
-  service: string;
-  rating: number;
-  comment: string;
-  timestamp: string;
-  images?: string[];
-  reply?: {
-    content: string;
-    timestamp: string;
-  };
-  status: 'pending' | 'replied';
-}
-
-// Thêm mock data
-// Generate mock reviews
-const mockReviews: Review[] = [
-  {
-    id: '1',
-    userName: 'Nguyễn Văn A',
-    userAvatar: 'https://randomuser.me/api/portraits/men/32.jpg',
-    bookingId: 'B0012345',
-    service: 'Sân cầu lông - Sân 3',
-    rating: 5,
-    comment: 'Sân rất tốt, nhân viên phục vụ chu đáo. Tôi rất hài lòng với trải nghiệm tại đây.',
-    timestamp: '2023-12-15T09:30:00Z',
-    images: [
-      'https://picsum.photos/id/26/200/200',
-      'https://picsum.photos/id/27/200/200'
-    ],
-    status: 'replied',
-    reply: {
-      content: 'Cảm ơn bạn đã đánh giá tốt cho sân của chúng tôi. Chúng tôi rất vui khi bạn có trải nghiệm tốt và mong sẽ được phục vụ bạn trong thời gian tới!',
-      timestamp: '2023-12-15T10:30:00Z'
-    }
-  },
-  {
-    id: '2',
-    userName: 'Trần Thị B',
-    userAvatar: 'https://randomuser.me/api/portraits/women/44.jpg',
-    bookingId: 'B0012346',
-    service: 'Sân cầu lông - Sân 2',
-    rating: 4,
-    comment: 'Sân đẹp, sạch sẽ. Tuy nhiên tôi nghĩ ánh sáng có thể được cải thiện thêm.',
-    timestamp: '2023-12-10T15:45:00Z',
-    status: 'pending'
-  },
-  {
-    id: '3',
-    userName: 'Lê Văn C',
-    userAvatar: 'https://randomuser.me/api/portraits/men/62.jpg',
-    bookingId: 'B0012350',
-    service: 'Sân cầu lông - Sân 1',
-    rating: 3,
-    comment: 'Sân ở mức trung bình, không quá tệ nhưng không tốt lắm. Tôi nghĩ cần cải thiện về chất lượng mặt sân và nhà vệ sinh.',
-    timestamp: '2023-12-05T18:20:00Z',
-    status: 'replied',
-    reply: {
-      content: 'Cảm ơn bạn đã góp ý. Chúng tôi đang có kế hoạch nâng cấp mặt sân và cải thiện các tiện ích trong thời gian tới.',
-      timestamp: '2023-12-05T20:30:00Z'
-    }
-  },
-  {
-    id: '4',
-    userName: 'Phạm Thị D',
-    userAvatar: 'https://randomuser.me/api/portraits/women/22.jpg',
-    bookingId: 'B0012355',
-    service: 'Sân cầu lông - Sân 4',
-    rating: 2,
-    comment: 'Sân quá nóng, không có đủ quạt. Nhân viên phục vụ còn chậm.',
-    timestamp: '2023-12-01T12:10:00Z',
-    status: 'pending'
-  },
-  {
-    id: '5',
-    userName: 'Hoàng Văn E',
-    userAvatar: 'https://randomuser.me/api/portraits/men/36.jpg',
-    bookingId: 'B0012360',
-    service: 'Sân cầu lông - Sân 2',
-    rating: 5,
-    comment: 'Tuyệt vời! Tôi rất thích sân này và sẽ quay lại vào tuần sau.',
-    timestamp: '2023-11-28T09:45:00Z',
-    images: [
-      'https://picsum.photos/id/28/200/200'
-    ],
-    status: 'replied',
-    reply: {
-      content: 'Cảm ơn bạn đã đánh giá tích cực. Chúng tôi rất vui được phục vụ bạn và mong sẽ gặp lại bạn vào tuần sau!',
-      timestamp: '2023-11-28T11:30:00Z'
-    }
-  }
-];
-
-const mockReviewStats: ReviewStats = {
-  averageRating: 4.2,
-  totalReviews: 58,
-  positiveRatePercentage: 92,
-  negativeReviewsCount: 2,
-  newReviewsCount: 3,
-  ratingDistribution: [
-    { rating: 5, count: 35 },
-    { rating: 4, count: 15 },
-    { rating: 3, count: 6 },
-    { rating: 2, count: 1 },
-    { rating: 1, count: 1 }
-  ],
-  reviewTrend: [
-    { date: '2023-11-01', count: 5 },
-    { date: '2023-11-08', count: 8 },
-    { date: '2023-11-15', count: 10 },
-    { date: '2023-11-22', count: 12 },
-    { date: '2023-11-29', count: 15 },
-    { date: '2023-12-06', count: 8 },
-  ]
-};
-
 const ReviewManagement: React.FC = () => {
   const screens = useBreakpoint();
   const isMobile = !screens.md;
   
   // States
-  const [facilities] = useState<Facility[]>([
-    { id: '1', name: 'Sân cầu lông Phạm Kha' },
-    { id: '2', name: 'Sân bóng đá Nguyễn Du' }
-  ]);
-  const [selectedFacility, setSelectedFacility] = useState<string>('1');
-  const [reviewStats] = useState<ReviewStats>(mockReviewStats);
-  
-  const [reviews, setReviews] = useState<Review[]>(mockReviews);
+  const [facilities, setFacilities] = useState<FacilityDropdownItem[]>([]);
+  const [selectedFacility, setSelectedFacility] = useState<string>('');
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(false);
   const [replyModalVisible, setReplyModalVisible] = useState(false);
   const [currentReview, setCurrentReview] = useState<Review | null>(null);
   const [replyContent, setReplyContent] = useState('');
-  const [activeTab, setActiveTab] = useState('all');
+  const [activeTab, setActiveTab] = useState('list');
 
   // Filter states
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'replied'>('all');
@@ -189,80 +67,173 @@ const ReviewManagement: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null]>([null, null]);
 
+  // Calculated review statistics
+  const [reviewStats, setReviewStats] = useState<ReviewStats>({
+    averageRating: 0,
+    totalReviews: 0,
+    positiveRatePercentage: 0,
+    negativeReviewsCount: 0,
+    newReviewsCount: 0,
+    ratingDistribution: [],
+    reviewTrend: []
+  });
+
+  // Fetch facilities when component mounts
   useEffect(() => {
-    // In a real app, we would fetch facilities from the API
+    const fetchFacilities = async () => {
+      try {
+        const facilitiesData = await facilityService.getFacilitiesDropdown();
+        setFacilities(facilitiesData);
+        
+        // Get saved facility ID from localStorage or use the first one
+        const savedFacilityId = localStorage.getItem(SELECTED_FACILITY_KEY);
+        const isValidSavedId = savedFacilityId && facilitiesData.some(f => f.id === savedFacilityId);
+        const initialFacilityId = isValidSavedId ? savedFacilityId : (facilitiesData.length > 0 ? facilitiesData[0].id : '');
+        
+        if (initialFacilityId) {
+          setSelectedFacility(initialFacilityId);
+          localStorage.setItem(SELECTED_FACILITY_KEY, initialFacilityId);
+          fetchReviewData(initialFacilityId);
+        }
+      } catch (error) {
+        console.error('Error fetching facilities:', error);
+        message.error('Không thể tải danh sách cơ sở. Vui lòng thử lại sau.');
+      }
+    };
+    
+    fetchFacilities();
   }, []);
 
+  // Fetch reviews when facility changes or filters change
   useEffect(() => {
     if (selectedFacility) {
       fetchReviewData();
     }
   }, [selectedFacility, statusFilter, ratingFilter, searchText, dateRange, activeTab]);
 
-  const fetchReviewData = () => {
+  // Calculate review statistics
+  useEffect(() => {
+    if (reviews.length > 0) {
+      // Calculate average rating
+      const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
+      const averageRating = totalRating / reviews.length;
+      
+      // Count reviews by rating
+      const ratingDistribution: RatingItem[] = [
+        { rating: 5, count: 0 },
+        { rating: 4, count: 0 },
+        { rating: 3, count: 0 },
+        { rating: 2, count: 0 },
+        { rating: 1, count: 0 }
+      ];
+      
+      reviews.forEach(review => {
+        const ratingIndex = 5 - review.rating;
+        if (ratingIndex >= 0 && ratingIndex < 5) {
+          ratingDistribution[ratingIndex].count += 1;
+        }
+      });
+      
+      // Calculate positive rate (4-5 stars)
+      const positiveReviews = reviews.filter(review => review.rating >= 4).length;
+      const positiveRatePercentage = (positiveReviews / reviews.length) * 100;
+      
+      // Count negative reviews (1-2 stars)
+      const negativeReviews = reviews.filter(review => review.rating <= 2).length;
+      
+      // Count reviews without feedback
+      const pendingReviews = reviews.filter(review => !review.feedback).length;
+      
+      // Generate review trend data (last 6 months)
+      const reviewDates = reviews.map(review => dayjs(review.reviewAt).format('YYYY-MM'));
+      const uniqueDates = Array.from(new Set(reviewDates)).sort();
+      const last6Months = uniqueDates.slice(-6);
+      
+      const reviewTrend: ReviewTrendItem[] = last6Months.map(date => {
+        const count = reviews.filter(review => 
+          dayjs(review.reviewAt).format('YYYY-MM') === date
+        ).length;
+        return { date, count };
+      });
+      
+      setReviewStats({
+        averageRating,
+        totalReviews: reviews.length,
+        positiveRatePercentage,
+        negativeReviewsCount: negativeReviews,
+        newReviewsCount: pendingReviews,
+        ratingDistribution,
+        reviewTrend
+      });
+    } else {
+      // Reset stats if no reviews
+      setReviewStats({
+        averageRating: 0,
+        totalReviews: 0,
+        positiveRatePercentage: 0,
+        negativeReviewsCount: 0,
+        newReviewsCount: 0,
+        ratingDistribution: [],
+        reviewTrend: []
+      });
+    }
+  }, [reviews]);
+
+  const fetchReviewData = async (facilityId: string = selectedFacility) => {
+    if (!facilityId) return;
+    
     setLoading(true);
     
-    // Simulate API call delay
-    setTimeout(() => {
-      // Filter reviews based on current filters
-      let filteredReviews = [...mockReviews];
-      
-      if (statusFilter !== 'all') {
-        filteredReviews = filteredReviews.filter(review => review.status === statusFilter);
-      }
-      
-      if (ratingFilter.length > 0) {
-        filteredReviews = filteredReviews.filter(review => ratingFilter.includes(review.rating));
-      }
-      
-      if (searchText) {
-        const lowerSearch = searchText.toLowerCase();
-        filteredReviews = filteredReviews.filter(
-          review => 
-            review.userName.toLowerCase().includes(lowerSearch) || 
-            review.service.toLowerCase().includes(lowerSearch) ||
-            review.bookingId.toLowerCase().includes(lowerSearch)
-        );
-      }
-      
-      if (dateRange[0] && dateRange[1]) {
-        filteredReviews = filteredReviews.filter(review => {
-          const reviewDate = dayjs(review.timestamp);
-          return reviewDate.isAfter(dateRange[0]) && reviewDate.isBefore(dateRange[1]);
-        });
-      }
-      
-      setReviews(filteredReviews);
+    try {
+      // Fetch reviews from API
+      const reviewsData = await reviewService.getListReviewByFacilityId(facilityId);
+      setReviews(reviewsData);
+    } catch (error) {
+      console.error('Error fetching reviews:', error);
+      message.error('Không thể tải dữ liệu đánh giá. Vui lòng thử lại sau.');
+    } finally {
       setLoading(false);
-    }, 500);
+    }
   };
 
-  const handleReplySubmit = () => {
+  const handleFacilityChange = (value: string) => {
+    setSelectedFacility(value);
+    localStorage.setItem(SELECTED_FACILITY_KEY, value);
+    fetchReviewData(value);
+  };
+
+  const handleReplySubmit = async () => {
     if (!currentReview || !replyContent.trim()) return;
     
-    // In a real app, this would be an API call
-    const updatedReviews = reviews.map(review => 
-      review.id === currentReview.id 
-        ? {
-            ...review,
-            status: 'replied' as const,
-            reply: {
-              content: replyContent,
-              timestamp: new Date().toISOString()
+    try {
+      // Call API to update feedback
+      await reviewService.updateFeedback(currentReview.id, replyContent);
+      
+      // Update local state
+      const updatedReviews = reviews.map(review => 
+        review.id === currentReview.id 
+          ? {
+              ...review,
+              feedback: replyContent,
+              feedbackAt: new Date().toISOString()
             }
-          }
-        : review
-    );
-    
-    setReviews(updatedReviews);
-    setReplyModalVisible(false);
-    setReplyContent('');
-    setCurrentReview(null);
+          : review
+      );
+      
+      setReviews(updatedReviews);
+      setReplyModalVisible(false);
+      setReplyContent('');
+      setCurrentReview(null);
+      message.success('Phản hồi đánh giá thành công!');
+    } catch (error) {
+      console.error('Error updating feedback:', error);
+      message.error('Không thể cập nhật phản hồi. Vui lòng thử lại sau.');
+    }
   };
 
   const openReplyModal = (review: Review) => {
     setCurrentReview(review);
-    setReplyContent(review.reply?.content || '');
+    setReplyContent(review.feedback || '');
     setReplyModalVisible(true);
   };
 
@@ -272,6 +243,27 @@ const ReviewManagement: React.FC = () => {
     setSearchText('');
     setDateRange([null, null]);
   };
+
+  // Filter reviews based on current filters
+  const filteredReviews = reviews.filter(review => {
+    // Status filter
+    if (statusFilter === 'pending' && review.feedback) return false;
+    if (statusFilter === 'replied' && !review.feedback) return false;
+    
+    // Rating filter
+    if (ratingFilter.length > 0 && !ratingFilter.includes(review.rating)) return false;
+    
+    // Search text filter (bookingId)
+    if (searchText && !review.booking?.id.toLowerCase().includes(searchText.toLowerCase())) return false;
+    
+    // Date range filter
+    if (dateRange[0] && dateRange[1]) {
+      const reviewDate = dayjs(review.reviewAt);
+      if (!reviewDate.isAfter(dateRange[0]) || !reviewDate.isBefore(dateRange[1])) return false;
+    }
+    
+    return true;
+  });
 
   // Chart configurations
   const reviewTrendConfig = {
@@ -305,11 +297,11 @@ const ReviewManagement: React.FC = () => {
       key: 'user',
       render: (_, review) => (
         <div className="flex items-center space-x-3">
-          <Avatar src={review.userAvatar} icon={<UserOutlined />} />
+          <Avatar icon={<UserOutlined />} />
           <div>
-            <Text strong>{review.userName}</Text>
+            <Text strong>{review.booking?.player?.name || 'Người dùng'}</Text>
             <div>
-              <Text type="secondary" className="text-xs">Đơn #{review.bookingId}</Text>
+              <Text type="secondary" className="text-xs">Đơn #{review.booking?.id.slice(0, 8)}</Text>
             </div>
           </div>
         </div>
@@ -324,13 +316,13 @@ const ReviewManagement: React.FC = () => {
           <div className="mb-1">
             <Rate disabled defaultValue={review.rating} />
             <Text type="secondary" className="ml-2">
-              {dayjs(review.timestamp).format('DD/MM/YYYY HH:mm')}
+              {dayjs(review.reviewAt).format('DD/MM/YYYY HH:mm')}
             </Text>
           </div>
           <Paragraph ellipsis={{ rows: isMobile ? 1 : 2 }}>{review.comment}</Paragraph>
-          {review.images && review.images.length > 0 && (
+          {review.imageUrl && review.imageUrl.length > 0 && (
             <div className="flex mt-2 space-x-2">
-              {review.images.map((image, index) => (
+              {review.imageUrl.map((image, index) => (
                 <div 
                   key={index} 
                   className="w-12 h-12 rounded overflow-hidden"
@@ -343,13 +335,13 @@ const ReviewManagement: React.FC = () => {
               ))}
             </div>
           )}
-          {review.reply && (
+          {review.feedback && (
             <div className="mt-2 bg-gray-50 p-2 rounded">
               <Text type="secondary" className="text-xs">
-                Phản hồi của bạn - {dayjs(review.reply.timestamp).format('DD/MM/YYYY HH:mm')}
+                Phản hồi của bạn - {dayjs(review.feedbackAt).format('DD/MM/YYYY HH:mm')}
               </Text>
               <Paragraph ellipsis={{ rows: isMobile ? 1 : 2 }} className="text-sm mt-1">
-                {review.reply.content}
+                {review.feedback}
               </Paragraph>
             </div>
           )}
@@ -357,10 +349,82 @@ const ReviewManagement: React.FC = () => {
       ),
     },
     {
-      title: 'Dịch vụ',
+      title: 'Đơn đặt sân',
       dataIndex: 'service',
       key: 'service',
-      render: (service) => <Text>{service}</Text>,
+      render: (_, review) => {
+        // Get booking date slots
+        const bookingSlots = review.booking?.bookingSlots || [];
+        
+        if (bookingSlots.length === 0) {
+          return (
+            <div>
+              <Text>
+                {review.booking?.startTime} - {review.booking?.endTime}
+              </Text>
+            </div>
+          );
+        }
+        
+        // Format dates
+        const formattedDates = bookingSlots.map((slot: BookingSlot) => 
+          dayjs(slot.date).format('DD/MM/YYYY')
+        );
+        
+        // If only one date, display it directly
+        if (formattedDates.length === 1) {
+          return (
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <CalendarOutlined style={{ marginRight: 8 }} />
+              <div>
+                <Text>{formattedDates[0]}</Text>
+                <div>
+                  <Text type="secondary" style={{ fontSize: '12px' }}>
+                    {review.booking?.startTime} - {review.booking?.endTime}
+                  </Text>
+                </div>
+              </div>
+            </div>
+          );
+        }
+        
+        // If multiple dates, use Popover
+        const content = (
+          <div style={{ padding: 4 }}>
+            {formattedDates.map((date: string, index: number) => (
+              <div key={index} style={{ marginBottom: 4 }}>
+                <Tag color="blue">{date}</Tag>
+              </div>
+            ))}
+          </div>
+        );
+        
+        return (
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <CalendarOutlined style={{ marginRight: 8 }} />
+            <div>
+              <Popover
+                content={content}
+                title="Lịch đặt sân"
+                trigger="hover"
+                placement="bottom"
+              >
+                <span style={{ cursor: 'pointer' }}>
+                  {formattedDates[0]} 
+                  <span style={{ fontWeight: 500, color: '#1890ff', marginLeft: 4 }}>
+                    [{formattedDates.length}]
+                  </span>
+                </span>
+              </Popover>
+              <div>
+                <Text type="secondary" style={{ fontSize: '12px' }}>
+                  {review.booking?.startTime} - {review.booking?.endTime}
+                </Text>
+              </div>
+            </div>
+          </div>
+        );
+      },
       responsive: ['md'],
     },
     {
@@ -368,8 +432,8 @@ const ReviewManagement: React.FC = () => {
       key: 'status',
       render: (_, review) => (
         <Badge 
-          status={review.status === 'replied' ? 'success' : 'warning'} 
-          text={review.status === 'replied' ? 'Đã phản hồi' : 'Chưa phản hồi'} 
+          status={review.feedback ? 'success' : 'warning'} 
+          text={review.feedback ? 'Đã phản hồi' : 'Chưa phản hồi'} 
         />
       ),
       responsive: ['md'],
@@ -380,11 +444,11 @@ const ReviewManagement: React.FC = () => {
       render: (_, review) => (
         <Space>
           <Button 
-            type={review.status === 'pending' ? 'primary' : 'default'} 
+            type={!review.feedback ? 'primary' : 'default'} 
             onClick={() => openReplyModal(review)}
             size={isMobile ? 'small' : 'middle'}
           >
-            {review.status === 'pending' ? 'Phản hồi' : 'Xem/Sửa phản hồi'}
+            {!review.feedback ? 'Phản hồi' : 'Xem/Sửa phản hồi'}
           </Button>
         </Space>
       ),
@@ -392,7 +456,7 @@ const ReviewManagement: React.FC = () => {
   ];
 
   return (
-    <div className="p-2 sm:p-4 md:p-6">
+    <div className="p-2 sm:p-4 md:p-6 ">
       <Card className="mb-4 md:mb-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 md:mb-6">
           <Title level={4} className="mb-2 md:mb-0">Quản lý đánh giá</Title>
@@ -400,7 +464,7 @@ const ReviewManagement: React.FC = () => {
             placeholder="Chọn cơ sở"
             style={{ width: isMobile ? '100%' : 300 }}
             value={selectedFacility}
-            onChange={setSelectedFacility}
+            onChange={handleFacilityChange}
           >
             {facilities.map((facility) => (
               <Option key={facility.id} value={facility.id}>{facility.name}</Option>
@@ -431,9 +495,11 @@ const ReviewManagement: React.FC = () => {
                 prefix={<MessageOutlined />}
               />
               <div className="mt-2">
-                <Tag color="green">
-                  <ArrowUpOutlined /> 12% so với tháng trước
-                </Tag>
+                {reviewStats.totalReviews > 0 && (
+                  <Tag color="green">
+                    <ArrowUpOutlined /> Có {reviewStats.totalReviews} đánh giá
+                  </Tag>
+                )}
               </div>
             </Card>
           </Col>
@@ -459,17 +525,21 @@ const ReviewManagement: React.FC = () => {
             <Card className="h-full">
               <Statistic
                 title="Cần phản hồi"
-                value={reviewStats.negativeReviewsCount}
-                valueStyle={{ color: reviewStats.negativeReviewsCount > 0 ? '#f5222d' : '#52c41a' }}
+                value={reviewStats.newReviewsCount}
+                valueStyle={{ color: reviewStats.newReviewsCount > 0 ? '#f5222d' : '#52c41a' }}
                 prefix={<CommentOutlined />}
               />
               <div className="mt-2">
                 <Button 
                   type="primary" 
-                  danger={reviewStats.negativeReviewsCount > 0}
-                  disabled={reviewStats.negativeReviewsCount === 0}
+                  danger={reviewStats.newReviewsCount > 0}
+                  disabled={reviewStats.newReviewsCount === 0}
                   size={isMobile ? 'small' : 'middle'}
                   block={isMobile}
+                  onClick={() => {
+                    setActiveTab('list');
+                    setStatusFilter('pending');
+                  }}
                 >
                   Xem đánh giá cần phản hồi
                 </Button>
@@ -489,32 +559,44 @@ const ReviewManagement: React.FC = () => {
                 children: (
                   <Row gutter={[8, 8]}>
                     <Col xs={24} md={12}>
-                      <Card title="Phân bố đánh giá theo sao" className="h-full">
-                        <Line {...reviewTrendConfig} height={isMobile ? 250 : 300} />
+                      <Card title="Xu hướng đánh giá theo thời gian" className="h-full">
+                        {reviewStats.reviewTrend.length > 0 ? (
+                          <Line {...reviewTrendConfig} height={isMobile ? 250 : 300} />
+                        ) : (
+                          <div className="flex items-center justify-center h-64">
+                            <Text type="secondary">Chưa có dữ liệu đánh giá</Text>
+                          </div>
+                        )}
                       </Card>
                     </Col>
                     <Col xs={24} md={12}>
-                      <Card title="Xu hướng đánh giá theo thời gian" className="h-full">
-                        <Pie 
-                          data={reviewStats.ratingDistribution.map(item => ({
-                            type: `${item.rating} sao`,
-                            value: item.count
-                          }))}
-                          angleField="value"
-                          colorField="type"
-                          radius={0.8}
-                          legend={{
-                            position: isMobile ? 'bottom' : 'right',
-                            layout: isMobile ? 'horizontal' : 'vertical'
-                          }}
-                          tooltip={{
-                            formatter: (datum: { type: string; value: number }) => {
-                              return { name: datum.type, value: datum.value };
-                            }
-                          }}
-                          interactions={[{ type: 'element-active' }]}
-                          height={isMobile ? 250 : 300}
-                        />
+                      <Card title="Phân bố đánh giá theo sao" className="h-full">
+                        {reviewStats.ratingDistribution.length > 0 ? (
+                          <Pie 
+                            data={reviewStats.ratingDistribution.map(item => ({
+                              type: `${item.rating} sao`,
+                              value: item.count
+                            }))}
+                            angleField="value"
+                            colorField="type"
+                            radius={0.8}
+                            legend={{
+                              position: isMobile ? 'bottom' : 'right',
+                              layout: isMobile ? 'horizontal' : 'vertical'
+                            }}
+                            tooltip={{
+                              formatter: (datum: { type: string; value: number }) => {
+                                return { name: datum.type, value: datum.value };
+                              }
+                            }}
+                            interactions={[{ type: 'element-active' }]}
+                            height={isMobile ? 250 : 300}
+                          />
+                        ) : (
+                          <div className="flex items-center justify-center h-64">
+                            <Text type="secondary">Chưa có dữ liệu đánh giá</Text>
+                          </div>
+                        )}
                       </Card>
                     </Col>
                   </Row>
@@ -525,9 +607,15 @@ const ReviewManagement: React.FC = () => {
                 label: 'Danh sách đánh giá',
                 children: (
                   <Card>
-                    <div className="review-filter-group">
-                      <div className="review-filter-item">
-                        <Text strong className="review-filter-label">Trạng thái:</Text>
+                    <div style={{ 
+                      display: 'flex', 
+                      flexWrap: 'wrap', 
+                      gap: '16px', 
+                      marginBottom: '16px',
+                      flexDirection: isMobile ? 'column' : 'row'
+                    }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <Text strong>Trạng thái:</Text>
                         <Select
                           value={statusFilter}
                           onChange={setStatusFilter}
@@ -539,8 +627,8 @@ const ReviewManagement: React.FC = () => {
                         </Select>
                       </div>
                       
-                      <div className="review-filter-item">
-                        <Text strong className="review-filter-label">Đánh giá:</Text>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <Text strong>Đánh giá:</Text>
                         <Select
                           mode="multiple"
                           placeholder="Chọn số sao"
@@ -556,8 +644,8 @@ const ReviewManagement: React.FC = () => {
                         </Select>
                       </div>
                       
-                      <div className="review-filter-item">
-                        <Text strong className="review-filter-label">Thời gian:</Text>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <Text strong>Thời gian:</Text>
                         <RangePicker 
                           value={dateRange}
                           onChange={(dates) => setDateRange(dates as [dayjs.Dayjs | null, dayjs.Dayjs | null])}
@@ -566,17 +654,24 @@ const ReviewManagement: React.FC = () => {
                       </div>
                     </div>
                     
-                    <div className="review-filter-group mt-4">
-                      <div className="review-filter-item" style={{ flex: 1 }}>
+                    <div style={{ 
+                      display: 'flex', 
+                      flexWrap: 'wrap', 
+                      gap: '16px', 
+                      marginTop: '16px',
+                      marginBottom: '16px',
+                      flexDirection: isMobile ? 'column' : 'row'
+                    }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
                         <Input.Search
-                          placeholder="Tìm kiếm theo tên, dịch vụ, mã đơn..."
+                          placeholder="Tìm kiếm theo mã đơn..."
                           value={searchText}
                           onChange={e => setSearchText(e.target.value)}
-                          onSearch={fetchReviewData}
+                          onSearch={() => fetchReviewData()}
                         />
                       </div>
                       
-                      <div className="review-filter-item" style={{ width: 'auto' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
                         <Button 
                           icon={<ReloadOutlined />} 
                           onClick={handleReset}
@@ -588,7 +683,7 @@ const ReviewManagement: React.FC = () => {
                     
                     <div className="mt-4">
                       <Table
-                        dataSource={reviews}
+                        dataSource={filteredReviews}
                         columns={columns}
                         rowKey="id"
                         loading={loading}
@@ -600,6 +695,7 @@ const ReviewManagement: React.FC = () => {
                         }}
                         scroll={{ x: 800 }}
                         className="review-table"
+                        locale={{ emptyText: 'Không có dữ liệu đánh giá' }}
                       />
                     </div>
                   </Card>
@@ -611,7 +707,7 @@ const ReviewManagement: React.FC = () => {
       </Card>
       
       <Modal
-        title={currentReview?.status === 'pending' ? "Phản hồi đánh giá" : "Xem/Sửa phản hồi"}
+        title={!currentReview?.feedback ? "Phản hồi đánh giá" : "Xem/Sửa phản hồi"}
         open={replyModalVisible}
         onOk={handleReplySubmit}
         onCancel={() => setReplyModalVisible(false)}
@@ -623,14 +719,14 @@ const ReviewManagement: React.FC = () => {
           <>
             <div className="mb-4">
               <div className="flex items-center mb-2">
-                <Avatar src={currentReview.userAvatar} icon={<UserOutlined />} />
-                <Text strong className="ml-2">{currentReview.userName}</Text>
+                <Avatar icon={<UserOutlined />} />
+                <Text strong className="ml-2">{currentReview.booking?.player?.name || 'Người dùng'}</Text>
               </div>
               <Rate disabled defaultValue={currentReview.rating} className="block mb-2" />
               <Paragraph>{currentReview.comment}</Paragraph>
-              {currentReview.images && currentReview.images.length > 0 && (
+              {currentReview.imageUrl && currentReview.imageUrl.length > 0 && (
                 <div className="flex mt-2 space-x-2">
-                  {currentReview.images.map((image, index) => (
+                  {currentReview.imageUrl.map((image, index) => (
                     <div 
                       key={index} 
                       className="w-16 h-16 rounded overflow-hidden"

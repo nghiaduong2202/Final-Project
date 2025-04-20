@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Form, Card, InputNumber, Typography, FormInstance, Row, Col, Divider, Empty, Tag, Input, Select, Badge, Button } from 'antd';
 import { Service } from '@/types/service.type';
 import { BookingFormData } from '@/types/booking.type';
-import { SearchOutlined, ShoppingCartOutlined, TagOutlined, FilterOutlined } from '@ant-design/icons';
+import { SearchOutlined, ShoppingCartOutlined, FilterOutlined } from '@ant-design/icons';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
@@ -23,8 +23,7 @@ interface ServiceCardProps {
 const ServiceCard: React.FC<ServiceCardProps> = ({ service, quantity, onChange, disabled = false }) => {
   const getServiceTypeName = (type: string | undefined): string => {
     switch (type) {
-      case 'rental': return 'Cho thuê';
-      case 'food': return 'Thức ăn';
+      case 'rental': return 'Cho thuê';     
       case 'coaching': return 'Huấn luyện';
       case 'equipment': return 'Thiết bị';
       default: return 'Khác';
@@ -34,10 +33,20 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ service, quantity, onChange, 
   const getServiceTypeColor = (type: string | undefined): string => {
     switch (type) {
       case 'rental': return '#1890ff';
-      case 'food': return '#52c41a';
       case 'coaching': return '#722ed1';
       case 'equipment': return '#faad14';
       default: return '#f5222d';
+    }
+  };
+
+  // Chuyển đổi đơn vị hiển thị thân thiện hơn
+  const formatUnit = (unit: string | undefined): string => {
+    if (!unit) return '';
+    
+    switch (unit.toLowerCase()) {
+      case 'quantity': return 'sản phẩm';
+      case 'time': return 'giờ';
+      default: return unit;
     }
   };
 
@@ -45,11 +54,25 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ service, quantity, onChange, 
     <Card 
       hoverable
       className={`h-full ${disabled ? 'opacity-60' : ''}`}
-      bodyStyle={{ padding: '16px', height: '100%', display: 'flex', flexDirection: 'column' }}
+      style={{ padding: '16px', height: '100%', display: 'flex', flexDirection: 'column' }}
     >
       <div className="flex justify-between items-start mb-2">
         <div>
-          <Text strong className="text-lg">{service.name}</Text>
+          <Text 
+            strong 
+            className="text-lg line-clamp-1"
+            style={{
+              overflow: 'hidden',
+              display: '-webkit-box',
+              WebkitLineClamp: 1,
+              WebkitBoxOrient: 'vertical',
+              height: '1.5em',
+              marginBottom: '4px',              
+            }}
+            title={service.name}
+          >
+            {service.name}
+          </Text>
           {service.sport && (
             <Tag color="blue" className="ml-2">
               {service.sport.name}
@@ -64,13 +87,24 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ service, quantity, onChange, 
         />
       </div>
 
-      <Paragraph className="text-gray-500 flex-grow">
-        {service.description}
+      <Paragraph 
+        className="text-gray-500 line-clamp-3"
+        style={{ 
+          overflow: 'hidden',
+          display: '-webkit-box',
+          WebkitLineClamp: 3,
+          WebkitBoxOrient: 'vertical',
+          height: '2em',
+          marginBottom: '16px'
+        }}
+        title={service.description}
+      >
+        {service.description || "Không có mô tả"}
       </Paragraph>
 
-      <div className="mt-2">
+      <div className="mt-auto">
         <div className="text-blue-600 font-semibold text-lg">
-          {service.price.toLocaleString('vi-VN')}đ/{service.unit}
+          {service.price.toLocaleString('vi-VN')}đ/{formatUnit(service.unit)}
         </div>
         <div className="flex justify-between items-center mt-2">
           <Text type={service.amount > 20 ? "success" : service.amount > 5 ? "warning" : "danger"}>
@@ -99,22 +133,11 @@ const BookingStepServices: React.FC<BookingStepServicesProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [serviceTypeFilter, setServiceTypeFilter] = useState<string>('all');
-  const [sportFilter, setSportFilter] = useState<string>('all');
-
-  // Tất cả các loại thể thao từ danh sách dịch vụ
-  const sportOptions = Array.from(
-    new Set(
-      services
-        .filter(s => s.sport)
-        .map(s => JSON.stringify({ id: s.sport.id, name: s.sport.name }))
-    )
-  ).map(sport => JSON.parse(sport));
 
   // Các loại dịch vụ
   const serviceTypeOptions = [
     { value: 'all', label: 'Tất cả' },
     { value: 'rental', label: 'Cho thuê' },
-    { value: 'food', label: 'Thức ăn' },
     { value: 'coaching', label: 'Huấn luyện' },
     { value: 'equipment', label: 'Thiết bị' },
     { value: 'other', label: 'Khác' }
@@ -128,10 +151,7 @@ const BookingStepServices: React.FC<BookingStepServicesProps> = ({
     
     const typeMatch = serviceTypeFilter === 'all' || service.type === serviceTypeFilter;
     
-    const sportMatch = sportFilter === 'all' || 
-      (service.sport && service.sport.id.toString() === sportFilter);
-    
-    return searchMatch && typeMatch && sportMatch;
+    return searchMatch && typeMatch;
   });
 
   // Lấy số lượng đã chọn cho mỗi dịch vụ
@@ -173,7 +193,6 @@ const BookingStepServices: React.FC<BookingStepServicesProps> = ({
   const resetFilters = () => {
     setSearchTerm('');
     setServiceTypeFilter('all');
-    setSportFilter('all');
   };
 
   return (
@@ -195,7 +214,7 @@ const BookingStepServices: React.FC<BookingStepServicesProps> = ({
           
           <div className="bg-gray-50 p-4 rounded-lg mb-6">
             <Row gutter={[16, 16]} align="middle">
-              <Col xs={24} sm={8} md={6}>
+              <Col xs={24} sm={12} md={8}>
                 <Input
                   placeholder="Tìm kiếm dịch vụ"
                   value={searchTerm}
@@ -205,7 +224,7 @@ const BookingStepServices: React.FC<BookingStepServicesProps> = ({
                 />
               </Col>
               
-              <Col xs={24} sm={8} md={6}>
+              <Col xs={24} sm={12} md={8}>
                 <Select
                   placeholder="Loại dịch vụ"
                   value={serviceTypeFilter}
@@ -219,22 +238,7 @@ const BookingStepServices: React.FC<BookingStepServicesProps> = ({
                 </Select>
               </Col>
               
-              <Col xs={24} sm={8} md={6}>
-                <Select
-                  placeholder="Loại thể thao"
-                  value={sportFilter}
-                  onChange={value => setSportFilter(value)}
-                  style={{ width: '100%' }}
-                  suffixIcon={<TagOutlined />}
-                >
-                  <Option value="all">Tất cả thể thao</Option>
-                  {sportOptions.map((sport) => (
-                    <Option key={sport.id} value={sport.id.toString()}>{sport.name}</Option>
-                  ))}
-                </Select>
-              </Col>
-              
-              <Col xs={24} sm={24} md={6} className="text-right">
+              <Col xs={24} sm={24} md={8} className="text-right">
                 <Button onClick={resetFilters}>Đặt lại bộ lọc</Button>
               </Col>
             </Row>
@@ -256,7 +260,7 @@ const BookingStepServices: React.FC<BookingStepServicesProps> = ({
             ) : (
               <Row gutter={[16, 16]}>
                 {filteredServices.map(service => (
-                  <Col xs={24} sm={12} md={8} lg={6} key={service.id}>
+                  <Col xs={24} sm={12} md={8} lg={6} key={service.id} className="flex">
                     <ServiceCard
                       service={service}
                       quantity={getServiceQuantity(service.id)}

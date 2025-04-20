@@ -1,7 +1,13 @@
 import { Sport } from "./sport.type";
 
 // Type aliases để sử dụng ở nhiều nơi
-export type ServiceType = 'rental' | 'coaching' | 'equipment' | 'food' | 'other';
+export type ServiceType = 'rental' | 'coaching' | 'equipment' | 'other';
+
+// Unit enum phù hợp với server
+export enum UnitEnum {
+  TIME = 'time',
+  QUANTITY = 'quantity',
+}
 
 export interface Service {
     id: number;
@@ -10,7 +16,7 @@ export interface Service {
     description: string;
     amount: number;
     sport: Sport;
-    unit?: string;
+    unit?: UnitEnum | string;
     type: ServiceType;
     facilityId?: string;
     bookedCount?: number;
@@ -23,7 +29,7 @@ export interface ServiceFormData {
   description: string;
   amount: number;
   sportId: number;
-  unit?: string;
+  unit?: UnitEnum | string;
   type: ServiceType;
   facilityId?: string;
 }
@@ -36,6 +42,7 @@ export interface ServiceApiRequest {
   amount: number;
   sportId: number;
   type: ServiceType;
+  unit: UnitEnum;
   facilityId?: string;
 }
 
@@ -47,7 +54,7 @@ export interface UpdatedServiceValues {
   amount: number;
   sportId: number;
   type: ServiceType;
-  unit?: string;
+  unit: UnitEnum | string;
   facilityId?: string;
 }
   

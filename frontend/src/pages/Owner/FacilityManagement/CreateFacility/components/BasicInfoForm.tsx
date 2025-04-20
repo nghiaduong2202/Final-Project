@@ -237,10 +237,7 @@ const BasicInfoForm = forwardRef<BasicInfoFormRef, BasicInfoFormProps>(({
       setVisibleShifts(shifts);
       
       // Set form values
-      form.setFieldsValue(initialValues);
-      
-      // Log ra console để debug
-      console.log("Khởi tạo form với giá trị:", initialValues);
+      form.setFieldsValue(initialValues);           
     }
   }, [formData, form]);
   
@@ -361,7 +358,7 @@ const BasicInfoForm = forwardRef<BasicInfoFormRef, BasicInfoFormProps>(({
       
       // Update form data with new facility info
       updateFormData({ facilityInfo });
-      console.log("Đã cập nhật facilityInfo:", facilityInfo);
+     
     } catch (error) {
       console.error('Error processing form submission:', error);
     }
@@ -372,7 +369,23 @@ const BasicInfoForm = forwardRef<BasicInfoFormRef, BasicInfoFormProps>(({
     // Không cập nhật nếu đang trong trạng thái ngăn submit
     if (shouldPreventSubmit) return;
     
-    // Theo dõi các thay đổi liên quan đến địa chỉ để cập nhật sớm
+    // Kiểm tra nếu đang thay đổi khung giờ hoặc tên cơ sở, không gọi submitFormData
+    const timeFieldChanged = _changedValues.openTime1 !== undefined || 
+                            _changedValues.closeTime1 !== undefined ||
+                            _changedValues.openTime2 !== undefined || 
+                            _changedValues.closeTime2 !== undefined ||
+                            _changedValues.openTime3 !== undefined || 
+                            _changedValues.closeTime3 !== undefined;
+                            
+    const nameOrDescChanged = _changedValues.name !== undefined || 
+                              _changedValues.description !== undefined;
+    
+    // Không cập nhật nếu đang thay đổi tên hoặc mô tả (sẽ cập nhật khi Tiếp Theo)
+    if (nameOrDescChanged || timeFieldChanged) {
+      return;
+    }
+    
+    // Chỉ theo dõi các thay đổi liên quan đến địa chỉ để cập nhật sớm
     if (_changedValues.provinceCode || _changedValues.districtCode || 
         _changedValues.wardCode || _changedValues.detailAddress) {
       
@@ -388,22 +401,9 @@ const BasicInfoForm = forwardRef<BasicInfoFormRef, BasicInfoFormProps>(({
         submitFormData(allValues);
       }
     }
-    // Chỉ cập nhật form data nếu có đủ thông tin cơ bản và sử dụng debounce
-    else if (allValues.name || allValues.description) {
-      // Hủy timer trước đó nếu có
-      if (submitTimerRef.current) {
-        clearTimeout(submitTimerRef.current);
-      }
-      
-      // Đặt timer mới với độ trễ ngắn hơn
-      submitTimerRef.current = setTimeout(() => {
-        submitFormData(allValues);
-        submitTimerRef.current = null;
-      }, 500); // Giảm thời gian delay để cập nhật thường xuyên hơn
-    }
   };
   
-  // Xử lý khi thay đổi timeRange
+  // Xử lý khi thay đổi timeRange - đảm bảo khung giờ được cập nhật đúng
   const handleTimeRangeChange = (index: number, times: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null) => {
     if (!times) return;
     
@@ -421,12 +421,25 @@ const BasicInfoForm = forwardRef<BasicInfoFormRef, BasicInfoFormProps>(({
         openTime2: start,
         closeTime2: end
       });
+      
+      // Đảm bảo visibleShifts >= 2 khi có dữ liệu ca 2
+      if (visibleShifts < 2) {
+        setVisibleShifts(2);
+      }
     } else if (index === 3) {
       form.setFieldsValue({
         openTime3: start,
         closeTime3: end
       });
+      
+      // Đảm bảo visibleShifts = 3 khi có dữ liệu ca 3
+      if (visibleShifts < 3) {
+        setVisibleShifts(3);
+      }
     }
+    
+    // KHÔNG gọi submitFormData tại đây để tránh việc reset các khung giờ
+    // Dữ liệu sẽ được cập nhật khi nhấn nút Tiếp theo
   };
   
   // Tiện ích để lấy giá trị timeRange từ open/close time
@@ -447,7 +460,15 @@ const BasicInfoForm = forwardRef<BasicInfoFormRef, BasicInfoFormProps>(({
   // Thêm ca làm việc tiếp theo
   const addShift = () => {
     if (visibleShifts < 3) {
+      // Tăng số ca hiển thị mà không gọi submitFormData
       setVisibleShifts(visibleShifts + 1);
+      
+      // Lưu vào localStorage để phòng trường hợp state bị reset
+      try {
+        localStorage.setItem('visibleShifts', (visibleShifts + 1).toString());
+      } catch (e) {
+        console.error('Error saving to localStorage:', e);
+      }
     }
   };
   

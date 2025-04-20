@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Form, Input, Button, Select, InputNumber, Card, Typography, Space, Divider, List, Tag, Modal, message } from 'antd';
 import { PlusOutlined, DeleteOutlined, ArrowLeftOutlined } from '@ant-design/icons';
-import { ServiceFormData, ServiceType, ServiceApiRequest } from '@/types/service.type';
+import { ServiceFormData, ServiceType, ServiceApiRequest, UnitEnum } from '@/types/service.type';
 import { facilityService } from '@/services/facility.service';
 import { FacilityDropdownItem } from '@/services/facility.service';
 import { Sport } from '@/types/sport.type';
 import { serviceService } from '@/services/service.service';
 import { getSportNameInVietnamese } from '@/utils/translateSport';
+import { AxiosError } from 'axios';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -35,14 +36,42 @@ const CreateService: React.FC<CreateServiceProps> = ({ onCancel, onSubmit }) => 
   const [sports, setSports] = useState<Sport[]>([]);
   const [loading, setLoading] = useState(false);
   
+  // Local storage key
+  const SELECTED_FACILITY_KEY = 'owner_selected_facility_id';
+  
   // Fetch facilities khi component mount
   useEffect(() => {
-    const fetchFacilities = async () => {
-      setLoading(true);
+    const fetchInitialData = async () => {
       try {
+        setLoading(true);
+        // Fetch danh sách cơ sở
         const facilitiesData = await facilityService.getFacilitiesDropdown();
         console.log('Fetched facilities data:', facilitiesData); // Debug log
         setFacilities(facilitiesData);
+        
+        // Lấy facilityId từ localStorage
+        const savedFacilityId = localStorage.getItem(SELECTED_FACILITY_KEY);
+        
+        // Kiểm tra xem savedFacilityId có còn hợp lệ không (có tồn tại trong danh sách facilities không)
+        const isValidSavedId = savedFacilityId && facilitiesData.some(f => f.id === savedFacilityId);
+        
+        // Nếu ID trong localStorage không hợp lệ, sử dụng ID đầu tiên trong danh sách
+        const initialFacilityId = isValidSavedId ? savedFacilityId : (facilitiesData.length > 0 ? facilitiesData[0].id : '');
+        
+        if (initialFacilityId) {
+          // Nếu ID đã thay đổi, cập nhật lại localStorage
+          if (initialFacilityId !== savedFacilityId) {
+            localStorage.setItem(SELECTED_FACILITY_KEY, initialFacilityId);
+          }
+          setSelectedFacilityId(initialFacilityId);
+          form.setFieldsValue({ facilityId: initialFacilityId });
+          
+          // Tìm facility được chọn để lấy danh sách sports
+          const selectedFacility = facilitiesData.find(facility => facility.id === initialFacilityId) as ExtendedFacility;
+          if (selectedFacility && selectedFacility.sports) {
+            setSports(selectedFacility.sports);
+          }
+        }
       } catch (error) {
         console.error('Error fetching facilities:', error);
         message.error('Không thể tải danh sách cơ sở. Vui lòng thử lại sau.');
@@ -51,18 +80,19 @@ const CreateService: React.FC<CreateServiceProps> = ({ onCancel, onSubmit }) => 
       }
     };
     
-    fetchFacilities();
-  }, []);
+    fetchInitialData();
+  }, [form]);
 
   // Handle facility selection và set sports
   const handleFacilitySelect = (value: string) => {
     setSelectedFacilityId(value);
+    localStorage.setItem(SELECTED_FACILITY_KEY, value);
     form.resetFields(['sportId']); // Reset sport field
     
     // Tìm facility được chọn
-    const selectedFacility = facilities.find(facility => facility.id === value);
+    const selectedFacility = facilities.find(facility => facility.id === value) as ExtendedFacility;
     
-    if (selectedFacility && selectedFacility.sports && selectedFacility.sports.length > 0) {
+    if (selectedFacility && selectedFacility.sports) {
       console.log('Setting sports from selected facility:', selectedFacility.sports);
       setSports(selectedFacility.sports);
     } else {
@@ -133,7 +163,7 @@ const CreateService: React.FC<CreateServiceProps> = ({ onCancel, onSubmit }) => 
         description: service.description,
         amount: service.amount,
         sportId: service.sportId,
-        unit: service.unit,
+        unit: service.unit as UnitEnum,
         type: service.type
       }));
       
@@ -149,9 +179,23 @@ const CreateService: React.FC<CreateServiceProps> = ({ onCancel, onSubmit }) => 
       } else {
         navigate('/owner/service-management');
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error creating services:', error);
-      message.error('Không thể tạo dịch vụ. Vui lòng thử lại sau.');
+      
+      // Kiểm tra thông báo lỗi
+      const axiosError = error as AxiosError<{message: string}>;
+      if (axiosError.response?.data?.message && axiosError.response.data.message.includes('Not found license with sport')) {
+        // Hiển thị thông báo lỗi về giấy phép
+        const sportId = axiosError.response.data.message.match(/sport (\d+)/)?.[1];
+        const sportName = sportId ? getSportName(Number(sportId)) : 'này';
+        
+        Modal.error({
+          title: 'Thiếu giấy phép kinh doanh',
+          content: `Cơ sở chưa được cập nhật giấy phép kinh doanh môn thể thao ${sportName}. Vui lòng cập nhật giấy phép trước khi tạo dịch vụ.`
+        });
+      } else {
+        message.error('Không thể tạo dịch vụ. Vui lòng thử lại sau.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -178,7 +222,6 @@ const CreateService: React.FC<CreateServiceProps> = ({ onCancel, onSubmit }) => 
       rental: { color: 'blue', text: 'Cho thuê' },
       coaching: { color: 'purple', text: 'Huấn luyện' },
       equipment: { color: 'cyan', text: 'Thiết bị' },
-      food: { color: 'green', text: 'Đồ uống/Thực phẩm' },
       other: { color: 'gray', text: 'Khác' },
     };
     return <Tag color={config[type].color}>{config[type].text}</Tag>;
@@ -274,11 +317,10 @@ const CreateService: React.FC<CreateServiceProps> = ({ onCancel, onSubmit }) => 
                 label="Loại dịch vụ"
                 rules={[{ required: true, message: 'Vui lòng chọn loại dịch vụ' }]}
               >
-                <Select placeholder="Chọn loại dịch vụ" disabled={submitting}>
+                <Select placeholder="Chọn loại dịch vụ">
                   <Option value="rental">Cho thuê</Option>
                   <Option value="coaching">Huấn luyện</Option>
                   <Option value="equipment">Thiết bị</Option>
-                  <Option value="food">Đồ uống/Thực phẩm</Option>
                   <Option value="other">Khác</Option>
                 </Select>
               </Form.Item>
@@ -306,7 +348,7 @@ const CreateService: React.FC<CreateServiceProps> = ({ onCancel, onSubmit }) => 
                     placeholder="Nhập giá dịch vụ"
                     addonAfter="đ"
                     style={{ width: '100%' }}
-                    formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}
+                    formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}
                     parser={(value: string | undefined) => {
                       if (!value) return 0;
                       return Number(value.replace(/\./g, ''));
@@ -318,15 +360,11 @@ const CreateService: React.FC<CreateServiceProps> = ({ onCancel, onSubmit }) => 
                 <Form.Item
                   name="unit"
                   label="Đơn vị tính"
-                  rules={[{ required: true, message: 'Vui lòng nhập đơn vị tính' }]}
+                  rules={[{ required: true, message: 'Vui lòng chọn đơn vị tính' }]}
                 >
-                  <Select placeholder="Chọn đơn vị tính" disabled={submitting}>
-                    <Option value="giờ">Giờ</Option>
-                    <Option value="ngày">Ngày</Option>
-                    <Option value="buổi">Buổi</Option>
-                    <Option value="chai">Chai</Option>
-                    <Option value="cái">Cái</Option>
-                    <Option value="bộ">Bộ</Option>
+                  <Select placeholder="Chọn đơn vị tính">
+                    <Option value={UnitEnum.TIME}>Giờ</Option>
+                    <Option value={UnitEnum.QUANTITY}>Sản phẩm</Option>
                   </Select>
                 </Form.Item>
               </div>

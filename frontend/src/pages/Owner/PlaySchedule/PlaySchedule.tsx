@@ -1,38 +1,79 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Select, Button, Input, DatePicker, Space, Typography, 
-  Badge, Card, Modal, Table, Form, TimePicker 
+  Badge, Card, Modal, Table, message
 } from 'antd';
 import {
   SearchOutlined, LeftOutlined, RightOutlined,
-  HistoryOutlined, UserOutlined,
-  PhoneOutlined
+  HistoryOutlined
 } from '@ant-design/icons';
-import { mockBookingHistory } from '@/mocks/booking/bookingData';
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
+import { facilityService, FacilityDropdownItem } from '@/services/facility.service';
+import bookingService from '@/services/booking.service';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
 
-interface Venue {
+// Storage key for selected facility
+const SELECTED_FACILITY_KEY = 'owner_selected_facility_play_schedule';
+
+// Interfaces for API responses
+interface FieldType {
   id: number;
   name: string;
+  status: string;
 }
 
-interface Sport {
-  id: number;
-  name: string;
-}
-
-interface BookingSlot {
+interface FieldGroupType {
   id: string;
+  name: string;
+  fields: FieldType[];
+}
+
+interface FacilityType {
+  id: string;
+  name: string;
+  openTime1: string;
+  closeTime1: string;
+  openTime2: string | null;
+  closeTime2: string | null;
+  openTime3: string | null;
+  closeTime3: string | null;
+  numberOfShifts: number;
+  fieldGroups: FieldGroupType[];
+}
+
+interface BookingScheduleItem {
+  id: string;
+  startTime: string;
+  endTime: string;
+  status: string;
+  payment: {
+    id: string;
+    fieldPrice: number;
+    servicePrice: number | null;
+    discount: number | null;
+    status: string;
+  };
+  player?: {
+    id: string;
+    name: string;
+    email: string;
+    phoneNumber: string;
+  };
+  field: {
+    id: number;
+    name: string;
+    status: string;
+  };
+}
+
+interface SlotInfo {
   time: string;
-  court: string;
-  customer: string;
-  phone: string;
-  status: 'booked' | 'available' | 'pending' | 'maintenance';
-  duration: number; // in hours
+  field: string;
+  fieldId: number;
+  booking: BookingScheduleItem | null;
 }
 
 const PlaySchedule: React.FC = () => {
@@ -40,45 +81,86 @@ const PlaySchedule: React.FC = () => {
   const [containerWidth, setContainerWidth] = useState<number>(0);
   const isMobile = containerWidth < 768;
   
-  // States for dropdowns
-  const [venues, setVenues] = useState<Venue[]>([
-    { id: 1, name: 'Sân bóng đá Hà Nội' },
-    { id: 2, name: 'Sân cầu lông Phạm Kha' }
-  ]);
-  const [sports, setSports] = useState<Sport[]>([
-    { id: 1, name: 'Bóng đá' },
-    { id: 2, name: 'Cầu lông' },
-    { id: 3, name: 'Tennis' }
-  ]);
-  const [selectedVenue, setSelectedVenue] = useState<number | null>(1);
-  const [selectedSport, setSelectedSport] = useState<number | null>(1);
+  // States for data
+  const [facilities, setFacilities] = useState<FacilityDropdownItem[]>([]);
+  const [selectedFacility, setSelectedFacility] = useState<FacilityType | null>(null);
+  const [selectedFacilityId, setSelectedFacilityId] = useState<string>('');
+  const [fieldGroups, setFieldGroups] = useState<FieldGroupType[]>([]);
+  const [selectedFieldGroup, setSelectedFieldGroup] = useState<FieldGroupType | null>(null);
+  const [selectedFieldGroupId, setSelectedFieldGroupId] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
 
   // States for search and date
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDate, setSelectedDate] = useState<Dayjs>(dayjs());
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [currentSlot, setCurrentSlot] = useState<BookingSlot | null>(null);
+  const [currentSlot, setCurrentSlot] = useState<SlotInfo | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  
+  // Booking data
+  const [bookingSchedule, setBookingSchedule] = useState<BookingScheduleItem[]>([]);
+  
+  // Generate time slots based on facility operating hours (30 min intervals)
+  const generateTimeSlots = () => {
+    if (!selectedFacility) return [];
+    
+    const timeSlots: string[] = [];
+    
+    // Helper function to add time slots for a given time range
+    const addTimeSlotsForRange = (startTime: string, endTime: string) => {
+      if (!startTime || !endTime) return;
+      
+      const start = dayjs(`2023-01-01 ${startTime}`);
+      const end = dayjs(`2023-01-01 ${endTime}`);
+      
+      let current = start;
+      while (current.isBefore(end) || current.isSame(end)) {
+        timeSlots.push(current.format('HH:mm'));
+        current = current.add(30, 'minute');
+      }
+    };
+    
+    // Add time slots for each operating time range
+    addTimeSlotsForRange(selectedFacility.openTime1, selectedFacility.closeTime1);
+    
+    if (selectedFacility.openTime2 && selectedFacility.closeTime2) {
+      addTimeSlotsForRange(selectedFacility.openTime2, selectedFacility.closeTime2);
+    }
+    
+    if (selectedFacility.openTime3 && selectedFacility.closeTime3) {
+      addTimeSlotsForRange(selectedFacility.openTime3, selectedFacility.closeTime3);
+    }
+    
+    return timeSlots;
+  };
+  
+  const timeSlots = generateTimeSlots();
 
-  // Mock data for booking slots
-  const [bookingSlots, setBookingSlots] = useState<BookingSlot[]>([
-    { id: 'bs1', time: '08:00', court: 'Sân 1', customer: 'Nguyễn Văn A', phone: '0901234567', status: 'booked', duration: 1 },
-    { id: 'bs2', time: '09:00', court: 'Sân 2', customer: 'Trần Thị B', phone: '0908765432', status: 'booked', duration: 2 },
-    { id: 'bs3', time: '10:00', court: 'Sân 3', customer: '', phone: '', status: 'available', duration: 1 },
-    { id: 'bs4', time: '14:00', court: 'Sân 1', customer: 'Lê Văn C', phone: '0912345678', status: 'pending', duration: 1 },
-    { id: 'bs5', time: '16:00', court: 'Sân 4', customer: '', phone: '', status: 'maintenance', duration: 3 },
-  ]);
-
-  // Time slots from 6:00 AM to 22:00 PM with 1-hour intervals
-  const timeSlots = Array.from({ length: 17 }, (_, i) => {
-    const hour = i + 6;
-    return `${hour.toString().padStart(2, '0')}:00`;
-  });
-
-  // Court names
-  const courts = ['Sân 1', 'Sân 2', 'Sân 3', 'Sân 4', 'Sân 5', 'Sân 6', 'Sân 7'];
-
+  // Fetch facilities on component mount
   useEffect(() => {
+    const fetchFacilities = async () => {
+      try {
+        const facilityList = await facilityService.getFacilitiesDropdown();
+        setFacilities(facilityList);
+        
+        // Get saved facility ID from localStorage or use the first one
+        const savedFacilityId = localStorage.getItem(SELECTED_FACILITY_KEY);
+        const isValidSavedId = savedFacilityId && facilityList.some(f => f.id === savedFacilityId);
+        const initialFacilityId = isValidSavedId ? savedFacilityId : (facilityList.length > 0 ? facilityList[0].id : '');
+        
+        if (initialFacilityId) {
+          setSelectedFacilityId(initialFacilityId);
+          localStorage.setItem(SELECTED_FACILITY_KEY, initialFacilityId);
+          await fetchFacilityDetails(initialFacilityId);
+        }
+      } catch (error) {
+        console.error('Error fetching facilities:', error);
+        message.error('Không thể tải danh sách cơ sở. Vui lòng thử lại sau.');
+      }
+    };
+    
+    fetchFacilities();
+    
     const updateWidth = () => {
       if (containerRef.current) {
         setContainerWidth(containerRef.current.offsetWidth);
@@ -89,101 +171,218 @@ const PlaySchedule: React.FC = () => {
     return () => window.removeEventListener('resize', updateWidth);
   }, []);
 
-  useEffect(() => {
-    // In a real app, this would fetch data from the API    
-  }, [selectedVenue, selectedSport, selectedDate]);
-
-  const handleSearch = (value: string) => {
-    setSearchQuery(value);
-    // Filter slots based on search query
-    // In a real app, this would trigger an API call
-  };
-
-  const handleTodayClick = () => {
-    setSelectedDate(dayjs());
-  };
-
-  const handleDateChange = (date: Dayjs | null) => {
-    if (date) {
-      setSelectedDate(date);
+  // Fetch facility details when selected facility changes
+  const fetchFacilityDetails = async (facilityId: string) => {
+    try {
+      setLoading(true);
+      const facilityDetails = await facilityService.getFacilityById(facilityId);
+      setSelectedFacility(facilityDetails as unknown as FacilityType);
+      
+      // Set field groups from facility data
+      if (facilityDetails && facilityDetails.fieldGroups) {
+        setFieldGroups(facilityDetails.fieldGroups as unknown as FieldGroupType[]);
+        
+        // Select the first field group by default
+        if (facilityDetails.fieldGroups.length > 0) {
+          const firstFieldGroup = facilityDetails.fieldGroups[0];
+          setSelectedFieldGroup(firstFieldGroup as unknown as FieldGroupType);
+          setSelectedFieldGroupId(firstFieldGroup.id);
+          
+          // Fetch booking schedule for this field group
+          await fetchBookingSchedule(firstFieldGroup.id, selectedDate.format('YYYY-MM-DD'));
+        }
+      }
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching facility details:', error);
+      message.error('Không thể tải thông tin cơ sở. Vui lòng thử lại sau.');
+      setLoading(false);
     }
   };
 
-  const handlePrevDay = () => {
-    setSelectedDate(selectedDate.subtract(1, 'day'));
+  // Fetch booking schedule when field group or date changes
+  const fetchBookingSchedule = async (fieldGroupId: string, date: string) => {
+    try {
+      setLoading(true);
+      const bookings = await bookingService.getBookingSchedule(fieldGroupId, date);
+      setBookingSchedule(bookings);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching booking schedule:', error);
+      message.error('Không thể tải lịch đặt sân. Vui lòng thử lại sau.');
+      setLoading(false);
+    }
   };
 
-  const handleNextDay = () => {
-    setSelectedDate(selectedDate.add(1, 'day'));
+  // Handle facility selection change
+  const handleFacilityChange = async (facilityId: string) => {
+    setSelectedFacilityId(facilityId);
+    localStorage.setItem(SELECTED_FACILITY_KEY, facilityId);
+    await fetchFacilityDetails(facilityId);
   };
 
-  const handleSlotClick = (time: string, court: string) => {
-    // Find if there's a booking for this slot
-    const slot = bookingSlots.find(
-      slot => slot.time === time && slot.court === court
-    );
+  // Handle field group selection change
+  const handleFieldGroupChange = async (fieldGroupId: string) => {
+    setSelectedFieldGroupId(fieldGroupId);
+    const fieldGroup = fieldGroups.find(fg => fg.id === fieldGroupId) || null;
+    setSelectedFieldGroup(fieldGroup);
     
-    if (slot) {
-      setCurrentSlot(slot);
-    } else {
+    // Fetch booking schedule for this field group
+    if (fieldGroupId) {
+      await fetchBookingSchedule(fieldGroupId, selectedDate.format('YYYY-MM-DD'));
+    }
+  };
+
+  const handleSearch = (value: string) => {
+    setSearchQuery(value);
+  };
+
+  const handleTodayClick = async () => {
+    const today = dayjs();
+    setSelectedDate(today);
+    if (selectedFieldGroupId) {
+      await fetchBookingSchedule(selectedFieldGroupId, today.format('YYYY-MM-DD'));
+    }
+  };
+
+  const handleDateChange = async (date: Dayjs | null) => {
+    if (date) {
+      setSelectedDate(date);
+      if (selectedFieldGroupId) {
+        await fetchBookingSchedule(selectedFieldGroupId, date.format('YYYY-MM-DD'));
+      }
+    }
+  };
+
+  const handlePrevDay = async () => {
+    const prevDay = selectedDate.subtract(1, 'day');
+    setSelectedDate(prevDay);
+    if (selectedFieldGroupId) {
+      await fetchBookingSchedule(selectedFieldGroupId, prevDay.format('YYYY-MM-DD'));
+    }
+  };
+
+  const handleNextDay = async () => {
+    const nextDay = selectedDate.add(1, 'day');
+    setSelectedDate(nextDay);
+    if (selectedFieldGroupId) {
+      await fetchBookingSchedule(selectedFieldGroupId, nextDay.format('YYYY-MM-DD'));
+    }
+  };
+
+  const handleSlotClick = (time: string, fieldName: string, fieldId: number) => {
+    // Get the time index
+    const timeIndex = timeSlots.findIndex(t => t === time);
+    
+    // Get calendar data
+    const calendarData = prepareCalendarData();
+    
+    // Find field data
+    const fieldData = calendarData.find(data => data.fieldId === fieldId);
+    
+    if (!fieldData) {
+      // Field not found, create empty slot info
       setCurrentSlot({
-        id: `new-${time}-${court}`,
         time,
-        court,
-        customer: '',
-        phone: '',
-        status: 'available',
-        duration: 1
+        field: fieldName,
+        fieldId,
+        booking: null
       });
+    } else {
+      // Check if this time slot has a booking
+      // We need to check if this time index is within any booking's range
+      const bookingData = fieldData.bookings.find(
+        b => timeIndex >= b.startSlotIndex && timeIndex < b.endSlotIndex
+      );
+      
+      if (bookingData) {
+        // Slot has a booking
+        setCurrentSlot({
+          time,
+          field: fieldName,
+          fieldId,
+          booking: bookingData.booking
+        });
+      } else {
+        // Empty slot
+        setCurrentSlot({
+          time,
+          field: fieldName,
+          fieldId,
+          booking: null
+        });
+      }
     }
     
     setIsModalVisible(true);
   };
 
-  const getCellStyle = (time: string, court: string) => {
-    const slot = bookingSlots.find(
-      slot => slot.time === time && slot.court === court
-    );
-    
-    if (!slot) return {};
-    
-    let backgroundColor = '';
-    let color = '';
-    
-    switch (slot.status) {
-      case 'booked':
-        backgroundColor = '#d6f5d6';
-        color = '#52c41a';
-        break;
-      case 'pending':
-        backgroundColor = '#fff7e6';
-        color = '#fa8c16';
-        break;
-      case 'maintenance':
-        backgroundColor = '#fff1f0';
-        color = '#f5222d';
-        break;
-      default:
-        backgroundColor = 'white';
-    }
-    
-    return {
-      backgroundColor,
-      color,
-      height: `${slot.duration * 40}px`,
-      position: 'relative' as const,
-      overflow: 'hidden'
-    };
-  };
+  // Update the prepareCalendarData function
+  const prepareCalendarData = () => {
+    if (!selectedFieldGroup || !timeSlots.length) return [];
 
-  // Filter bookings for history
-  const bookingHistory = mockBookingHistory.filter(booking => 
-    booking.facility.id === selectedVenue && booking.sportId === selectedSport
-  );
+    // Helper function to convert time string to minutes for comparison
+    const timeToMinutes = (timeString: string) => {
+      const [hours, minutes] = timeString.split(':').map(Number);
+      return hours * 60 + minutes;
+    };
+
+    // Initialize calendar data structure
+    const calendarData = selectedFieldGroup.fields.map(field => {
+      return {
+        fieldId: field.id,
+        fieldName: field.name,
+        bookings: [] as {
+          booking: BookingScheduleItem;
+          startSlotIndex: number;
+          endSlotIndex: number;
+          rowSpan: number;
+        }[]
+      };
+    });
+
+    // Process bookings for each field
+    bookingSchedule.forEach(booking => {
+      // Find field in our calendar data
+      const fieldData = calendarData.find(data => data.fieldId === booking.field.id);
+      if (!fieldData) return;
+
+      // Find time slot indices for this booking
+      const startIndex = timeSlots.findIndex(time => time === booking.startTime.substring(0, 5));
+      let endIndex = timeSlots.findIndex(time => time === booking.endTime.substring(0, 5));
+      
+      // If end time is not exactly on a time slot, find the nearest slot before
+      if (endIndex === -1) {
+        // Find the slot just before the end time
+        const endTimeMinutes = timeToMinutes(booking.endTime.substring(0, 5));
+        endIndex = timeSlots.findIndex((time, index) => {
+          const slotMinutes = timeToMinutes(time);
+          const nextSlotMinutes = index < timeSlots.length - 1 ? timeToMinutes(timeSlots[index + 1]) : Infinity;
+          return slotMinutes <= endTimeMinutes && nextSlotMinutes > endTimeMinutes;
+        });
+      }
+
+      // If we couldn't find valid indices, skip this booking
+      if (startIndex === -1 || endIndex === -1) return;
+
+      // Calculate number of rows this booking spans
+      const rowSpan = endIndex - startIndex;
+      
+      // Add booking to field data
+      fieldData.bookings.push({
+        booking,
+        startSlotIndex: startIndex,
+        endSlotIndex: endIndex,
+        rowSpan: rowSpan > 0 ? rowSpan : 1
+      });
+    });
+
+    return calendarData;
+  };
 
   return (
     <div ref={containerRef} className="p-3 sm:p-4 md:p-6 bg-gray-50 min-h-screen">
-      <Card className="mb-4 sm:mb-6">
+      <Card className="mb-4 sm:mb-6" loading={loading}>
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 sm:mb-6">
           <Title level={4} className="m-0 text-lg sm:text-xl">Lịch đặt sân</Title>
           <Button
@@ -201,24 +400,24 @@ const PlaySchedule: React.FC = () => {
             <Select
               placeholder="Chọn cơ sở hoạt động"
               style={{ width: '100%' }}
-              value={selectedVenue || undefined}
-              onChange={setSelectedVenue}
+              value={selectedFacilityId || undefined}
+              onChange={handleFacilityChange}
               size={isMobile ? "middle" : "large"}
             >
-              {venues.map(venue => (
-                <Option key={venue.id} value={venue.id}>{venue.name}</Option>
+              {facilities.map(facility => (
+                <Option key={facility.id} value={facility.id}>{facility.name}</Option>
               ))}
             </Select>
             
             <Select
-              placeholder="Chọn môn thể thao"
+              placeholder="Chọn nhóm sân"
               style={{ width: '100%' }}
-              value={selectedSport || undefined}
-              onChange={setSelectedSport}
+              value={selectedFieldGroupId || undefined}
+              onChange={handleFieldGroupChange}
               size={isMobile ? "middle" : "large"}
             >
-              {sports.map(sport => (
-                <Option key={sport.id} value={sport.id}>{sport.name}</Option>
+              {fieldGroups.map(fieldGroup => (
+                <Option key={fieldGroup.id} value={fieldGroup.id}>{fieldGroup.name}</Option>
               ))}
             </Select>
           </Space>
@@ -256,31 +455,33 @@ const PlaySchedule: React.FC = () => {
         {showHistory ? (
           <div className="overflow-x-auto -mx-4 px-4 sm:-mx-0 sm:px-0">
             <Table
-              dataSource={bookingHistory}
+              dataSource={bookingSchedule}
+              rowKey="id"
               columns={[
                 {
                   title: 'Thời gian',
-                  dataIndex: 'time',
                   key: 'time',
                   width: isMobile ? '120px' : '150px',
+                  render: (record) => `${record.startTime} - ${record.endTime}`
                 },
                 {
                   title: 'Sân',
-                  dataIndex: 'court',
-                  key: 'court',
+                  dataIndex: ['field', 'name'],
+                  key: 'field',
                   width: isMobile ? '80px' : '100px',
                 },
                 {
-                  title: 'Khách hàng',
-                  dataIndex: 'customer',
-                  key: 'customer',
+                  title: 'Người đặt',
+                  key: 'player',
                   width: isMobile ? '120px' : '150px',
+                  render: (record) => record.player ? record.player.name : 'N/A',
                 },
                 {
-                  title: 'Số điện thoại',
-                  dataIndex: 'phone',
-                  key: 'phone',
-                  width: isMobile ? '120px' : '150px',
+                  title: 'Giá tiền',
+                  dataIndex: ['payment', 'fieldPrice'],
+                  key: 'price',
+                  width: isMobile ? '100px' : '120px',
+                  render: (price) => price ? `${price.toLocaleString()} đ` : 'N/A'
                 },
                 {
                   title: 'Trạng thái',
@@ -289,8 +490,26 @@ const PlaySchedule: React.FC = () => {
                   width: isMobile ? '100px' : '120px',
                   render: (status) => (
                     <Badge 
-                      status={status === 'completed' ? 'success' : 'processing'} 
-                      text={status === 'completed' ? 'Đã hoàn thành' : 'Đang chờ'}
+                      status={
+                        status === 'completed' ? 'success' : 
+                        status === 'cancelled' ? 'error' : 'processing'
+                      } 
+                      text={
+                        status === 'completed' ? 'Đã hoàn thành' : 
+                        status === 'cancelled' ? 'Đã hủy' : 'Đang chờ'
+                      }
+                    />
+                  ),
+                },
+                {
+                  title: 'Thanh toán',
+                  dataIndex: ['payment', 'status'],
+                  key: 'payment',
+                  width: isMobile ? '100px' : '120px',
+                  render: (paymentStatus) => (
+                    <Badge 
+                      status={paymentStatus === 'paid' ? 'success' : 'warning'} 
+                      text={paymentStatus === 'paid' ? 'Đã thanh toán' : 'Chưa thanh toán'}
                     />
                   ),
                 },
@@ -306,55 +525,110 @@ const PlaySchedule: React.FC = () => {
         ) : (
           <div className="overflow-x-auto -mx-4 px-4 sm:-mx-0 sm:px-0">
             <div className="min-w-[650px]">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr>
-                    <th className="p-2 border text-center" style={{ width: '80px' }}>Thời gian</th>
-                    {courts.map(court => (
-                      <th key={court} className="p-2 border text-center">{court}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {timeSlots.map(time => (
-                    <tr key={time}>
-                      <td className="p-2 border text-center font-medium">{time}</td>
-                      {courts.map(court => {
-                        const slot = bookingSlots.find(s => s.time === time && s.court === court);
-                        return (
-                          <td
-                            key={`${time}-${court}`}
-                            className="p-2 border cursor-pointer hover:bg-gray-50"
-                            style={getCellStyle(time, court)}
-                            onClick={() => handleSlotClick(time, court)}
-                          >
-                            {slot && (
-                              <div className="p-1">
-                                <div className="text-sm font-medium">{slot.customer}</div>
-                                <div className="text-xs">{slot.phone}</div>
-                                <div className="text-xs mt-1">
-                                  <Badge 
-                                    status={
-                                      slot.status === 'booked' ? 'success' :
-                                      slot.status === 'pending' ? 'warning' :
-                                      slot.status === 'maintenance' ? 'error' : 'default'
-                                    }
-                                    text={
-                                      slot.status === 'booked' ? 'Đã đặt' :
-                                      slot.status === 'pending' ? 'Chờ xác nhận' :
-                                      slot.status === 'maintenance' ? 'Bảo trì' : 'Trống'
-                                    }
+              {selectedFieldGroup && (
+                <>
+                  <div className="mb-2 text-sm text-gray-500">
+                    Lịch đặt sân ngày {selectedDate.format('DD/MM/YYYY')}
+                  </div>
+                  <div className="relative overflow-x-auto">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr>
+                          <th className="p-2 border text-center" style={{ width: '80px', minWidth: '80px', position: 'sticky', left: 0, backgroundColor: 'white', zIndex: 10 }}>Thời gian</th>
+                          {selectedFieldGroup.fields.map(field => (
+                            <th key={field.id} className="p-2 border text-center" style={{ width: isMobile ? '120px' : '150px', minWidth: isMobile ? '120px' : '150px' }}>
+                              {field.name}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {timeSlots.map((time, timeIndex) => {
+                          // Get preprocessed calendar data
+                          const calendarData = prepareCalendarData();
+                          
+                          return (
+                            <tr key={time}>
+                              <td className="p-2 border text-center font-medium" style={{ position: 'sticky', left: 0, backgroundColor: 'white', zIndex: 5 }}>
+                                {time}
+                              </td>
+                              {calendarData.map(fieldData => {
+                                // Check if this time slot has the start of a booking
+                                const bookingData = fieldData.bookings.find(b => b.startSlotIndex === timeIndex);
+
+                                // Check if this time slot is in the middle of a booking (should be skipped as it's rowspan'd)
+                                const isInBookingSpan = fieldData.bookings.some(
+                                  b => timeIndex > b.startSlotIndex && timeIndex < b.endSlotIndex
+                                );
+
+                                // If this time slot is in the middle of a booking, don't render a cell
+                                if (isInBookingSpan) return null;
+                                
+                                if (bookingData) {
+                                  // This is the start of a booking, render a cell with rowSpan
+                                  const { booking, rowSpan } = bookingData;
+                                  return (
+                                    <td
+                                      key={`${time}-${fieldData.fieldId}`}
+                                      className="p-2 border cursor-pointer hover:bg-gray-50"
+                                      style={{
+                                        backgroundColor: booking.status === 'completed' ? '#d6f5d6' : 
+                                                        booking.status === 'cancelled' ? '#fff1f0' : 
+                                                        '#fff7e6',
+                                        color: booking.status === 'completed' ? '#52c41a' : 
+                                              booking.status === 'cancelled' ? '#f5222d' : 
+                                              '#fa8c16',
+                                        position: 'relative',
+                                        overflow: 'hidden'
+                                      }}
+                                      rowSpan={rowSpan || 1}
+                                      onClick={() => handleSlotClick(time, fieldData.fieldName, fieldData.fieldId)}
+                                    >
+                                      <div className="p-1">
+                                        <div className="text-sm font-medium">
+                                          {booking.player ? booking.player.name : 'Đã đặt'}
+                                        </div>
+                                        {booking.player && (
+                                          <div className="text-xs">{booking.player.phoneNumber}</div>
+                                        )}
+                                        <div className="text-xs mt-1">
+                                          <div className="flex items-center gap-1">
+                                            <div className={`w-2 h-2 rounded-full ${
+                                              booking.status === 'completed' ? 'bg-green-500' :
+                                              booking.status === 'cancelled' ? 'bg-red-500' : 
+                                              'bg-orange-500'
+                                            }`}></div>
+                                            <span>
+                                              {booking.status === 'completed' ? 'Đã hoàn thành' :
+                                              booking.status === 'cancelled' ? 'Đã hủy' : 'Đang chờ'}
+                                            </span>
+                                          </div>
+                                        </div>
+                                        <div className="text-xs mt-1">
+                                          {booking.startTime.substring(0, 5)} - {booking.endTime.substring(0, 5)}
+                                        </div>
+                                      </div>
+                                    </td>
+                                  );
+                                }
+                                
+                                // Empty cell (no booking)
+                                return (
+                                  <td
+                                    key={`${time}-${fieldData.fieldId}`}
+                                    className="p-2 border cursor-pointer hover:bg-gray-50"
+                                    onClick={() => handleSlotClick(time, fieldData.fieldName, fieldData.fieldId)}
                                   />
-                                </div>
-                              </div>
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                                );
+                              })}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -362,7 +636,7 @@ const PlaySchedule: React.FC = () => {
 
       {/* Booking Modal */}
       <Modal
-        title="Đặt sân"
+        title="Thông tin đặt sân"
         open={isModalVisible}
         onCancel={() => setIsModalVisible(false)}
         footer={null}
@@ -373,57 +647,56 @@ const PlaySchedule: React.FC = () => {
           <div>
             <div className="mb-4">
               <Text strong className="mr-2">Sân:</Text>
-              <Text>{currentSlot.court}</Text>
+              <Text>{currentSlot.field}</Text>
             </div>
             <div className="mb-4">
               <Text strong className="mr-2">Thời gian:</Text>
               <Text>{selectedDate.format('DD/MM/YYYY')} | {currentSlot.time}</Text>
             </div>
             
-            {currentSlot.status === 'available' ? (
-              <Form layout="vertical">
-                <Form.Item label="Thông tin khách hàng" required>
-                  <Input placeholder="Họ tên khách hàng" prefix={<UserOutlined />} />
-                </Form.Item>
-                <Form.Item required>
-                  <Input placeholder="Số điện thoại" prefix={<PhoneOutlined />} />
-                </Form.Item>
-                <Form.Item label="Thời gian">
-                  <Space>
-                    <TimePicker format="HH:mm" defaultValue={dayjs(currentSlot.time, 'HH:mm')} />
-                    <Text>đến</Text>
-                    <TimePicker format="HH:mm" defaultValue={dayjs(currentSlot.time, 'HH:mm').add(1, 'hour')} />
-                  </Space>
-                </Form.Item>
-                <Form.Item label="Ghi chú">
-                  <Input.TextArea rows={3} placeholder="Nhập ghi chú nếu có" />
-                </Form.Item>
-              </Form>
-            ) : (
+            {currentSlot.booking ? (
               <>
                 <div className="mb-4">
                   <Text strong className="mr-2">Trạng thái:</Text>
-                  {currentSlot.status === 'booked' && <Badge status="success" text="Đã xác nhận" />}
-                  {currentSlot.status === 'pending' && <Badge status="warning" text="Đang chờ xác nhận" />}
-                  {currentSlot.status === 'maintenance' && <Badge status="error" text="Bảo trì" />}
+                  <Badge 
+                    status={
+                      currentSlot.booking.status === 'completed' ? 'success' : 
+                      currentSlot.booking.status === 'cancelled' ? 'error' : 'warning'
+                    } 
+                    text={
+                      currentSlot.booking.status === 'completed' ? 'Đã hoàn thành' : 
+                      currentSlot.booking.status === 'cancelled' ? 'Đã hủy' : 'Đang chờ'
+                    }
+                  />
                 </div>
-                {(currentSlot.status === 'booked' || currentSlot.status === 'pending') && (
+                {currentSlot.booking.player && (
                   <>
                     <div className="mb-4">
-                      <Text strong className="mr-2">Khách hàng:</Text>
-                      <Text>{currentSlot.customer}</Text>
+                      <Text strong className="mr-2">Người đặt:</Text>
+                      <Text>{currentSlot.booking.player.name}</Text>
                     </div>
                     <div className="mb-4">
                       <Text strong className="mr-2">Số điện thoại:</Text>
-                      <Text>{currentSlot.phone}</Text>
-                    </div>
-                    <div className="mb-4">
-                      <Text strong className="mr-2">Thời lượng:</Text>
-                      <Text>{currentSlot.duration} giờ</Text>
+                      <Text>{currentSlot.booking.player.phoneNumber}</Text>
                     </div>
                   </>
                 )}
+                <div className="mb-4">
+                  <Text strong className="mr-2">Thanh toán:</Text>
+                  <Badge 
+                    status={currentSlot.booking.payment?.status === 'paid' ? 'success' : 'warning'} 
+                    text={currentSlot.booking.payment?.status === 'paid' ? 'Đã thanh toán' : 'Chưa thanh toán'}
+                  />
+                </div>
+                <div className="mb-4">
+                  <Text strong className="mr-2">Giá tiền:</Text>
+                  <Text>{currentSlot.booking.payment?.fieldPrice?.toLocaleString()} đ</Text>
+                </div>
               </>
+            ) : (
+              <div className="mb-4">
+                <Text strong>Chưa có người đặt</Text>
+              </div>
             )}
           </div>
         )}

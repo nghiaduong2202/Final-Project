@@ -1,79 +1,171 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
-  Card, Typography, Button, Descriptions, Tag, Steps, Row, Col, Modal, 
-  Divider, Timeline, Statistic, Space, Input
+  Card, Typography, Button, Descriptions, Tag, Modal, 
+  Divider, Statistic, Space, Input, Breadcrumb, notification, Tooltip
 } from 'antd';
 import { 
-  CheckCircleOutlined, CalendarOutlined, ClockCircleOutlined, 
-  DollarOutlined, StarOutlined, PrinterOutlined, RollbackOutlined,
-  CloseCircleOutlined, InfoCircleOutlined, QrcodeOutlined,
+  StarOutlined, PrinterOutlined, RollbackOutlined,
+  CloseCircleOutlined, InfoCircleOutlined,
   ShareAltOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { mockBookingHistory } from '@/mocks/booking/bookingData';
-import { BookingStatus, PaymentStatus, Booking } from '@/types/booking.type';
-import { QRCodeSVG } from 'qrcode.react'; // Cài đặt: npm install qrcode.react
+import api from '@/services/api';
+import { getSportNameInVietnamese } from '@/utils/translateSport';
 
 const { Title, Text, Paragraph } = Typography;
 
-interface BookingHistoryItem extends Booking {
-  facility: {
+// Service methods for bookings
+const bookingService = {
+  async getBookingDetail(bookingId: string) {
+    try {
+      const response = await api.get(`/booking/${bookingId}/detail`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching booking detail:', error);
+      throw error;
+    }
+  },
+
+  async cancelBooking(bookingId: string) {
+    try {
+      const response = await api.put(`/booking/${bookingId}/cancel`);
+      return response.data;
+    } catch (error) {
+      console.error('Error cancelling booking:', error);
+      throw error;
+    }
+  }
+};
+
+interface Facility {
+  id: string;
+  name: string;
+  description: string;
+  location: string;
+  status: string;
+  avgRating: number;
+  numberOfRating: number;
+  imagesUrl: string[];
+  fieldGroups: FieldGroup[];
+}
+
+interface FieldGroup {
+  id: string;
+  name: string;
+  dimension: string;
+  surface: string;
+  basePrice: number;
+  numberOfPeaks: number;
+  peakStartTime1?: string;
+  peakEndTime1?: string;
+  peakStartTime2?: string;
+  peakEndTime2?: string;
+  peakStartTime3?: string;
+  peakEndTime3?: string;
+  priceIncrease1?: number;
+  priceIncrease2?: number;
+  priceIncrease3?: number;
+}
+
+interface Sport {
+  id: number;
+  name: string;
+}
+
+interface Field {
+  id: number;
+  name: string;
+  status: string;
+}
+
+interface BookingSlot {
+  id: number;
+  date: string;
+  field: Field;
+}
+
+interface Payment {
+  id: string;
+  fieldPrice: number;
+  servicePrice: number | null;
+  discount: number | null;
+  status: string;
+  updatedAt: string;
+}
+
+interface AdditionalService {
+  serviceId: number;
+  quantity: number;
+  bookingId?: string;
+  service?: {
     id: number;
     name: string;
-    address: string;
-    phoneNumber?: string;
+    price: number;
+    type: string;
+    description: string;
+    amount: number;
+    bookedCount: number;
+    unit: string;
   };
-  sport: {
-    id: number;
-    name: string;
+}
+
+interface ReviewData {
+  id: number;
+  rating: number;
+  comment: string;
+  imageUrl: string[];
+  reviewAt: string;
+  feedbackAt?: string;
+  feedback?: string;
+}
+
+interface BookingData {
+  id: string;
+  startTime: string;
+  endTime: string;
+  createdAt: string;
+  updatedAt: string;
+  status: string;
+  sport: Sport;
+  bookingSlots: BookingSlot[];
+  payment: Payment;
+  additionalServices: AdditionalService[];
+  recurringConfig?: {
+    pattern: string;
+    count: number;
   };
-  field: {
-    id: number;
-    name: string;
-    fieldGroup: {
-      id: number;
-      name: string;
-      basePrice: number;
-    };
-  };
-  hasReview?: boolean;
-  confirmationCode?: string;
+  review?: ReviewData | null;
+}
+
+interface BookingDetailData {
+  facility: Facility;
+  booking: BookingData;
 }
 
 const BookingDetail: React.FC = () => {
   const { bookingId } = useParams<{ bookingId: string }>();
   const navigate = useNavigate();
-  const [booking, setBooking] = useState<BookingHistoryItem | null>(null);
+  const [bookingDetail, setBookingDetail] = useState<BookingDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
-  const [qrModalVisible, setQrModalVisible] = useState(false);
   const [shareModalVisible, setShareModalVisible] = useState(false);
 
-  // Giả lập lấy dữ liệu đặt sân từ mock data
+  // Lấy dữ liệu từ API
   useEffect(() => {
     const fetchBookingDetail = async () => {
       try {
         setLoading(true);
-        // Trong thực tế sẽ gọi API
-        await new Promise(resolve => setTimeout(resolve, 500));
-        const foundBooking = mockBookingHistory.find(b => b.id === bookingId);
+        if (!bookingId) return;
         
-        if (foundBooking) {
-          // Giả lập thêm một số dữ liệu
-          const enhancedBooking = {
-            ...foundBooking,
-            confirmationCode: 'TAN' + Math.random().toString(36).substring(2, 8).toUpperCase(),
-            facility: {
-              ...foundBooking.facility,
-              phoneNumber: '0923456789'
-            },
-            hasReview: Math.random() > 0.5
-          };
-          setBooking(enhancedBooking as BookingHistoryItem);
-        }
+        const data = await bookingService.getBookingDetail(bookingId);
+        setBookingDetail(data);
       } catch (error) {
         console.error('Failed to fetch booking detail:', error);
+        notification.error({
+          message: 'Không thể tải thông tin đặt sân',
+          description: 'Đã xảy ra lỗi khi tải thông tin chi tiết đặt sân. Vui lòng thử lại sau.'
+        });
       } finally {
         setLoading(false);
       }
@@ -85,7 +177,8 @@ const BookingDetail: React.FC = () => {
   }, [bookingId]);
 
   // Format tiền tệ
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number | null) => {
+    if (amount === null) return formatCurrency(0);
     return new Intl.NumberFormat('vi-VN', {
       style: 'currency',
       currency: 'VND'
@@ -94,24 +187,27 @@ const BookingDetail: React.FC = () => {
 
   // Hàm xử lý hủy đặt sân
   const handleCancelBooking = async () => {
+    if (!bookingId) return;
+    
     try {
       setLoading(true);
-      // TODO: Gọi API hủy đặt sân
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      // Cập nhật trạng thái
-      if (booking) {
-        setBooking({
-          ...booking,
-          status: 'cancelled' as BookingStatus,
-          payment: {
-            ...booking.payment,
-            status: 'refunded' as PaymentStatus
-          }
-        });
-      }
+      await bookingService.cancelBooking(bookingId);
+      
+      notification.success({
+        message: 'Hủy đặt sân thành công',
+        description: 'Yêu cầu hủy đặt sân đã được xử lý thành công.'
+      });
+      
+      // Cập nhật lại dữ liệu
+      const data = await bookingService.getBookingDetail(bookingId);
+      setBookingDetail(data);
       setCancelModalVisible(false);
     } catch (error) {
       console.error('Failed to cancel booking:', error);
+      notification.error({
+        message: 'Không thể hủy đặt sân',
+        description: 'Đã xảy ra lỗi khi hủy đặt sân. Vui lòng thử lại sau.'
+      });
     } finally {
       setLoading(false);
     }
@@ -128,83 +224,78 @@ const BookingDetail: React.FC = () => {
     return `Còn ${diff} giờ`;
   };
 
-  // Lấy trạng thái hiện tại để hiển thị trong Steps
-  const getCurrentStep = (status: BookingStatus) => {
-    switch (status.toString()) {
-      case 'pending_payment':
-        return 0;
-      case 'payment_confirmed':
-        return 1;
-      case 'in_progress':
-        return 2;
-      case BookingStatus.COMPLETED:
-        return 3;
-      case 'cancelled':
-        return -1;
-      case 'refunded':
-        return -1;
-      default:
-        return 0;
-    }
-  };
+  // Breadcrumb items
+  const breadcrumbItems = [
+    {
+      title: <Link to="/">Trang chủ</Link>,
+    },
+    {
+      title: <Link to="/user/history-booking">Lịch sử đặt sân</Link>,
+    },
+    {
+      title: 'Chi tiết đặt sân',
+    },
+  ];
 
-  // Render các bước đặt sân
-  const renderBookingSteps = () => {
-    if (!booking) return null;
-    
-    const currentStep = getCurrentStep(booking.status);
-    
-    // Nếu đã hủy hoặc hoàn tiền
-    if (currentStep === -1) {
-      return (
-        <Steps
-          direction="horizontal"
-          current={1}
-          status="error"
-          className="mb-6"
-          items={[
-            {
-              title: 'Đặt sân',
-              icon: <CalendarOutlined />,
-            },
-            {
-              title: booking.status.toString() === 'cancelled' ? 'Đã hủy' : 'Đã hoàn tiền',
-              icon: <CloseCircleOutlined />,
-            }
-          ]}
-        />
-      );
+  // Thêm hàm để xác định trạng thái hiển thị dựa trên thời gian thực tế
+  const getBookingDisplayStatus = (booking: BookingData): string => {
+    // Nếu booking đã bị hủy hoặc hoàn tiền, luôn hiển thị là đã hủy
+    if (booking.status === 'cancelled' || booking.status === 'refunded') {
+      return 'cancelled';
     }
     
-    return (
-      <Steps
-        direction="horizontal"
-        current={currentStep}
-        className="mb-6"
-        items={[
-          {
-            title: 'Đặt sân',
-            description: 'Đã xác nhận',
-            icon: <CalendarOutlined />,
-          },
-          {
-            title: 'Thanh toán',
-            description: currentStep >= 1 ? 'Hoàn tất' : 'Đang chờ',
-            icon: <DollarOutlined />,
-          },
-          {
-            title: 'Sử dụng',
-            description: currentStep >= 2 ? 'Đang diễn ra' : 'Sắp tới',
-            icon: <ClockCircleOutlined />,
-          },
-          {
-            title: 'Hoàn tất',
-            description: currentStep >= 3 ? 'Đã hoàn thành' : 'Chưa hoàn thành',
-            icon: <CheckCircleOutlined />,
-          },
-        ]}
-      />
-    );
+    const today = dayjs();
+    
+    // Lấy tất cả các ngày đặt sân
+    const bookingDates = booking.bookingSlots.map(slot => dayjs(slot.date));
+    const startTime = booking.startTime;
+    const endTime = booking.endTime;
+    
+    // Sắp xếp các ngày theo thứ tự tăng dần
+    bookingDates.sort((a, b) => a.valueOf() - b.valueOf());
+    
+    // Ngày cuối cùng trong lịch đặt sân
+    const lastBookingDate = bookingDates[bookingDates.length - 1];
+    const lastBookingEnd = lastBookingDate
+      .hour(parseInt(endTime.split(':')[0]))
+      .minute(parseInt(endTime.split(':')[1]));
+      
+    // Nếu đã qua thời điểm kết thúc của ngày cuối cùng, xem như hoàn thành
+    if (today.isAfter(lastBookingEnd)) {
+      return 'completed';
+    }
+    
+    // Ngày đầu tiên trong lịch đặt sân
+    const firstBookingDate = bookingDates[0];
+    const firstBookingStart = firstBookingDate
+      .hour(parseInt(startTime.split(':')[0]))
+      .minute(parseInt(startTime.split(':')[1]));
+      
+    // Nếu chưa đến thời điểm bắt đầu của ngày đầu tiên, xem như sắp diễn ra
+    if (today.isBefore(firstBookingStart)) {
+      return 'upcoming';
+    }
+    
+    // Kiểm tra xem có đang trong một phiên đặt sân nào không
+    for (const bookingDate of bookingDates) {
+      const bookingStart = bookingDate
+        .hour(parseInt(startTime.split(':')[0]))
+        .minute(parseInt(startTime.split(':')[1]));
+      const bookingEnd = bookingDate
+        .hour(parseInt(endTime.split(':')[0]))
+        .minute(parseInt(endTime.split(':')[1]));
+        
+      if (today.isAfter(bookingStart) && today.isBefore(bookingEnd)) {
+        return 'in_progress';
+      }
+    }
+    
+    // Kiểm tra xem có phải là đang ở giữa các phiên đặt sân không
+    if (today.isAfter(firstBookingStart) && today.isBefore(lastBookingEnd)) {
+      return 'upcoming'; // Đang ở giữa các phiên định kỳ, xem như sắp diễn ra
+    }
+    
+    return 'upcoming'; // Mặc định là sắp diễn ra nếu không rơi vào các trường hợp trên
   };
 
   if (loading) {
@@ -217,7 +308,7 @@ const BookingDetail: React.FC = () => {
     );
   }
 
-  if (!booking) {
+  if (!bookingDetail) {
     return (
       <div className="container mx-auto px-4 py-6">
         <Card>
@@ -239,15 +330,25 @@ const BookingDetail: React.FC = () => {
     );
   }
 
+  const { facility, booking } = bookingDetail;
+
+  // Kiểm tra nếu có thể hủy booking (còn ít nhất 24h trước giờ chơi)
   const canCancel = 
-    (booking.status.toString() === 'pending_payment' || booking.status.toString() === 'payment_confirmed') &&
+    (booking.status === 'pending_payment' || booking.status === 'payment_confirmed') &&
     dayjs(booking.bookingSlots[0]?.date + ' ' + booking.startTime).diff(dayjs(), 'hour') >= 24;
 
-  const totalAmount = booking.payment.fieldPrice + booking.payment.servicePrice - booking.payment.discount;
+  // Tính tổng tiền
+  const totalAmount = 
+    (booking.payment.fieldPrice || 0) + 
+    (booking.payment.servicePrice || 0) - 
+    (booking.payment.discount || 0);
 
   return (
-    <div className="w-full px-4 py-6">
+    <div className="w-full  px-4 py-6 bg-gray-50">
       <div className="max-w-7xl mx-auto">
+        {/* Breadcrumb */}
+        <Breadcrumb items={breadcrumbItems} className="mb-4" />
+        
         <div className="flex justify-between items-center mb-4 md:mb-6 flex-wrap gap-2">
           <div>
             <Title level={3} className="m-0 text-xl md:text-2xl lg:text-3xl">Chi tiết đặt sân</Title>
@@ -261,161 +362,168 @@ const BookingDetail: React.FC = () => {
           </Button>
         </div>
 
-        {/* Trạng thái đặt sân */}
-        <Card className="mb-4 md:mb-6 shadow-md">
-          {renderBookingSteps()}
-          
-          <div className="flex flex-wrap gap-3 justify-between">
-            <div>
-              <Text className="block mb-1" strong>Mã xác nhận:</Text>
-              <div className="flex items-center">
-                <Tag color="green" className="text-sm md:text-base py-1 px-2 md:px-3">
-                  {booking.confirmationCode}
-                </Tag>
-                <Button 
-                  type="text" 
-                  icon={<QrcodeOutlined />}
-                  onClick={() => setQrModalVisible(true)}
-                  className="ml-2"
-                >
-                  Xem QR
-                </Button>
-              </div>
-            </div>
-            
-            <Space wrap>
-              {canCancel && (
-                <Button 
-                  danger 
-                  icon={<CloseCircleOutlined />}
-                  onClick={() => setCancelModalVisible(true)}
-                >
-                  Hủy đặt sân
-                </Button>
-              )}
-              
-              {booking.status === BookingStatus.COMPLETED && !booking.hasReview && (
-                <Button 
-                  type="primary" 
-                  icon={<StarOutlined />}
-                  onClick={() => navigate(`/user/booking/review/${booking.id}`)}
-                >
-                  Đánh giá
-                </Button>
-              )}
-              
-              <Button icon={<PrinterOutlined />}>In xác nhận</Button>
-              <Button icon={<ShareAltOutlined />} onClick={() => setShareModalVisible(true)}>Chia sẻ</Button>
-            </Space>
-          </div>
-        </Card>
-
-        <Row gutter={[16, 16]}>
-          <Col xs={24} lg={16}>
+        {/* Booking Detail */}
+        <div className="flex flex-col lg:flex-row gap-6">
+          <div className="w-full lg:w-2/3 flex flex-col gap-6">
             {/* Thông tin chính */}
-            <Card title="Thông tin đặt sân" className="mb-4 md:mb-6 shadow-md">
-              <Descriptions column={{ xs: 1, sm: 2 }} bordered size="small">
+            <Card 
+              title="Thông tin đặt sân" 
+              className="shadow-sm rounded-lg"
+              extra={
+                <Space wrap>
+                  <Tooltip title={getBookingDisplayStatus(booking) !== 'completed' ? "Đơn đặt sân phải hoàn thành trước khi đánh giá" : ""}>
+                    <Button 
+                      type="primary" 
+                      icon={<StarOutlined />}
+                      onClick={() => navigate(`/user/booking/review/${booking.id}`)}
+                      disabled={getBookingDisplayStatus(booking) !== 'completed'}
+                    >
+                      Đánh giá
+                    </Button>
+                  </Tooltip>
+                  {canCancel && (
+                    <Button 
+                      danger 
+                      icon={<CloseCircleOutlined />}
+                      onClick={() => setCancelModalVisible(true)}
+                    >
+                      Hủy đặt sân
+                    </Button>
+                  )}
+                </Space>
+              }
+            >
+              <Descriptions column={2} bordered size="small">
                 <Descriptions.Item label="Cơ sở thể thao" span={2}>
-                  <div>{booking.facility.name}</div>
-                  <div className="text-sm text-gray-500">{booking.facility.address}</div>
-                  <div className="text-sm text-gray-500">ĐT: {booking.facility.phoneNumber}</div>
+                  <div>{facility.name}</div>
+                  <div className="text-sm text-gray-500">{facility.location}</div>
                 </Descriptions.Item>
                 
-                <Descriptions.Item label="Ngày đặt">
+                <Descriptions.Item label="Ngày đặt" span={1}>
                   {dayjs(booking.bookingSlots[0]?.date).format('DD/MM/YYYY')}
                 </Descriptions.Item>
                 
-                <Descriptions.Item label="Khung giờ">
+                <Descriptions.Item label="Khung giờ" span={1}>
                   {`${booking.startTime.substring(0, 5)} - ${booking.endTime.substring(0, 5)}`}
                 </Descriptions.Item>
                 
-                <Descriptions.Item label="Loại sân">
-                  {booking.field.fieldGroup.name}
+                <Descriptions.Item label="Loại sân" span={1}>
+                  {facility.fieldGroups[0]?.name || ''}
                 </Descriptions.Item>
                 
-                <Descriptions.Item label="Sân">
-                  {booking.field.name}
+                <Descriptions.Item label="Sân" span={1}>
+                  {booking.bookingSlots[0]?.field.name || ''}
                 </Descriptions.Item>
                 
-                <Descriptions.Item label="Môn thể thao">
-                  {booking.sport.name}
+                <Descriptions.Item label="Môn thể thao" span={1}>
+                  {getSportNameInVietnamese(booking.sport.name)}
                 </Descriptions.Item>
                 
-                <Descriptions.Item label="Đặt lặp lại">
-                  {booking.recurringConfig ? 'Có' : 'Không'}
+                <Descriptions.Item label="Đặt lặp lại" span={1}>
+                  {booking.bookingSlots.length > 1 ? 'Có' : 'Không'}
+                </Descriptions.Item>
+
+                <Descriptions.Item label="Giá cơ bản" span={2}>
+                  {formatCurrency(facility.fieldGroups[0]?.basePrice || 0)}
+                  {facility.fieldGroups[0]?.numberOfPeaks > 0 && (
+                    <div className="mt-1">
+                      <Text type="secondary" className="text-sm">Giá cao điểm:</Text>
+                      <ul className="list-disc pl-5 mt-1 text-sm">
+                        {facility.fieldGroups[0]?.peakStartTime1 && facility.fieldGroups[0]?.peakEndTime1 && (
+                          <li>
+                            {facility.fieldGroups[0].peakStartTime1.substring(0, 5)} - {facility.fieldGroups[0].peakEndTime1.substring(0, 5)}: 
+                            {' +' + formatCurrency(facility.fieldGroups[0].priceIncrease1 || 0)}
+                          </li>
+                        )}
+                        {facility.fieldGroups[0]?.peakStartTime2 && facility.fieldGroups[0]?.peakEndTime2 && (
+                          <li>
+                            {facility.fieldGroups[0].peakStartTime2.substring(0, 5)} - {facility.fieldGroups[0].peakEndTime2.substring(0, 5)}: 
+                            {' +' + formatCurrency(facility.fieldGroups[0].priceIncrease2 || 0)}
+                          </li>
+                        )}
+                        {facility.fieldGroups[0]?.peakStartTime3 && facility.fieldGroups[0]?.peakEndTime3 && (
+                          <li>
+                            {facility.fieldGroups[0].peakStartTime3.substring(0, 5)} - {facility.fieldGroups[0].peakEndTime3.substring(0, 5)}: 
+                            {' +' + formatCurrency(facility.fieldGroups[0].priceIncrease3 || 0)}
+                          </li>
+                        )}
+                      </ul>
+                    </div>
+                  )}
                 </Descriptions.Item>
                 
                 <Descriptions.Item label="Trạng thái" span={2}>
                   <Space wrap>
-                    {booking.status.toString() === 'pending_payment' && (
-                      <Tag color="orange">Chờ thanh toán</Tag>
+                    {getBookingDisplayStatus(booking) === 'upcoming' && (
+                      <Tag color="blue">Sắp diễn ra</Tag>
                     )}
-                    {booking.status.toString() === 'payment_confirmed' && (
-                      <Tag color="cyan">Đã xác nhận</Tag>
-                    )}
-                    {booking.status.toString() === 'in_progress' && (
+                    {getBookingDisplayStatus(booking) === 'in_progress' && (
                       <Tag color="processing">Đang diễn ra</Tag>
                     )}
-                    {booking.status === BookingStatus.COMPLETED && (
+                    {getBookingDisplayStatus(booking) === 'completed' && (
                       <Tag color="green">Hoàn thành</Tag>
                     )}
-                    {booking.status.toString() === 'cancelled' && (
+                    {getBookingDisplayStatus(booking) === 'cancelled' && (
                       <Tag color="red">Đã hủy</Tag>
                     )}
-                    {booking.status.toString() === 'refunded' && (
-                      <Tag color="purple">Đã hoàn tiền</Tag>
-                    )}
                     
-                    {booking.payment.status === PaymentStatus.UNPAID && (
+                    {booking.payment.status === 'unpaid' && (
                       <Tag color="red">Chưa thanh toán</Tag>
                     )}
-                    {booking.payment.status === PaymentStatus.PAID && (
+                    {booking.payment.status === 'paid' && (
                       <Tag color="green">Đã thanh toán</Tag>
                     )}
-                    {booking.payment.status.toString() === 'released' && (
+                    {booking.payment.status === 'released' && (
                       <Tag color="green">Đã chuyển cho chủ sân</Tag>
                     )}
-                    {booking.payment.status.toString() === 'refunded' && (
+                    {booking.payment.status === 'refunded' && (
                       <Tag color="purple">Đã hoàn tiền</Tag>
                     )}
                   </Space>
                 </Descriptions.Item>
               </Descriptions>
               
-              {booking.status.toString() === 'payment_confirmed' && (
+              {booking.status === 'payment_confirmed' && (
                 <div className="mt-4 bg-blue-50 p-3 md:p-4 rounded flex items-start">
                   <InfoCircleOutlined className="text-blue-500 mr-2 mt-1" />
                   <div>
                     <Text strong>Hướng dẫn sử dụng:</Text>
                     <ul className="list-disc pl-5 mt-1">
-                      <li>Đến đúng giờ và mang theo mã xác nhận hoặc QR code</li>
+                      <li>Đến đúng giờ</li>
                       <li>Liên hệ quản lý sân khi đến để kiểm tra thông tin</li>
                       <li>Tuân thủ quy định của cơ sở thể thao</li>
                     </ul>
                   </div>
                 </div>
               )}
+              
+              <div className="flex justify-end mt-4">
+                <Space>
+                  <Button icon={<PrinterOutlined />}>In xác nhận</Button>
+                  <Button icon={<ShareAltOutlined />} onClick={() => setShareModalVisible(true)}>Chia sẻ</Button>
+                </Space>
+              </div>
             </Card>
             
-            {/* Dịch vụ đi kèm */}
-            {booking.additionalServices && booking.additionalServices.length > 0 && (
-              <Card title="Dịch vụ đi kèm" className="mb-6">
+            {/* Danh sách các buổi (đặt định kỳ) */}
+            {booking.bookingSlots.length > 1 && (
+              <Card title="Lịch đặt sân định kỳ" className="shadow-sm rounded-lg mt-6">
                 <table className="min-w-full">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="py-2 px-4 text-left">Tên dịch vụ</th>
-                      <th className="py-2 px-4 text-right">Số lượng</th>
-                      <th className="py-2 px-4 text-right">Đơn giá</th>
-                      <th className="py-2 px-4 text-right">Thành tiền</th>
+                      <th className="py-2 px-4 text-left">STT</th>
+                      <th className="py-2 px-4 text-left">Ngày</th>
+                      <th className="py-2 px-4 text-left">Giờ</th>
+                      <th className="py-2 px-4 text-left">Sân</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {booking.additionalServices.map(service => (
-                      <tr key={service.serviceId}>
-                        <td className="py-2 px-4">Dịch vụ {service.serviceId}</td>
-                        <td className="py-2 px-4 text-right">{service.quantity}</td>
-                        <td className="py-2 px-4 text-right">{formatCurrency(15000)}</td>
-                        <td className="py-2 px-4 text-right">{formatCurrency(service.quantity * 15000)}</td>
+                    {booking.bookingSlots.map((slot, index) => (
+                      <tr key={slot.id} className={dayjs(slot.date).isBefore(dayjs(), 'day') ? 'bg-gray-100' : ''}>
+                        <td className="py-2 px-4">{index + 1}</td>
+                        <td className="py-2 px-4">{dayjs(slot.date).format('DD/MM/YYYY')}</td>
+                        <td className="py-2 px-4">{`${booking.startTime.substring(0, 5)} - ${booking.endTime.substring(0, 5)}`}</td>
+                        <td className="py-2 px-4">{slot.field.name}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -423,53 +531,70 @@ const BookingDetail: React.FC = () => {
               </Card>
             )}
             
-            {/* Lịch sử trạng thái */}
-            <Card title="Lịch sử trạng thái" className="mb-6">
-              <Timeline
-                mode="left"
-                items={[
-                  {
-                    label: dayjs().subtract(3, 'day').format('DD/MM/YYYY HH:mm'),
-                    children: 'Tạo đơn đặt sân',
-                    dot: <CalendarOutlined className="text-blue-500" />,
-                  },
-                  {
-                    label: dayjs().subtract(3, 'day').format('DD/MM/YYYY HH:mm'),
-                    children: 'Thanh toán thành công',
-                    dot: <DollarOutlined className="text-green-500" />,
-                  },
-                  ...(booking.status.toString() === 'cancelled' ? [{
-                    label: dayjs().subtract(1, 'day').format('DD/MM/YYYY HH:mm'),
-                    children: 'Hủy đặt sân',
-                    dot: <CloseCircleOutlined className="text-red-500" />,
-                  }] : []),
-                  ...(booking.status === BookingStatus.COMPLETED ? [{
-                    label: dayjs().format('DD/MM/YYYY HH:mm'),
-                    children: 'Hoàn thành',
-                    dot: <CheckCircleOutlined className="text-green-500" />,
-                  }] : []),
-                ]}
-              />
-            </Card>
-          </Col>
+            {/* Dịch vụ đi kèm */}
+            {booking.additionalServices && booking.additionalServices.length > 0 && (
+              <Card title="Dịch vụ đi kèm" className="shadow-sm rounded-lg mt-6">
+                <table className="min-w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="py-2 px-4 text-left">STT</th>
+                      <th className="py-2 px-4 text-left">Tên dịch vụ</th>
+                      <th className="py-2 px-4 text-right">Số lượng</th>
+                      <th className="py-2 px-4 text-right">Đơn giá</th>
+                      <th className="py-2 px-4 text-right">Thành tiền</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {booking.additionalServices.map((service, index) => {
+                      // Calculate total price based on service unit type
+                      const unitPrice = service.service?.price || 0;
+                      let totalPrice = unitPrice * service.quantity;
+                      
+                      // If service unit is "time", multiply by duration in hours
+                      if (service.service?.unit === "time") {
+                        // Calculate duration in hours
+                        const startTime = dayjs(`2000-01-01 ${booking.startTime}`);
+                        const endTime = dayjs(`2000-01-01 ${booking.endTime}`);
+                        let durationHours = endTime.diff(startTime, 'hour', true);
+                        // Round to nearest 0.5 hour if needed
+                        durationHours = Math.round(durationHours * 2) / 2;
+                        
+                        totalPrice = unitPrice * service.quantity * durationHours;
+                      }
+                      
+                      return (
+                        <tr key={service.serviceId}>
+                          <td className="py-2 px-4">{index + 1}</td>
+                          <td className="py-2 px-4">{service.service?.name || `Dịch vụ ${service.serviceId}`}</td>
+                          <td className="py-2 px-4 text-right">{service.quantity}</td>
+                          <td className="py-2 px-4 text-right">{formatCurrency(unitPrice)}</td>
+                          <td className="py-2 px-4 text-right">{formatCurrency(totalPrice)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </Card>
+            )}
+          </div>
           
-          <Col xs={24} lg={8}>
+          <div className="w-full lg:w-1/3 flex flex-col gap-6">
             {/* Thông tin thanh toán */}
-            <Card title="Thông tin thanh toán" className="mb-6">
+            <Card title="Thông tin thanh toán" className="shadow-sm rounded-lg">
               <div className="space-y-3">
                 <div className="flex justify-between">
                   <span>Giá sân:</span>
                   <span>{formatCurrency(booking.payment.fieldPrice)}</span>
                 </div>
                 
-                {booking.additionalServices.length > 0 && (
+                {booking.payment.servicePrice && booking.payment.servicePrice > 0 && (
                   <div className="flex justify-between">
                     <span>Dịch vụ đi kèm:</span>
                     <span>{formatCurrency(booking.payment.servicePrice)}</span>
                   </div>
                 )}
                 
-                {booking.payment.discount > 0 && (
+                {booking.payment.discount && booking.payment.discount > 0 && (
                   <div className="flex justify-between text-green-600">
                     <span>Giảm giá:</span>
                     <span>-{formatCurrency(booking.payment.discount)}</span>
@@ -490,7 +615,7 @@ const BookingDetail: React.FC = () => {
                   </div>
                 </div>
                 
-                {booking.status.toString() === 'payment_confirmed' && (
+                {booking.status === 'payment_confirmed' && booking.bookingSlots.length > 0 && (
                   <div className="pt-3">
                     <Statistic 
                       title="Thời gian còn lại đến giờ chơi" 
@@ -509,7 +634,7 @@ const BookingDetail: React.FC = () => {
             </Card>
             
             {/* Chính sách hủy */}
-            <Card title="Chính sách hủy đặt sân" className="mb-6">
+            <Card title="Chính sách hủy đặt sân" className="shadow-sm rounded-lg mt-6">
               <ul className="list-disc pl-5 space-y-2">
                 <li>Hủy trước 24 giờ: Hoàn 100% thành điểm tích lũy</li>
                 <li>Hủy từ 12-24 giờ: Hoàn 50% thành điểm tích lũy</li>
@@ -521,8 +646,8 @@ const BookingDetail: React.FC = () => {
                 <p>1 điểm = 1.000 VNĐ</p>
               </div>
             </Card>
-          </Col>
-        </Row>
+          </div>
+        </div>
         
         {/* Modal Hủy đặt sân */}
         <Modal
@@ -549,10 +674,10 @@ const BookingDetail: React.FC = () => {
             
             <div className="bg-gray-50 p-4 rounded">
               <div className="mb-2">
-                <Text strong>Cơ sở:</Text> {booking.facility.name}
+                <Text strong>Cơ sở:</Text> {facility.name}
               </div>
               <div className="mb-2">
-                <Text strong>Sân:</Text> {booking.field.name}
+                <Text strong>Sân:</Text> {booking.bookingSlots[0]?.field.name}
               </div>
               <div className="mb-2">
                 <Text strong>Ngày:</Text> {dayjs(booking.bookingSlots[0]?.date).format('DD/MM/YYYY')}
@@ -571,48 +696,6 @@ const BookingDetail: React.FC = () => {
                 Bạn sẽ nhận được hoàn tiền dưới dạng điểm tích lũy nếu hủy trước 24 giờ so với giờ đặt sân.
               </Text>
             </div>
-          </div>
-        </Modal>
-
-        {/* Modal QR Code */}
-        <Modal
-          title="Mã QR xác nhận đặt sân"
-          open={qrModalVisible}
-          onCancel={() => setQrModalVisible(false)}
-          footer={[
-            <Button key="back" onClick={() => setQrModalVisible(false)}>
-              Đóng
-            </Button>,
-            <Button 
-              key="download" 
-              type="primary"
-              onClick={() => {
-                // Tạo link download QR code
-                alert('Tính năng đang phát triển');
-              }}
-            >
-              Tải xuống
-            </Button>,
-          ]}
-        >
-          <div className="text-center py-4">
-            <div className="inline-block border p-4 bg-white rounded">
-              <QRCodeSVG 
-                value={`TANSPORT_BOOKING:${booking.id}:${booking.confirmationCode}`} 
-                size={200}
-                level="H"
-                includeMargin
-              />
-            </div>
-            <div className="mt-4">
-              <Text strong>Mã xác nhận: </Text>
-              <Tag color="green" className="text-lg py-1 px-3">
-                {booking.confirmationCode}
-              </Tag>
-            </div>
-            <Paragraph className="mt-2 text-gray-500">
-              Mang theo mã QR này khi đến sân để xác nhận đặt chỗ của bạn
-            </Paragraph>
           </div>
         </Modal>
 

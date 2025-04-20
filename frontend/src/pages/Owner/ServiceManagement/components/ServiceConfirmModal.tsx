@@ -1,7 +1,7 @@
 import React from 'react';
 import { Modal, Tag } from 'antd';
 import { ExclamationCircleOutlined } from '@ant-design/icons';
-import { Service, UpdatedServiceValues } from '@/types/service.type';
+import { Service, UpdatedServiceValues, UnitEnum } from '@/types/service.type';
 import { formatPrice } from '@/utils/statusUtils';
 
 interface ServiceConfirmModalProps {
@@ -27,11 +27,23 @@ const ServiceConfirmModal: React.FC<ServiceConfirmModalProps> = ({
       rental: { color: 'blue', text: 'Cho thuê' },
       coaching: { color: 'purple', text: 'Huấn luyện' },
       equipment: { color: 'cyan', text: 'Thiết bị' },
-      food: { color: 'green', text: 'Đồ uống/Thực phẩm' },
       other: { color: 'gray', text: 'Khác' },
     };
     const typeConfig = config[type] || { color: 'default', text: type };
     return <Tag color={typeConfig.color}>{typeConfig.text}</Tag>;
+  };
+
+  // Helper function to display unit
+  const displayUnit = (unit: string | UnitEnum | undefined) => {
+    if (!unit) return '';
+    
+    if (unit === UnitEnum.TIME) {
+      return 'giờ';
+    } else if (unit === UnitEnum.QUANTITY) {
+      return 'sản phẩm';
+    } 
+    
+    return unit;
   };
 
   if (!service || !updatedValues) return null;
@@ -92,11 +104,11 @@ const ServiceConfirmModal: React.FC<ServiceConfirmModalProps> = ({
             
             <div>
               <p><strong>Giá cũ:</strong></p>
-              <p className="text-gray-500">{formatPrice(service.price)}/{service.unit}</p>
+              <p className="text-gray-500">{formatPrice(service.price)}/{displayUnit(service.unit)}</p>
             </div>
             <div>
               <p><strong>Giá mới:</strong></p>
-              <p className="text-blue-500">{formatPrice(updatedValues.price)}/{updatedValues.unit}</p>
+              <p className="text-blue-500">{formatPrice(updatedValues.price)}/{displayUnit(updatedValues.unit)}</p>
             </div>
             
             <div>

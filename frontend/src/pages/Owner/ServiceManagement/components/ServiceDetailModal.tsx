@@ -1,6 +1,6 @@
 import React from 'react';
 import { Modal, Button, Typography, Tag, Divider, Descriptions } from 'antd';
-import { Service } from '@/types/service.type';
+import { Service, UnitEnum } from '@/types/service.type';
 import { formatPrice } from '@/utils/statusUtils';
 import { getSportNameInVietnamese } from '@/utils/translateSport';
 
@@ -23,11 +23,23 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
       rental: { color: 'blue', text: 'Cho thuê' },
       coaching: { color: 'purple', text: 'Huấn luyện' },
       equipment: { color: 'cyan', text: 'Thiết bị' },
-      food: { color: 'green', text: 'Đồ uống/Thực phẩm' },
       other: { color: 'gray', text: 'Khác' },
     };
     const typeConfig = config[type] || { color: 'default', text: type };
     return <Tag color={typeConfig.color}>{typeConfig.text}</Tag>;
+  };
+
+  // Helper function to display unit
+  const displayUnit = (unit: string | UnitEnum | undefined) => {
+    if (!unit) return '';
+    
+    if (unit === UnitEnum.TIME) {
+      return 'giờ';
+    } else if (unit === UnitEnum.QUANTITY) {
+      return 'sản phẩm';
+    } 
+    
+    return unit;
   };
 
   return (
@@ -53,9 +65,9 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
               </div>
             </div>
             <div className="text-right">
-              <Text strong className="text-lg text-red-500">{formatPrice(service.price)}/{service.unit}</Text>
+              <Text strong className="text-lg text-red-500">{formatPrice(service.price)}/{displayUnit(service.unit)}</Text>
               <div className="mt-1">
-                <Text type="secondary">Tổng: {service.amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')} sản phẩm</Text>
+                <Text type="secondary">Tổng: {service.amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')} {displayUnit(service.unit)}</Text>
               </div>
             </div>
           </div>
@@ -85,7 +97,7 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
               <Descriptions.Item label="Tổng">
                 <strong>
                   {service.amount?.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')}
-                  {service.unit && ` ${service.unit}`}
+                  {service.unit && ` ${displayUnit(service.unit)}`}
                 </strong>
               </Descriptions.Item>
 
@@ -96,14 +108,14 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
               <Descriptions.Item label="Số lượng đã đặt">
                 <strong>
                   {service.bookedCount?.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.') || '0'}
-                  {service.unit && ` ${service.unit}`}
+                  {service.unit && ` ${displayUnit(service.unit)}`}
                 </strong>
               </Descriptions.Item>
 
               <Descriptions.Item label="Đang sử dụng trong ngày">
                 <strong>
                   {service.bookedCountOnDate?.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.') || '0'}
-                  {service.unit && ` ${service.unit}`}
+                  {service.unit && ` ${displayUnit(service.unit)}`}
                 </strong>
               </Descriptions.Item>
             </Descriptions>

@@ -41,9 +41,20 @@ const CreateEvent: React.FC<CreateEventProps> = ({ onCancel, onSubmit }) => {
   // Fetch initial facility from localStorage
   useEffect(() => {
     const savedFacilityId = localStorage.getItem(SELECTED_FACILITY_KEY);
-    if (savedFacilityId) {
-      setSelectedFacilityId(savedFacilityId);
-      form.setFieldsValue({ facilityId: savedFacilityId });
+    
+    // Kiểm tra xem savedFacilityId có còn hợp lệ không (có tồn tại trong danh sách facilities không)
+    const isValidSavedId = savedFacilityId && mockFacilitiesDropdown.some(f => f.id === savedFacilityId);
+    
+    // Nếu ID trong localStorage không hợp lệ, sử dụng ID đầu tiên trong danh sách
+    const initialFacilityId = isValidSavedId ? savedFacilityId : (mockFacilitiesDropdown.length > 0 ? mockFacilitiesDropdown[0].id : '');
+    
+    if (initialFacilityId) {
+      // Nếu ID đã thay đổi, cập nhật lại localStorage
+      if (initialFacilityId !== savedFacilityId) {
+        localStorage.setItem(SELECTED_FACILITY_KEY, initialFacilityId);
+      }
+      setSelectedFacilityId(initialFacilityId);
+      form.setFieldsValue({ facilityId: initialFacilityId });
     }
   }, [form]);
   

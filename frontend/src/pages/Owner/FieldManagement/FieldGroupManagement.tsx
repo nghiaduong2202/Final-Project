@@ -5,8 +5,7 @@ import { ExclamationCircleOutlined, PlusOutlined, ArrowRightOutlined } from '@an
 import { FieldGroup } from '@/types/field.type';
 import fieldImage from '@/assets/Owner/content/field.png';
 import { fieldService } from '@/services/field.service';
-import { facilityService } from '@/services/facility.service';
-import { FacilityDropdownItem } from '@/services/facility.service';
+import { facilityService, FacilityDropdownItem } from '@/services/facility.service';
 
 // Component imports
 import FieldGroupTable from './components/FieldGroupTable';
@@ -45,11 +44,20 @@ const FieldGroupManagement: React.FC = () => {
         const facilityList = await facilityService.getFacilitiesDropdown();
         setFacilities(facilityList);
 
-        // Lấy facilityId từ localStorage hoặc sử dụng cơ sở đầu tiên
+        // Lấy facilityId từ localStorage
         const savedFacilityId = localStorage.getItem(SELECTED_FACILITY_KEY);
-        const initialFacilityId = savedFacilityId || (facilityList.length > 0 ? facilityList[0].id : '');
+        
+        // Kiểm tra xem savedFacilityId có còn hợp lệ không (có tồn tại trong danh sách facilities không)
+        const isValidSavedId = savedFacilityId && facilityList.some(f => f.id === savedFacilityId);
+        
+        // Nếu ID trong localStorage không hợp lệ, sử dụng ID đầu tiên trong danh sách
+        const initialFacilityId = isValidSavedId ? savedFacilityId : (facilityList.length > 0 ? facilityList[0].id : '');
         
         if (initialFacilityId) {
+          // Nếu ID đã thay đổi, cập nhật lại localStorage
+          if (initialFacilityId !== savedFacilityId) {
+            localStorage.setItem(SELECTED_FACILITY_KEY, initialFacilityId);
+          }
           setSelectedFacilityId(initialFacilityId);
           fetchFieldGroups(initialFacilityId);
         }

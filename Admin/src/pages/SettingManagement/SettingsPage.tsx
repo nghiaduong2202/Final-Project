@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { Tabs, Form, Input, Button, Upload, message, Select, Card, Avatar } from 'antd';
+import type { UploadChangeParam, UploadFile } from 'antd/es/upload/interface';
 import { UserOutlined, LockOutlined, UploadOutlined } from '@ant-design/icons';
-import { useAppSelector, useAppDispatch } from '@/hooks/reduxHooks';
+import { useAppSelector } from '@/hooks/reduxHooks';
+import { sportService, SportData } from '@/services/sport.service';
 
 const { TabPane } = Tabs;
 const { Option } = Select;
@@ -10,10 +12,12 @@ const SettingsPage: React.FC = () => {
   const { user } = useAppSelector(state => state.auth);
   const [profileForm] = Form.useForm();
   const [passwordForm] = Form.useForm();
+  const [sportForm] = Form.useForm();
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>(user?.avatar);
   const [loading, setLoading] = useState(false);
+  const [sportLoading, setSportLoading] = useState(false);
 
-  const handleProfileSubmit = async (values: any) => {
+  const handleProfileSubmit = async () => {
     try {
       setLoading(true);
       // Mock API call for now
@@ -23,13 +27,13 @@ const SettingsPage: React.FC = () => {
         setLoading(false);
         message.success('Thông tin cá nhân đã được cập nhật');
       }, 1000);
-    } catch (error) {
+    } catch {
       setLoading(false);
       message.error('Không thể cập nhật thông tin cá nhân');
     }
   };
 
-  const handlePasswordSubmit = async (values: any) => {
+  const handlePasswordSubmit = async () => {
     try {
       setLoading(true);
       // Mock API call for now
@@ -43,13 +47,13 @@ const SettingsPage: React.FC = () => {
         passwordForm.resetFields();
         message.success('Mật khẩu đã được cập nhật');
       }, 1000);
-    } catch (error) {
+    } catch {
       setLoading(false);
       message.error('Không thể cập nhật mật khẩu');
     }
   };
 
-  const handleAvatarChange = (info: any) => {
+  const handleAvatarChange = (info: UploadChangeParam<UploadFile>) => {
     if (info.file.status === 'uploading') {
       return;
     }
@@ -58,6 +62,19 @@ const SettingsPage: React.FC = () => {
       // For now, use a placeholder
       setAvatarUrl('https://picsum.photos/200');
       message.success('Ảnh đại diện đã được cập nhật');
+    }
+  };
+
+  const handleSportSubmit = async (values: SportData) => {
+    try {
+      setSportLoading(true);
+      await sportService.createSport(values);
+      sportForm.resetFields();
+      message.success('Loại hình thể thao đã được tạo thành công');
+      setSportLoading(false);
+    } catch {
+      setSportLoading(false);
+      message.error('Không thể tạo loại hình thể thao');
     }
   };
 
@@ -205,6 +222,31 @@ const SettingsPage: React.FC = () => {
               <Form.Item>
                 <Button type="primary" htmlType="submit">
                   Lưu cài đặt
+                </Button>
+              </Form.Item>
+            </Form>
+          </Card>
+        </TabPane>
+
+        <TabPane tab="Quản lý loại hình thể thao" key="sports">
+          <Card>
+            <h2 className="text-lg font-semibold mb-4">Tạo loại hình thể thao mới</h2>
+            <Form
+              form={sportForm}
+              layout="vertical"
+              onFinish={handleSportSubmit}
+            >
+              <Form.Item
+                name="name"
+                label="Tên loại hình thể thao"
+                rules={[{ required: true, message: 'Vui lòng nhập tên loại hình thể thao' }]}
+              >
+                <Input placeholder="Ví dụ: Bóng đá, Bơi lội, Tennis..." />
+              </Form.Item>
+              
+              <Form.Item>
+                <Button type="primary" htmlType="submit" loading={sportLoading}>
+                  Tạo loại hình thể thao
                 </Button>
               </Form.Item>
             </Form>

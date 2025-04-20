@@ -1,7 +1,7 @@
 import React from 'react';
 import { Table, Space, Button, Tooltip, Tag, Typography } from 'antd';
 import { EditOutlined, DeleteOutlined, EyeOutlined } from '@ant-design/icons';
-import { Service, ServiceType } from '@/types/service.type';
+import { Service, ServiceType, UnitEnum } from '@/types/service.type';
 import { formatPrice } from '@/utils/statusUtils';
 import { getSportNameInVietnamese } from '@/utils/translateSport';
 
@@ -36,11 +36,23 @@ const ServiceTable: React.FC<ServiceTableProps> = ({
       rental: { color: 'blue', text: 'Cho thuê' },
       coaching: { color: 'purple', text: 'Huấn luyện' },
       equipment: { color: 'cyan', text: 'Thiết bị' },
-      food: { color: 'green', text: 'Đồ uống/Thực phẩm' },
       other: { color: 'gray', text: 'Khác' },
     };
     const typeConfig = config[type] || { color: 'default', text: type };
     return <Tag color={typeConfig.color}>{typeConfig.text}</Tag>;
+  };
+
+  // Helper function to display unit
+  const displayUnit = (unit: string | UnitEnum | undefined) => {
+    if (!unit) return '';
+    
+    if (unit === UnitEnum.TIME) {
+      return 'giờ';
+    } else if (unit === UnitEnum.QUANTITY) {
+      return 'sản phẩm';
+    } 
+    
+    return unit;
   };
 
   // Table columns
@@ -73,7 +85,7 @@ const ServiceTable: React.FC<ServiceTableProps> = ({
       key: 'price',
       render: (price: number, record: Service) => (
         <div>
-          {formatPrice(price)}/{record.unit}
+          {formatPrice(price)}/{displayUnit(record.unit)}
         </div>
       ),
     },

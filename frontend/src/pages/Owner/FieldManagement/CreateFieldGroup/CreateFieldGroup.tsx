@@ -4,15 +4,19 @@ import { PlusOutlined, ArrowLeftOutlined, ExclamationCircleOutlined } from '@ant
 import { getSportNameInVietnamese } from '@/utils/translateSport';
 import { sportService } from '@/services/sport.service';
 import { fieldService } from '@/services/field.service';
-import { facilityService } from '@/services/facility.service';
+import { facilityService, FacilityDropdownItem } from '@/services/facility.service';
 import { Sport } from '@/types/sport.type';
 import { FieldGroup, FieldGroupFormData } from '@/types/field.type';
-import { FacilityDropdownItem } from '@/services/facility.service';
 import FieldGroupForm from './components/FieldGroupForm';
 import { useNavigate } from 'react-router-dom';
+
+
 const { Title, Text } = Typography;
 const { Option } = Select;
 const { CheckableTag } = Tag;
+
+// Local storage key
+const SELECTED_FACILITY_KEY = 'owner_selected_facility_id';
 
 // Danh sách tất cả các loại thể thao được hỗ trợ trong ứng dụng
 const ALL_SUPPORTED_SPORTS = [
@@ -67,9 +71,21 @@ const CreateFieldGroup: React.FC = () => {
           const facilitiesData = await facilityService.getFacilitiesDropdown();
           setFacilities(facilitiesData);
           
-          // Set default facility if available
-          if (facilitiesData.length > 0) {
-            setSelectedFacilityId(facilitiesData[0].id);
+          // Lấy facilityId từ localStorage
+          const savedFacilityId = localStorage.getItem(SELECTED_FACILITY_KEY);
+          
+          // Kiểm tra xem savedFacilityId có còn hợp lệ không (có tồn tại trong danh sách facilities không)
+          const isValidSavedId = savedFacilityId && facilitiesData.some(f => f.id === savedFacilityId);
+          
+          // Nếu ID trong localStorage không hợp lệ, sử dụng ID đầu tiên trong danh sách
+          const initialFacilityId = isValidSavedId ? savedFacilityId : (facilitiesData.length > 0 ? facilitiesData[0].id : '');
+          
+          if (initialFacilityId) {
+            // Nếu ID đã thay đổi, cập nhật lại localStorage
+            if (initialFacilityId !== savedFacilityId) {
+              localStorage.setItem(SELECTED_FACILITY_KEY, initialFacilityId);
+            }
+            setSelectedFacilityId(initialFacilityId);
           }
           
           // Fetch sports
@@ -154,6 +170,7 @@ const CreateFieldGroup: React.FC = () => {
   // Handle facility selection
   const handleFacilityChange = (value: string) => {
     setSelectedFacilityId(value);
+    localStorage.setItem(SELECTED_FACILITY_KEY, value);
     // Reset sport selection when facility changes
     setSelectedSports([]);
   };

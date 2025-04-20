@@ -14,9 +14,9 @@ export interface FieldGroup {
     dimension: string;
     surface: string;
     basePrice: number;
-    peakStartTime1: string;
-    peakEndTime1: string;
-    priceIncrease1: number;
+    peakStartTime1?: string;
+    peakEndTime1?: string;
+    priceIncrease1?: number;
     peakStartTime2?: string;
     peakEndTime2?: string;
     priceIncrease2?: number;
@@ -28,6 +28,37 @@ export interface FieldGroup {
     sports: Sport[]; 
     facilityId: string;
   }
+
+// Interface for Available Field Groups used in booking process
+export interface AvailableFieldGroup {
+  id: string;
+  name: string;
+  dimension: string;
+  surface: string;
+  basePrice: number;
+  peakStartTime1?: string;
+  peakEndTime1?: string;
+  priceIncrease1?: number;
+  peakStartTime2?: string;
+  peakEndTime2?: string;
+  priceIncrease2?: number;
+  peakStartTime3?: string;
+  peakEndTime3?: string;
+  priceIncrease3?: number;
+  numberOfPeaks?: number;
+  sports: {
+    id: number;
+    name: string;
+  }[];
+  bookingSlot: {
+    date: string;
+    fields: {
+      id: number;
+      name: string;
+      status: string;
+    }[];
+  }[];
+}
 
 // For field group form when creating or editing
 export interface FieldGroupFormData {

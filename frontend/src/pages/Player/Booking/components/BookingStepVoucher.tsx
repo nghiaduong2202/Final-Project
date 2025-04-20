@@ -32,7 +32,7 @@ const BookingStepVoucher: React.FC<BookingStepVoucherProps> = ({
   useEffect(() => {
     // Lọc voucher theo từ khóa tìm kiếm
     const filtered = vouchers.filter(voucher => 
-      voucher.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      voucher.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       voucher.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
     setFilteredVouchers(filtered);
@@ -83,7 +83,7 @@ const BookingStepVoucher: React.FC<BookingStepVoucherProps> = ({
     setSearchTerm(value);
     
     // Tìm voucher theo mã chính xác
-    const exactVoucher = vouchers.find(v => v.code.toLowerCase() === value.toLowerCase());
+    const exactVoucher = vouchers.find(v => v.code?.toLowerCase() === value.toLowerCase());
     if (exactVoucher && isVoucherValid(exactVoucher)) {
       handleVoucherSelect(exactVoucher.id);
     }

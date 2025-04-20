@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Select, Card, Carousel, Tag, Empty, Input } from 'antd';
-import { EnvironmentOutlined, StarOutlined, DollarOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import { EnvironmentOutlined, StarOutlined, DollarOutlined } from '@ant-design/icons';
 import { IMAGE } from '@/constants/user/Home/Image';
 import { useNavigate } from 'react-router-dom';
 import type { RangePickerProps } from 'antd/es/date-picker';
@@ -12,6 +12,8 @@ import { mockFacilities } from '@/mocks/facility/mockFacilities';
 import { Facility } from '@/types/facility.type';
 import { Sport } from '@/types/sport.type';
 import './Home.css'; // Import custom CSS file for carousel
+import { facilityService } from '@/services/facility.service';
+import OperatingHoursDisplay from '@/components/shared/OperatingHoursDisplay';
 
 const { Option } = Select;
 
@@ -82,8 +84,6 @@ const HomePage = () => {
       // Sử dụng mock data nếu chưa đăng nhập
       setRecommendedFacilities(mockFacilities.slice(0, 4));
     }
-    
-    setLoading(false);
   }, [isAuthenticated]);
 
   // Fetch districts khi province thay đổi
@@ -138,21 +138,23 @@ const HomePage = () => {
   // Fetch cơ sở thể thao có điểm đánh giá cao nhất
   const fetchTopRatedFacilities = async () => {
     try {
-      // Trong tương lai sẽ call API thực tế
-      // const response = await facilityService.getTopRatedFacilities();
-      // setTopRatedFacilities(response.data);
-      
-      // Hiện tại sử dụng mock data, sort theo avgRating giảm dần
-      const sortedFacilities = [...mockFacilities].sort((a, b) => b.avgRating - a.avgRating);
-      setTopRatedFacilities(sortedFacilities.slice(0, 6));
+      setLoading(true);
+      const topFacilities = await facilityService.getFacilityTop();
+      setTopRatedFacilities(topFacilities);
     } catch (error) {
       console.error('Error fetching top rated facilities:', error);
+      // Fallback to mock data in case of error
+      const sortedFacilities = [...mockFacilities].sort((a, b) => b.avgRating - a.avgRating);
+      setTopRatedFacilities(sortedFacilities.slice(0, 6));
+    } finally {
+      setLoading(false);
     }
   };
 
   // Fetch cơ sở thể thao được đề xuất cho người dùng đã đăng nhập
   const fetchRecommendedFacilities = async () => {
     try {
+      setLoading(true);
       // Trong tương lai sẽ call API thực tế để lấy cơ sở mà user đã từng đặt
       // const response = await facilityService.getRecommendedFacilities();
       // setRecommendedFacilities(response.data);
@@ -161,6 +163,8 @@ const HomePage = () => {
       setRecommendedFacilities(mockFacilities.slice(0, 4));
     } catch (error) {
       console.error('Error fetching recommended facilities:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -387,12 +391,9 @@ const HomePage = () => {
         
         {/* Giờ hoạt động và Rating */}
         <div className="flex items-center text-gray-500 mb-1 sm:mb-2 text-xs sm:text-sm">
-          <ClockCircleOutlined className="mr-1" />
-          <span>
-            {facility.openTime1 && facility.closeTime1 ? 
-              `${facility.openTime1.substring(0, 5)} - ${facility.closeTime1.substring(0, 5)}` : 
-              '08:00 - 22:00'}
-          </span>
+          <div className="flex-1">
+            <OperatingHoursDisplay facility={facility} />
+          </div>
           
           {/* Rating */}
           <div className="ml-auto flex items-center">

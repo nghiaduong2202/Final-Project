@@ -1,5 +1,19 @@
 /* Override style cho Ant Design components */
+/* ===== Element Styling ===== */
+/* Breadcrumb */
+.ant-breadcrumb {
+  margin-bottom: 1rem;
+}
 
+.ant-breadcrumb a {
+  color: #1890ff;
+}
+
+/* Description lists */
+.ant-descriptions-bordered .ant-descriptions-item-label {
+  background-color: #fafafa;
+  font-weight: 500;
+}
 /* Ghi đè class của Ant Design Image component */
 .ant-image {
   display: block !important; /* Sử dụng !important để ghi đè style mặc định */

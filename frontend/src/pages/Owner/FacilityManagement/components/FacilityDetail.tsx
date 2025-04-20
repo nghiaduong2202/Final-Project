@@ -7,7 +7,6 @@ import {
   Image, 
   Typography, 
   Card, 
-  Space, 
   List, 
   Empty, 
   Divider,
@@ -20,17 +19,28 @@ import {
   EditOutlined,
   FileOutlined,
   StarOutlined,
-  ArrowLeftOutlined,
   CalendarOutlined,
-  TagOutlined
+  TagOutlined,
+  FieldTimeOutlined,
+  DollarOutlined,
+  CommentOutlined,
+  UpOutlined,
+  DownOutlined,
+  InfoCircleOutlined,
+  PictureOutlined,
+  AppstoreOutlined,
+  ShoppingOutlined,
+  GiftOutlined,
+  HistoryOutlined,
+  SafetyOutlined
 } from '@ant-design/icons';
 import { Facility } from '@/types/facility.type';
 import { Event, EventDetail, EventPrize } from '@/types/event.type';
 import { getSportNameInVietnamese } from '@/utils/translateSport';
-import OperatingHoursDisplay from '@/components/shared/OperatingHoursDisplay';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/store';
 import { fetchFacilityById } from '@/store/slices/facilitySlice';
+import { FieldGroup } from '@/types/field.type';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -40,6 +50,138 @@ interface FacilityDetailProps {
   onEdit: () => void;
 }
 
+// Thêm component con cho mỗi FieldGroup
+const FieldGroupComponent: React.FC<{group: FieldGroup, facilityStatus: string}> = ({ group, facilityStatus = 'active' }) => {
+  const [showFields, setShowFields] = useState(true);
+  
+  // Đơn giản hóa hiển thị trạng thái sân
+  const renderFieldStatus = (fieldStatus: string) => {
+    // Chỉ hiển thị trạng thái khi cơ sở đang hoạt động và sân đang đóng cửa
+    if (facilityStatus === 'active' && fieldStatus === 'closed') {
+      return <Tag color="default">Đang đóng cửa</Tag>;
+    }
+    // Trong các trường hợp khác không hiển thị trạng thái
+    return null;
+  };
+  
+  return (
+    <Card 
+      key={group.id} 
+      title={
+        <div className="flex justify-between items-center">
+          <span>{group.name}</span>
+          <Tag color="blue">{group.fields.length} sân</Tag>
+        </div>
+      }
+      className="mb-6 shadow-sm hover:shadow-md transition-all"
+    >
+      <div className="mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div>
+            <Text type="secondary">Kích thước:</Text>
+            <Text strong className="ml-2">{group.dimension}</Text>
+          </div>
+          <div>
+            <Text type="secondary">Mặt sân:</Text>
+            <Text strong className="ml-2">{group.surface}</Text>
+          </div>
+          <div>
+            <Text type="secondary">Giá cơ bản:</Text>
+            <Text strong className="ml-2 text-blue-600">{group.basePrice?.toLocaleString()}đ/giờ</Text>
+          </div>
+          <div>
+            <Text type="secondary">Môn thể thao:</Text>
+            <span className="ml-2">
+              {group.sports.map(sport => (
+                <Tag key={sport.id} color="blue">{getSportNameInVietnamese(sport.name)}</Tag>
+              ))}
+            </span>
+          </div>
+        </div>
+        
+        {/* Giờ cao điểm */}
+        <Divider orientation="left">Giờ cao điểm</Divider>
+        <div className="mb-4">
+          {(group.peakStartTime1 && group.peakEndTime1) || 
+           (group.peakStartTime2 && group.peakEndTime2) || 
+           (group.peakStartTime3 && group.peakEndTime3) ? (
+            <div className="grid grid-cols-1 gap-2">
+              {group.peakStartTime1 && group.peakEndTime1 && (
+                <div className="p-3 bg-gray-50 rounded-md">
+                  <div className="flex justify-between items-center">
+                    <Text strong>Giờ cao điểm 1: {group.peakStartTime1} - {group.peakEndTime1}</Text>
+                    <Text className="text-green-600 font-semibold">+{group.priceIncrease1?.toLocaleString()}đ/giờ</Text>
+                  </div>
+                </div>
+              )}
+              
+              {group.peakStartTime2 && group.peakEndTime2 && group.priceIncrease2 && (
+                <div className="p-3 bg-gray-50 rounded-md">
+                  <div className="flex justify-between items-center">
+                    <Text strong>Giờ cao điểm 2: {group.peakStartTime2} - {group.peakEndTime2}</Text>
+                    <Text className="text-green-600 font-semibold">+{group.priceIncrease2?.toLocaleString()}đ/giờ</Text>
+                  </div>
+                </div>
+              )}
+              
+              {group.peakStartTime3 && group.peakEndTime3 && group.priceIncrease3 && (
+                <div className="p-3 bg-gray-50 rounded-md">
+                  <div className="flex justify-between items-center">
+                    <Text strong>Giờ cao điểm 3: {group.peakStartTime3} - {group.peakEndTime3}</Text>
+                    <Text className="text-green-600 font-semibold">+{group.priceIncrease3?.toLocaleString()}đ/giờ</Text>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <Empty description="Không có thông tin giờ cao điểm" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+          )}
+        </div>
+        
+        <div className="flex justify-between items-center mt-4 mb-3">
+          <Divider orientation="left" style={{ margin: 0, marginRight: '16px', minWidth: '100px' }}>
+            Danh sách sân
+          </Divider>
+          <Button 
+            type="primary"
+            ghost
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowFields(!showFields);
+            }}
+            size="small"
+            className="flex items-center hover:shadow-sm"
+            icon={showFields ? <UpOutlined /> : <DownOutlined />}
+          >
+            {showFields ? 'Ẩn danh sách' : 'Hiện danh sách'}
+          </Button>
+        </div>
+        
+        {showFields && (
+          <List
+            grid={{ gutter: 16, xs: 1, sm: 2, md: 3, lg: 4 }}
+            dataSource={group.fields}
+            renderItem={field => (
+              <List.Item>
+                <Card size="small" hoverable className="text-center">
+                  <div className="text-center">
+                    <Text strong>{field.name}</Text>
+                    <div className="mt-1">
+                      {renderFieldStatus(field.status)}
+                    </div>
+                  </div>
+                </Card>
+              </List.Item>
+            )}
+          />
+        )}
+      </div>
+    </Card>
+  );
+};
+
+type TabKey = 'info' | 'images' | 'fields' | 'services' | 'events' | 'vouchers' | 'documents' | 'history';
+
 const FacilityDetail: React.FC<FacilityDetailProps> = ({ facilityId, onClose, onEdit }) => {
   const dispatch = useDispatch<AppDispatch>();
   const { facility: reduxFacility, isLoading: reduxLoading, error: reduxError } = useSelector((state: RootState) => state.facility);
@@ -47,7 +189,7 @@ const FacilityDetail: React.FC<FacilityDetailProps> = ({ facilityId, onClose, on
   const [facility, setFacility] = useState<Facility | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<string>('info');
+  const [activeTab, setActiveTab] = useState<TabKey>('info');
   const [mainImage, setMainImage] = useState<string>('');
   
   // Add an effect to handle Redux errors
@@ -179,41 +321,33 @@ const FacilityDetail: React.FC<FacilityDetailProps> = ({ facilityId, onClose, on
   }
   
   const tabItems = [
-    { key: 'info', label: 'Thông tin cơ bản' },
-    { key: 'images', label: 'Hình ảnh' },
-    { key: 'fields', label: 'Nhóm sân' },
-    { key: 'services', label: 'Dịch vụ' },
-    { key: 'events', label: 'Sự kiện' },
-    { key: 'vouchers', label: 'Khuyến mãi' },
-    { key: 'documents', label: 'Giấy tờ xác thực' },
-    { key: 'history', label: 'Lịch sử xác thực' }
+    { key: 'info' as TabKey, label: 'Thông tin cơ bản', icon: <InfoCircleOutlined /> },
+    { key: 'images' as TabKey, label: 'Hình ảnh', icon: <PictureOutlined /> },
+    { key: 'fields' as TabKey, label: 'Nhóm sân', icon: <AppstoreOutlined /> },
+    { key: 'services' as TabKey, label: 'Dịch vụ', icon: <ShoppingOutlined /> },
+    { key: 'events' as TabKey, label: 'Sự kiện', icon: <CalendarOutlined /> },
+    { key: 'vouchers' as TabKey, label: 'Khuyến mãi', icon: <GiftOutlined /> },
+    { key: 'documents' as TabKey, label: 'Giấy tờ xác thực', icon: <SafetyOutlined /> },
+    { key: 'history' as TabKey, label: 'Lịch sử xác thực', icon: <HistoryOutlined /> }
   ];
   
   return (
-    <div className="facility-detail">
+    <div className="facility-detail w-full max-w-7xl mx-auto">
       {/* Header */}
-      <div className="p-6 border-b">
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center">
-            <Button 
-              icon={<ArrowLeftOutlined />} 
-              onClick={onClose}
-              className="mr-4"
-            >
-              Quay lại
-            </Button>
-            <div>
-              <div className="flex items-center">
-                <Title level={4} className="m-0 mr-2">{facility.name}</Title>
-                {getStatusTag(facility.status)}
-              </div>
-              <Text type="secondary">{facility.location}</Text>
+      <div className="border-b shadow-sm">
+        {/* Facility title and edit button row */}
+        <div className="flex justify-between items-center px-5 mt-8">
+          <div>
+            <div className="flex items-center">
+              <Title level={3} className="m-0 mr-3">{facility.name}</Title>
+              {getStatusTag(facility.status)}
             </div>
           </div>
           <Button 
             type="primary" 
             icon={<EditOutlined />}
             onClick={onEdit}
+            size="middle"
           >
             Chỉnh sửa
           </Button>
@@ -221,65 +355,115 @@ const FacilityDetail: React.FC<FacilityDetailProps> = ({ facilityId, onClose, on
         
         <Tabs 
           activeKey={activeTab} 
-          onChange={setActiveTab}
+          onChange={(key) => setActiveTab(key as TabKey)}
           items={tabItems.map(item => ({
             key: item.key,
-            label: item.label
+            label: (
+              <span>
+                {item.icon && <span className="mr-1">{item.icon}</span>}
+                {item.label}
+              </span>
+            )
           }))}
+          className="px-6"
+          size="large"
         />
       </div>
       
       {/* Content */}
       <div className="p-6">
         {activeTab === 'info' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div>
-              <Card className="mb-4">
-                <div className="mb-4">
-                  <Title level={5} className="mb-2">Giờ hoạt động</Title>
-                  <OperatingHoursDisplay facility={facility} />
-                </div>
-
-                <div className="mb-4">
-                  <Title level={5} className="mb-2">Địa chỉ</Title>
-                  <div className="flex items-start text-gray-600">
-                    <EnvironmentOutlined className="mr-2 mt-1" />
-                    <Text>{facility.location}</Text>
-                  </div>
-                </div>
-                
-                <div>
-                  <Title level={5} className="mb-2">Môn thể thao</Title>
-                  <div className="flex flex-wrap gap-2">
-                    {sportsList && sportsList.length > 0 ? (
-                      sportsList.map((sport) => (
-                        <Tag key={sport.id} color="blue">{getSportNameInVietnamese(sport.name)}</Tag>
-                      ))
-                    ) : (
-                      <Text type="secondary">Không có thông tin về môn thể thao</Text>
-                    )}
-                  </div>
-                </div>
-              </Card>
-            </div>
-
-            <div>
-              <Card className="mb-4">
-                <div className="mb-4">
-                  <Title level={5} className="mb-2">Mô tả</Title>
-                  <Paragraph className="text-gray-600">{facility.description}</Paragraph>
-                </div>
-                
-                <div>
-                  <Title level={5} className="mb-2">Đánh giá</Title>
-                  <div className="flex items-center">
-                    <div className="bg-blue-50 p-3 rounded-lg flex items-center mr-4">
-                      <Text className="text-3xl text-blue-600 font-bold mr-1">{facility.avgRating.toFixed(1)}</Text>
-                      <StarOutlined className="text-yellow-500 text-lg" />
+          <div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Thông tin cơ bản - khối thông tin ngắn */}
+              <Card 
+                title={<div className="flex items-center"><FieldTimeOutlined className="mr-2 text-blue-600" /> Thông tin cơ sở</div>}
+                className="h-full shadow-sm hover:shadow-md transition-shadow"
+              >
+                <ul className="list-none p-0 m-0 space-y-4">
+                  <li className="flex items-start">                    
+                    <FieldTimeOutlined className="text-blue-600 mr-3 mt-1" />                 
+                    <div className="flex-1">
+                      <Text strong className="block mb-2">Giờ mở cửa:</Text>                      
+                      <div className='pl-2 space-y-1'>
+                        <Text className="block">Ca 1: {facility.openTime1?.substring(0, 5) || ''} - {facility.closeTime1?.substring(0, 5) || ''}</Text>
+                        {facility.numberOfShifts > 1 && (
+                          <Text className="block">Ca 2: {facility.openTime2?.substring(0, 5) || ''} - {facility.closeTime2?.substring(0, 5) || ''}</Text>
+                        )}
+                        {facility.numberOfShifts > 2 && (
+                          <Text className="block">Ca 3: {facility.openTime3?.substring(0, 5) || ''} - {facility.closeTime3?.substring(0, 5) || ''}</Text>
+                        )}
+                      </div>
                     </div>
-                    <div>
-                      <Text className="block">Dựa trên {facility.numberOfRatings} đánh giá</Text>
-                      <Text type="secondary">Từ người dùng đặt sân</Text>
+                  </li>
+                  <Divider className="my-3" />
+                  <li className="flex items-start">
+                    <DollarOutlined className="text-blue-600 mr-3 mt-1" />
+                    <div className="flex-1">
+                      <Text strong className="block mb-2">Giá dao động:</Text>
+                      <div className="pl-2">
+                        {facility.minPrice && facility.maxPrice ? (
+                          <Text className="block">{facility.minPrice.toLocaleString()}đ - {facility.maxPrice.toLocaleString()}đ</Text>
+                        ) : (
+                          <Text className="block text-gray-500">Chưa có thông tin giá</Text>
+                        )}
+                      </div>
+                    </div>
+                  </li>
+                  <Divider className="my-3" />
+                  <li className="flex items-start">
+                    <TagOutlined className="text-blue-600 mr-3 mt-1" />
+                    <div className="flex-1">
+                      <Text strong className="block mb-2">Môn thể thao:</Text>
+                      <div className="pl-2">
+                        {sportsList && sportsList.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {sportsList.map((sport) => (
+                              <Tag key={sport.id} color="blue" className="px-2 py-1 text-sm rounded-full">
+                                {getSportNameInVietnamese(sport.name)}
+                              </Tag>
+                            ))}
+                          </div>
+                        ) : (
+                          <Text type="secondary">Không có thông tin về môn thể thao</Text>
+                        )}
+                      </div>
+                    </div>
+                  </li>
+                </ul>
+              </Card>
+
+              {/* Mô tả - khối thông tin dài */}
+              <Card 
+                title={<div className="flex items-center"><CommentOutlined className="mr-2 text-blue-600" /> Mô tả cơ sở</div>}
+                className="h-full shadow-sm hover:shadow-md transition-shadow"
+              >
+                <Paragraph className="text-sm md:text-base text-justify whitespace-pre-line mb-4">
+                  {facility.description || "Chưa có mô tả chi tiết cho cơ sở này."}
+                </Paragraph>
+                
+                <Divider className="my-4" />
+                
+                <div className="flex items-start mt-4">
+                  <EnvironmentOutlined className="text-blue-600 mr-3 mt-1" />
+                  <div className="flex-1">
+                    <Text strong className="block mb-2">Địa chỉ:</Text>
+                    <div className="pl-2">
+                      <Text className="block">{facility.location}</Text>
+                    </div>
+                  </div>
+                </div>
+                
+                <Divider className="my-4" />
+                
+                <div className="flex items-start mt-4">
+                  <StarOutlined className="text-blue-600 mr-3 mt-1" />
+                  <div className="flex-1">
+                    <Text strong className="block mb-2">Đánh giá:</Text>
+                    <div className="pl-2 flex items-center">
+                      <Text className="text-lg text-blue-600 font-bold mr-2">{facility.avgRating.toFixed(1)}</Text>
+                      <Text className="mr-2">/ 5</Text>
+                      <Text className="text-gray-500">({facility.numberOfRating} đánh giá)</Text>
                     </div>
                   </div>
                 </div>
@@ -289,7 +473,7 @@ const FacilityDetail: React.FC<FacilityDetailProps> = ({ facilityId, onClose, on
         )}
         
         {activeTab === 'images' && (
-          <div>
+          <div className="max-h-[calc(100vh-240px)] overflow-y-auto pr-2">
             <div className="mb-6">
               <div className="max-h-96 overflow-hidden rounded-lg mb-4">
                 <Image
@@ -315,105 +499,15 @@ const FacilityDetail: React.FC<FacilityDetailProps> = ({ facilityId, onClose, on
         )}
         
         {activeTab === 'fields' && (
-          <div>
+          <div className="max-h-[calc(100vh-240px)] overflow-y-auto pr-2">
             {facility?.fieldGroups && facility.fieldGroups.length > 0 ? (
               <div>
                 {facility.fieldGroups.map(group => (
-                  <Card 
+                  <FieldGroupComponent 
                     key={group.id} 
-                    title={
-                      <div className="flex justify-between items-center">
-                        <span>{group.name}</span>
-                        <Tag color="blue">{group.fields.length} sân</Tag>
-                      </div>
-                    }
-                    className="mb-6"
-                  >
-                    <div className="mb-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div>
-                          <Text type="secondary">Kích thước:</Text>
-                          <Text strong className="ml-2">{group.dimension}</Text>
-                        </div>
-                        <div>
-                          <Text type="secondary">Mặt sân:</Text>
-                          <Text strong className="ml-2">{group.surface}</Text>
-                        </div>
-                        <div>
-                          <Text type="secondary">Giá cơ bản:</Text>
-                          <Text strong className="ml-2 text-blue-600">{group.basePrice?.toLocaleString()}đ/giờ</Text>
-                        </div>
-                        <div>
-                          <Text type="secondary">Môn thể thao:</Text>
-                          <span className="ml-2">
-                            {group.sports.map(sport => (
-                              <Tag key={sport.id} color="blue">{getSportNameInVietnamese(sport.name)}</Tag>
-                            ))}
-                          </span>
-                        </div>
-                      </div>
-                      
-                      {/* Giờ cao điểm */}
-                      <Divider orientation="left">Giờ cao điểm</Divider>
-                      <div className="mb-4">
-                        {(group.peakStartTime1 && group.peakEndTime1) || 
-                         (group.peakStartTime2 && group.peakEndTime2) || 
-                         (group.peakStartTime3 && group.peakEndTime3) ? (
-                          <div className="grid grid-cols-1 gap-2">
-                            {group.peakStartTime1 && group.peakEndTime1 && (
-                              <div className="p-3 bg-gray-50 rounded-md">
-                                <div className="flex justify-between items-center">
-                                  <Text strong>Giờ cao điểm 1: {group.peakStartTime1} - {group.peakEndTime1}</Text>
-                                  <Text className="text-green-600 font-semibold">+{group.priceIncrease1?.toLocaleString()}đ/giờ</Text>
-                                </div>
-                              </div>
-                            )}
-                            
-                            {group.peakStartTime2 && group.peakEndTime2 && group.priceIncrease2 && (
-                              <div className="p-3 bg-gray-50 rounded-md">
-                                <div className="flex justify-between items-center">
-                                  <Text strong>Giờ cao điểm 2: {group.peakStartTime2} - {group.peakEndTime2}</Text>
-                                  <Text className="text-green-600 font-semibold">+{group.priceIncrease2?.toLocaleString()}đ/giờ</Text>
-                                </div>
-                              </div>
-                            )}
-                            
-                            {group.peakStartTime3 && group.peakEndTime3 && group.priceIncrease3 && (
-                              <div className="p-3 bg-gray-50 rounded-md">
-                                <div className="flex justify-between items-center">
-                                  <Text strong>Giờ cao điểm 3: {group.peakStartTime3} - {group.peakEndTime3}</Text>
-                                  <Text className="text-green-600 font-semibold">+{group.priceIncrease3?.toLocaleString()}đ/giờ</Text>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <Empty description="Không có thông tin giờ cao điểm" image={Empty.PRESENTED_IMAGE_SIMPLE} />
-                        )}
-                      </div>
-                      
-                      <Divider orientation="left">Danh sách sân</Divider>
-                      
-                      <List
-                        grid={{ gutter: 16, xs: 1, sm: 2, md: 3, lg: 4 }}
-                        dataSource={group.fields}
-                        renderItem={field => (
-                          <List.Item>
-                            <Card size="small">
-                              <div className="text-center">
-                                <Text strong>{field.name}</Text>
-                                <div className="mt-1">
-                                  <Tag color={field.status === 'active' ? 'success' : 'default'}>
-                                    {field.status === 'active' ? 'Đang hoạt động' : 'Đang đóng cửa'}
-                                  </Tag>
-                                </div>
-                              </div>
-                            </Card>
-                          </List.Item>
-                        )}
-                      />
-                    </div>
-                  </Card>
+                    group={group} 
+                    facilityStatus={facility.status}
+                  />
                 ))}
               </div>
             ) : (
@@ -423,7 +517,7 @@ const FacilityDetail: React.FC<FacilityDetailProps> = ({ facilityId, onClose, on
         )}
         
         {activeTab === 'services' && (
-          <div>
+          <div className="max-h-[calc(100vh-240px)] overflow-y-auto pr-2">
             {facility?.services && facility.services.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {facility.services.map(service => (
@@ -434,17 +528,14 @@ const FacilityDetail: React.FC<FacilityDetailProps> = ({ facilityId, onClose, on
                   >
                     <div>
                       <div className="flex justify-between items-start mb-2">
-                        <Title level={5}>{service.name}</Title>
-                        <Tag color={service.status === 'available' ? 'success' : 'warning'}>
-                          {service.status === 'available' ? 'Có sẵn' : 'Sắp hết hàng'}
-                        </Tag>
+                        <Title level={5}>{service.name}</Title>                        
                       </div>
                       
                       <Paragraph className="text-gray-500 mb-4">{service.description}</Paragraph>
                       
                       <div className="flex justify-between items-center mb-3">
                         <div>
-                          <Text type="secondary">{service.serviceType === 'rental' ? 'Cho thuê' : 'Dịch vụ'}</Text>
+                          <Text type="secondary">{service.type === 'rental' ? 'Cho thuê' : 'Dịch vụ'}</Text>
                           <Tag color="blue" className="ml-2">{service.sport?.name}</Tag>
                         </div>
                         <Text className="text-lg font-bold text-blue-600">{service.price.toLocaleString()}đ/{service.unit}</Text>
@@ -457,22 +548,22 @@ const FacilityDetail: React.FC<FacilityDetailProps> = ({ facilityId, onClose, on
                           <Text type="secondary">Số lượng còn lại:</Text>
                           <Text strong className="ml-1 text-green-600">{service.amount?.toLocaleString() || 0}</Text>
                         </div>
-                        {service.popularityScore !== undefined && (
+                        {/* {service.popularityScore !== undefined && (
                           <div>
                             <Text type="secondary">Độ phổ biến:</Text>
                             <Text strong className="ml-1">{service.popularityScore}/100</Text>
                           </div>
-                        )}
+                        )} */}
                         {service.bookedCount !== undefined && (
                           <div>
                             <Text type="secondary">Lượt đặt:</Text>
                             <Text strong className="ml-1">{service.bookedCount}</Text>
                           </div>
                         )}
-                        {service.inUseCount !== undefined && (
+                        {service.bookedCountOnDate !== undefined && (
                           <div>
                             <Text type="secondary">Đang sử dụng:</Text>
-                            <Text strong className="ml-1">{service.inUseCount}</Text>
+                            <Text strong className="ml-1">{service.bookedCountOnDate}</Text>
                           </div>
                         )}
                       </div>
@@ -487,7 +578,7 @@ const FacilityDetail: React.FC<FacilityDetailProps> = ({ facilityId, onClose, on
         )}
         
         {activeTab === 'events' && (
-          <div>
+          <div className="max-h-[calc(100vh-240px)] overflow-y-auto pr-2">
             {facility?.events && facility.events.length > 0 ? (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {facility.events.map(event => {
@@ -632,7 +723,7 @@ const FacilityDetail: React.FC<FacilityDetailProps> = ({ facilityId, onClose, on
         )}
         
         {activeTab === 'vouchers' && (
-          <div>
+          <div className="max-h-[calc(100vh-240px)] overflow-y-auto pr-2">
             {facility?.vouchers && facility.vouchers.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {facility.vouchers.map(voucher => {
@@ -720,161 +811,161 @@ const FacilityDetail: React.FC<FacilityDetailProps> = ({ facilityId, onClose, on
         )}
         
         {activeTab === 'documents' && (
-          <div>
+          <div className="max-h-[calc(100vh-240px)] overflow-y-auto pr-2">
             <Card title="Giấy chứng nhận" className="mb-6">
-              {facility.certificate && (facility.certificate.verified || facility.certificate.temporary) ? (
-                <Space direction="vertical" className="w-full">
-                  {facility.certificate.verified && (
-                    <div className="flex justify-between items-center p-3 border rounded-lg bg-gray-50">
-                      <div className="flex items-center">
-                        <FileOutlined className="text-blue-500 mr-3 text-lg" />
-                        <div>
-                          <Text strong>Giấy chứng nhận chính thức</Text>
-                          <Text className="block text-gray-500 text-sm">Đã được xác thực</Text>
-                        </div>
-                      </div>
-                      <Button type="link" href={facility.certificate.verified} target="_blank">
-                        Xem
-                      </Button>
+              {facility.certificate && facility.certificate.verified ? (
+                <div className="flex justify-between items-center p-3 border rounded-lg bg-gray-50">
+                  <div className="flex items-center">
+                    <FileOutlined className="text-blue-500 mr-3 text-lg" />
+                    <div>
+                      <Text strong>Giấy chứng nhận cơ sở kinh doanh</Text>
+                      <Text className="block text-gray-500 text-sm">Đã được cập nhật</Text>
                     </div>
-                  )}
-                  
-                  {facility.certificate.temporary && (
-                    <div className="flex justify-between items-center p-3 border rounded-lg bg-gray-50">
-                      <div className="flex items-center">
-                        <FileOutlined className="text-orange-500 mr-3 text-lg" />
-                        <div>
-                          <Text strong>Giấy chứng nhận tạm thời</Text>
-                          <Text className="block text-gray-500 text-sm">Đang chờ xác thực</Text>
-                        </div>
-                      </div>
-                      <Button type="link" href={facility.certificate.temporary} target="_blank">
-                        Xem
-                      </Button>
-                    </div>
-                  )}
-                </Space>
+                  </div>
+                  <Button type="link" href={facility.certificate.verified} target="_blank">
+                    Xem
+                  </Button>
+                </div>
               ) : (
                 <Empty description="Chưa có giấy chứng nhận" />
               )}
             </Card>
             
             <Card title="Giấy phép kinh doanh">
-              {facility.licenses && facility.licenses.length > 0 ? (
+              {sportsList && sportsList.length > 0 ? (
                 <Table 
-                  dataSource={facility.licenses}
-                  rowKey={(record) => `${record.facilityId}-${record.sportId}`}
+                  dataSource={sportsList.map(sport => {
+                    // Tìm license tương ứng với sport nếu có
+                    const license = facility.licenses?.find(license => license.sportId === sport.id);
+                    
+                    return {
+                      sportId: sport.id,
+                      sportName: sport.name,
+                      verified: license?.verified || null,
+                      temporary: license?.temporary || null
+                    };
+                  })}
+                  rowKey={(record) => `sport-${record.sportId}`}
                   pagination={false}
                   columns={[
                     {
                       title: 'Môn thể thao',
-                      dataIndex: 'sportId',
-                      key: 'sportId',
-                      render: (sportId) => {
-                        // Tìm sport trong danh sách sportsList (ưu tiên)
-                        const sport = sportsList.find(s => s.id === sportId);
-                        if (sport) {
-                          return getSportNameInVietnamese(sport.name);
-                        }
-                        return "Không xác định";
-                      }
+                      dataIndex: 'sportName',
+                      key: 'sportName',
+                      render: (sportName) => getSportNameInVietnamese(sportName)
                     },
                     {
                       title: 'Trạng thái',
                       key: 'status',
                       render: (_, record) => (
-                        <Tag color={record.verified ? 'success' : 'warning'}>
-                          {record.verified ? 'Đã xác thực' : 'Đang chờ xác thực'}
-                        </Tag>
+                        record.verified ? 
+                          <Tag color="success">Đã cập nhật</Tag> : 
+                          <Tag color="default">Chưa cập nhật</Tag>
                       )
                     },
                     {
                       title: 'Hành động',
                       key: 'action',
                       render: (_, record) => (
-                        <Space>
-                          {record.verified && (
-                            <Button type="link" href={record.verified} target="_blank">
-                              Xem giấy phép chính thức
-                            </Button>
-                          )}
-                          
-                          {record.temporary && (
-                            <Button type="link" href={record.temporary} target="_blank">
-                              Xem giấy phép tạm thời
-                            </Button>
-                          )}
-                        </Space>
+                        record.verified ? (
+                          <Button type="link" href={record.verified} target="_blank">
+                            Xem giấy phép
+                          </Button>
+                        ) : (
+                          <Text type="secondary">Không có tài liệu</Text>
+                        )
                       )
                     }
                   ]}
                 />
               ) : (
-                <Empty description="Chưa có giấy phép kinh doanh" />
+                <Empty description="Chưa có thông tin về môn thể thao" />
               )}
             </Card>
           </div>
         )}
         
         {activeTab === 'history' && (
-          <div>
-            {facility.verificationHistory && facility.verificationHistory.length > 0 ? (
-              <Timeline>
-                {facility.verificationHistory.map((item, index) => (
-                  <Timeline.Item 
-                    key={item.id || index}
-                    color={
-                      item.status === 'approved' ? 'green' :
-                      item.status === 'pending' ? 'blue' : 'red'
-                    }
-                  >
-                    <div className="mb-1">
-                      <Text strong>{`Thay đổi trường "${item.field}"`}</Text>
-                      <Tag 
-                        className="ml-2"
-                        color={
-                          item.status === 'approved' ? 'success' :
-                          item.status === 'pending' ? 'processing' : 'error'
-                        }
-                      >
-                        {item.status === 'approved' ? 'Đã chấp thuận' :
-                         item.status === 'pending' ? 'Đang chờ' : 'Đã từ chối'
-                        }
-                      </Tag>
-                    </div>
+          <div className="max-h-[calc(100vh-240px)] overflow-y-auto pr-2">
+            <Card title="Lịch sử các yêu cầu phê duyệt" className="shadow-sm">
+              {facility.approvals && facility.approvals.length > 0 ? (
+                <Timeline className="p-2">
+                  {facility.approvals.map((approval, index) => {
+                    // Xác định màu sắc cho timeline item dựa trên trạng thái phê duyệt
+                    const color = 
+                      approval.status === 'approved' ? 'green' :
+                      approval.status === 'pending' ? 'blue' : 'red';
                     
-                    <div className="pl-4 border-l-2 border-gray-200 ml-1 mt-2">
-                      <div className="mb-2">
-                        <Text type="secondary">Giá trị cũ:</Text>
-                        <Text className="ml-2">{item.oldValue || '(Không có)'}</Text>
-                      </div>
-                      <div className="mb-2">
-                        <Text type="secondary">Giá trị mới:</Text>
-                        <Text className="ml-2">{item.newValue}</Text>
-                      </div>
-                      {item.note && (
-                        <div className="mb-2">
-                          <Text type="secondary">Ghi chú:</Text>
-                          <Text className="ml-2">{item.note}</Text>
+                    // Xác định nội dung hiển thị dựa trên loại approval
+                    let title = '';
+                    switch(approval.type) {
+                      case 'facility':
+                        title = 'Đăng ký cơ sở thể thao';
+                        break;
+                      case 'facility_name':
+                        title = `Cập nhật tên cơ sở: ${approval.name || ''}`;
+                        break;
+                      case 'certificate':
+                        title = 'Cập nhật giấy chứng nhận';
+                        break;
+                      case 'license':
+                        title = `Cập nhật giấy phép ${approval.sport ? ` (${getSportNameInVietnamese(approval.sport.name)})` : ''}`;
+                        break;
+                      default:
+                        title = 'Yêu cầu xác thực';
+                    }
+                    
+                    return (
+                      <Timeline.Item 
+                        key={approval.id || index}
+                        color={color}
+                        className="pb-4"
+                      >
+                        <div className="mb-2 bg-gray-50 p-3 rounded-md border border-gray-100">
+                          <div className="flex justify-between items-center flex-wrap">
+                            <Text strong className="text-lg">{title}</Text>
+                            <Tag 
+                              className="ml-2"
+                              color={
+                                approval.status === 'approved' ? 'success' :
+                                approval.status === 'pending' ? 'processing' : 'error'
+                              }
+                            >
+                              {approval.status === 'approved' ? 'Đã chấp thuận' :
+                              approval.status === 'pending' ? 'Đang chờ' : 'Đã từ chối'
+                              }
+                            </Tag>
+                          </div>
+                          
+                          <div className="mt-3 space-y-2 text-sm">
+                            {approval.note && (
+                              <div className="p-2 bg-white rounded border border-gray-100">
+                                <Text type="secondary" strong>Ghi chú:</Text>
+                                <div className="mt-1 pl-3">{approval.note}</div>
+                              </div>
+                            )}
+                            <div className="flex justify-between flex-wrap">
+                              <div>
+                                <Text type="secondary" strong>Ngày yêu cầu:</Text>
+                                <Text className="ml-2">{new Date(approval.createdAt).toLocaleString('vi-VN')}</Text>
+                              </div>
+                              {approval.updatedAt && approval.updatedAt !== approval.createdAt && (
+                                <div>
+                                  <Text type="secondary" strong>Ngày xử lý:</Text>
+                                  <Text className="ml-2">{new Date(approval.updatedAt).toLocaleString('vi-VN')}</Text>
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      )}
-                      <div>
-                        <Text type="secondary">Ngày yêu cầu:</Text>
-                        <Text className="ml-2">{new Date(item.requestDate).toLocaleString('vi-VN')}</Text>
-                      </div>
-                      {item.updatedDate && (
-                        <div>
-                          <Text type="secondary">Ngày xử lý:</Text>
-                          <Text className="ml-2">{new Date(item.updatedDate).toLocaleString('vi-VN')}</Text>
-                        </div>
-                      )}
-                    </div>
-                  </Timeline.Item>
-                ))}
-              </Timeline>
-            ) : (
-              <Empty description="Không có lịch sử thay đổi" />
-            )}
+                      </Timeline.Item>
+                    );
+                  })}
+                </Timeline>
+              ) : (
+                <Empty description="Không có lịch sử xác thực" />
+              )}
+            </Card>
           </div>
         )}
       </div>

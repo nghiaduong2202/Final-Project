@@ -73,7 +73,7 @@ export const SURFACE_TYPES = {
     {
       id: 5,
       name: "Sân bóng đá nhỏ đa năng",
-      sports: ["football", "basketball"],
+      sports: ["volleyball", "basketball"],
       description: "Sân bóng đá cỡ nhỏ có thể kết hợp với bóng rổ",
       recommendedSurfaces: ["Sân chất nhựa tổng hợp", "Sân bê tông"],
       recommendedDimensions: ["25m x 16m", "28m x 15m"],
@@ -82,8 +82,8 @@ export const SURFACE_TYPES = {
   
   // For each sport, define which other sports it can be combined with
   export const SPORT_COMPATIBILITY = {
-    football: ["basketball"],
-    basketball: ["football", "volleyball", "badminton", "pickleball"],
+    football: [],
+    basketball: ["tennis", "volleyball", "badminton", "pickleball"],
     volleyball: ["basketball", "badminton", "tennis", "pickleball"],
     tennis: ["pickleball", "volleyball"],
     badminton: ["pickleball", "basketball", "volleyball"],

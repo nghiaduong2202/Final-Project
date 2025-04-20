@@ -1,7 +1,7 @@
 export interface Voucher {
     id: number;
     name: string;
-    code: string;
+    code?: string;
     startDate: string;
     endDate: string;
     voucherType: 'cash' | 'percent';
@@ -25,7 +25,7 @@ export interface Voucher {
     minPrice: number;
     maxDiscount: number;
     amount: number;
-    facilityId: string;
+    // facilityId: string;
   }
 
   export interface VoucherFilter {

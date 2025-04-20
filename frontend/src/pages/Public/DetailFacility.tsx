@@ -34,19 +34,19 @@ import {
   DownOutlined,
   UpOutlined
 } from '@ant-design/icons';
-import { mockFacilities } from '@/mocks/facility/mockFacilities';
-import { mockFieldGroups } from '@/mocks/field/Groupfield_Field';
-import { mockServices } from '@/mocks/service/serviceData';
 import type { Service } from '@/types/service.type';
 import type { Facility } from '@/types/facility.type';
 import type { FieldGroup } from '@/types/field.type';
+import type { Voucher } from '@/types/voucher.type';
 import { getSportNameInVietnamese } from '@/utils/translateSport';
 import { getMockCoordinates } from '@/utils/geocoding';
 import MapLocation from '@/components/MapLocation';
+import { facilityService } from '@/services/facility.service';
 import dayjs from 'dayjs';
 
 // Import CSS ghi đè Ant Design
 import '@/styles/AntdOverride.css';
+
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -117,68 +117,6 @@ const mockReviews: Review[] = [
   }
 ];
 
-// Mock events data
-const mockEvents = [
-  {
-    id: 1,
-    name: 'Giải đấu cầu lông mở rộng',
-    description: 'Giải đấu cầu lông dành cho mọi người yêu thích môn thể thao này. Cơ hội giành giải thưởng lớn và giao lưu với những người có cùng đam mê.',
-    startDate: '2023-12-25T08:00:00Z',
-    endDate: '2023-12-30T18:00:00Z',
-    status: 'upcoming',
-    eventType: 'TOURNAMENT',
-    image: 'https://picsum.photos/id/1/500/300',
-    prizes: [
-      { position: 1, prize: 'Cúp vô địch + 5.000.000đ' },
-      { position: 2, prize: '3.000.000đ' },
-      { position: 3, prize: '1.000.000đ' }
-    ],
-    maxParticipants: 32,
-    currentParticipants: 18,
-    registrationEndDate: '2023-12-20T23:59:59Z'
-  },
-  {
-    id: 2,
-    name: 'Khuyến mãi Tháng 12 - Đặt 3 giờ tặng 1 giờ',
-    description: 'Chương trình khuyến mãi đặc biệt nhân dịp cuối năm. Áp dụng cho tất cả các sân vào các ngày trong tuần.',
-    startDate: '2023-12-01T00:00:00Z',
-    endDate: '2023-12-31T23:59:59Z',
-    status: 'active',
-    eventType: 'SPECIAL_OFFER',
-    image: 'https://picsum.photos/id/41/500/300'
-  }
-];
-
-// Mock vouchers data
-const mockVouchers = [
-  {
-    id: 1,
-    name: 'Giảm 15% cho lần đặt đầu tiên',
-    code: 'WELCOME15',
-    startDate: '2023-01-01T00:00:00Z',
-    endDate: '2023-12-31T23:59:59Z',
-    voucherType: 'percent',
-    discount: 15,
-    minPrice: 100000,
-    maxDiscount: 100000,
-    amount: 100,
-    remain: 45
-  },
-  {
-    id: 2,
-    name: 'Giảm 50.000đ cho đơn từ 200.000đ',
-    code: 'DEC50K',
-    startDate: '2023-12-01T00:00:00Z',
-    endDate: '2023-12-31T23:59:59Z',
-    voucherType: 'cash',
-    discount: 50000,
-    minPrice: 200000,
-    maxDiscount: 50000,
-    amount: 50,
-    remain: 20
-  }
-];
-
 const DetailFacility: React.FC = () => {
   const navigate = useNavigate();
   const { facilityId } = useParams<{ facilityId: string }>();
@@ -189,8 +127,8 @@ const DetailFacility: React.FC = () => {
   const [fieldGroups, setFieldGroups] = useState<FieldGroup[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
-  const [events, setEvents] = useState(mockEvents);
-  const [vouchers, setVouchers] = useState(mockVouchers);
+  const [events, setEvents] = useState<any[]>([]);
+  const [vouchers, setVouchers] = useState<Voucher[]>([]);
   const [mainImage, setMainImage] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -221,36 +159,33 @@ const DetailFacility: React.FC = () => {
       
       setLoading(true);
       try {
-        // Simulate API call delay
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Get facility details from API
+        const facilityData = await facilityService.getFacilityById(facilityId);
         
-        // Get facility details from mock data
-        const facilityData = mockFacilities.find(f => f.id === facilityId);
-        if (!facilityData) {
-          throw new Error('Facility not found');
-        }
+        // Set facility data
         setFacility(facilityData);
         
+        // Set main image if images exist
         if (facilityData.imagesUrl && facilityData.imagesUrl.length > 0) {
           setMainImage(facilityData.imagesUrl[0]);
         }
         
-        // Get field groups from mock data
-        const fieldGroupsData = mockFieldGroups.filter(fg => fg.facilityId === facilityId);
-        setFieldGroups(fieldGroupsData);
+        // Set field groups from API response
+        if (facilityData.fieldGroups) {
+          setFieldGroups(facilityData.fieldGroups);
+        }
         
-        // Get services from mock data
-        const servicesData = mockServices.filter(s => s.facilityId === facilityId);
-        setServices(servicesData);
+        // Set services from API response
+        if (facilityData.services) {
+          setServices(facilityData.services);
+        }
+        
+        // Set events and vouchers (empty arrays if not present)
+        setEvents(facilityData.events || []);
+        setVouchers(facilityData.vouchers || []);
 
-        // Set mock reviews
+        // Set mock reviews (only data that needs to stay mocked)
         setReviews(mockReviews);
-        
-        // Set mock events
-        setEvents(mockEvents);
-        
-        // Set mock vouchers
-        setVouchers(mockVouchers);
         
         setError(null);
       } catch (err) {
@@ -430,27 +365,33 @@ const DetailFacility: React.FC = () => {
                         
             {/* Thumbnail gallery - các ảnh nhỏ */}
             <div className="flex gap-2 overflow-x-auto w-full md:w-1/4">
-              {facility.imagesUrl.map((image, index) => (
-                <div 
-                  key={index} 
-                  className={`relative cursor-pointer border-2 rounded-lg overflow-hidden flex-shrink-0 ${mainImage === image ? 'border-blue-500' : 'border-transparent'}`}
-                  onClick={() => handleImageClick(image)}
-                  style={{ width: '100px' }}
-                >
-                  <Image
-                    src={image}
-                    alt={`${facility.name} ${index + 1}`}
-                    className="rounded-lg"
-                    style={{ 
-                      width: '100%', 
-                      height: '60px',
-                      objectFit: 'cover',
-                      display: 'block'
-                    }}
-                    preview={false}
-                  />
+              {facility && facility.imagesUrl && facility.imagesUrl.length > 0 ? (
+                facility.imagesUrl.map((image, index) => (
+                  <div 
+                    key={index} 
+                    className={`relative cursor-pointer border-2 rounded-lg overflow-hidden flex-shrink-0 ${mainImage === image ? 'border-blue-500' : 'border-transparent'}`}
+                    onClick={() => handleImageClick(image)}
+                    style={{ width: '100px' }}
+                  >
+                    <Image
+                      src={image}
+                      alt={`${facility.name} ${index + 1}`}
+                      className="rounded-lg"
+                      style={{ 
+                        width: '100%', 
+                        height: '60px',
+                        objectFit: 'cover',
+                        display: 'block'
+                      }}
+                      preview={false}
+                    />
+                  </div>
+                ))
+              ) : (
+                <div className="text-center w-full">
+                  <Text className="text-gray-500">Không có hình ảnh</Text>
                 </div>
-              ))}
+              )}
             </div>
           </div>
         </section>
@@ -490,14 +431,14 @@ const DetailFacility: React.FC = () => {
                         <div>
                           <Text strong>Giờ hoạt động:</Text>
                           <div>
-                            <Text className="block">{facility.openTime1.substring(0, 5)} - {facility.closeTime1.substring(0, 5)}</Text>
-                            {facility.numberOfShifts > 1 && (
-                              <>
-                                <Text className="block">{facility.openTime2.substring(0, 5)} - {facility.closeTime2.substring(0, 5)}</Text>
-                                {facility.numberOfShifts > 2 && (
-                                  <Text className="block">{facility.openTime3.substring(0, 5)} - {facility.closeTime3.substring(0, 5)}</Text>
-                                )}
-                              </>
+                            {facility.openTime1 && facility.closeTime1 && (
+                              <Text className="block">{facility.openTime1.substring(0, 5)} - {facility.closeTime1.substring(0, 5)}</Text>
+                            )}
+                            {facility.numberOfShifts > 1 && facility.openTime2 && facility.closeTime2 && (
+                              <Text className="block">{facility.openTime2.substring(0, 5)} - {facility.closeTime2.substring(0, 5)}</Text>
+                            )}
+                            {facility.numberOfShifts > 2 && facility.openTime3 && facility.closeTime3 && (
+                              <Text className="block">{facility.openTime3.substring(0, 5)} - {facility.closeTime3.substring(0, 5)}</Text>
                             )}
                           </div>
                         </div>
@@ -516,11 +457,25 @@ const DetailFacility: React.FC = () => {
                       <li>
                         <div className="flex flex-wrap gap-2">
                           <Text strong className="mr-2 whitespace-nowrap">Môn thể thao:</Text>
-                          {facility.sports.map(sport => (
-                            <Tag key={sport.id} color="blue" className="px-2 py-0.5 text-sm rounded-full">
-                              {getSportNameInVietnamese(sport.name)}
-                            </Tag>
-                          ))}
+                          {fieldGroups && fieldGroups.length > 0 && fieldGroups.some(group => group.sports && group.sports.length > 0) ? (
+                            // Collect unique sports from all field groups
+                            [...new Set(
+                              fieldGroups
+                                .filter(group => group.sports && group.sports.length > 0)
+                                .flatMap(group => group.sports || [])
+                                .map(sport => JSON.stringify(sport))
+                            )]
+                            .map(sportStr => {
+                              const sport = JSON.parse(sportStr);
+                              return (
+                                <Tag key={sport.id} color="blue" className="px-2 py-0.5 text-sm rounded-full">
+                                  {getSportNameInVietnamese(sport.name)}
+                                </Tag>
+                              );
+                            })
+                          ) : (
+                            <Text className="text-gray-500">Chưa có môn thể thao</Text>
+                          )}
                         </div>
                       </li>
                     </ul>
@@ -592,7 +547,7 @@ const DetailFacility: React.FC = () => {
                                     <Text>Giá cơ bản:</Text>
                                     <Text className="text-blue-600 font-semibold">{group.basePrice.toLocaleString()}đ/giờ</Text>
                                   </div>
-                                  {group.priceIncrease1 > 0 && (
+                                  {group.priceIncrease1 && group.priceIncrease1 > 0 && (
                                     <div className="flex justify-between items-center mt-1">
                                       <Text>Giờ cao điểm:</Text>
                                       <Text className="text-red-500 font-semibold">+{group.priceIncrease1.toLocaleString()}đ/giờ</Text>
@@ -766,7 +721,7 @@ const DetailFacility: React.FC = () => {
                           <div className="mb-3">
                             <Text strong className="block mb-2">Giải thưởng:</Text>
                             <ul className="list-disc pl-5 text-sm">
-                              {event.prizes.map((prize, index) => (
+                              {event.prizes.map((prize: {position: number; prize: string}, index: number) => (
                                 <li key={index}>
                                   <Text>Hạng {prize.position}: {prize.prize}</Text>
                                 </li>
@@ -845,7 +800,7 @@ const DetailFacility: React.FC = () => {
                 <div className="text-center p-4 bg-white rounded-lg shadow-sm">
                   <Title level={1} className="m-0 text-blue-600 text-3xl md:text-5xl">{facility.avgRating.toFixed(1)}</Title>
                   <Rate disabled defaultValue={facility.avgRating} allowHalf className="my-2" />
-                  <Text className="block mt-1 md:mt-2 text-sm text-gray-500">{facility.numberOfRatings || 0} đánh giá</Text>
+                  <Text className="block mt-1 md:mt-2 text-sm text-gray-500">{facility.numberOfRating || 0} đánh giá</Text>
                 </div>
                 
                 {/* Rating Distribution */}

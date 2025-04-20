@@ -42,9 +42,9 @@ const VoucherDetailModal: React.FC<VoucherDetailModalProps> = ({
           {voucher.name}
         </Descriptions.Item>
         
-        <Descriptions.Item label="Mã voucher">
+        {/* <Descriptions.Item label="Mã voucher">
           {voucher.code}
-        </Descriptions.Item>
+        </Descriptions.Item> */}
         
         <Descriptions.Item label="Trạng thái">
           <Badge 

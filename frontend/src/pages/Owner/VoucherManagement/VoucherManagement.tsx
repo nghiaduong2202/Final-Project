@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { Button, Select, Card, Typography, Radio, Modal, Input } from 'antd';
 import { PlusOutlined, ArrowRightOutlined, SearchOutlined } from '@ant-design/icons';
 import { Voucher, VoucherFormData } from '@/types/voucher.type';
-import { mockVouchers } from '@/mocks/voucher/voucherData';
-import { mockFacilitiesDropdown } from '@/mocks/facility/mockFacilities';
 import { getVoucherStatus } from '@/utils/voucherUtils';
 import voucherImage from '@/assets/Owner/content/voucher.png';
+import { useAppDispatch, useAppSelector } from '@/hooks/reduxHooks';
+import { fetchVouchers, updateVoucher, deleteVoucher, setSelectedFacilityId } from '@/store/slices/voucherSlice';
+import { RootState } from '@/store';
+import { facilityService, FacilityDropdownItem } from '@/services/facility.service';
 
 // Components
 import VoucherTable from './components/VoucherTable';
@@ -21,14 +23,17 @@ const SELECTED_FACILITY_KEY = 'owner_selected_facility_id';
 
 const VoucherManagement: React.FC = () => {
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
+  
+  // Redux state
+  const { vouchers, isLoading, error } = useAppSelector((state: RootState) => state.voucher);
+  const selectedFacilityId = useAppSelector((state: RootState) => state.voucher.selectedFacilityId);
 
   // States
-  const [selectedFacilityId, setSelectedFacilityId] = useState<string>('');
-  const [vouchers, setVouchers] = useState<Voucher[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [facilities, setFacilities] = useState<FacilityDropdownItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState<string>('all');
+  const [facilityLoading, setFacilityLoading] = useState(false);
   
   // Modal states
   const [detailModalVisible, setDetailModalVisible] = useState(false);
@@ -44,41 +49,41 @@ const VoucherManagement: React.FC = () => {
     { value: 'expired', label: 'Đã kết thúc' }
   ];
 
-  // Load initial facility from localStorage
+  // Load facilities dropdown
   useEffect(() => {
-    const savedFacilityId = localStorage.getItem(SELECTED_FACILITY_KEY);
-    const initialFacilityId = savedFacilityId || (mockFacilitiesDropdown.length > 0 ? mockFacilitiesDropdown[0].id : '');
-    
-    if (initialFacilityId) {
-      setSelectedFacilityId(initialFacilityId);
-      fetchVouchers();
-    }
-  }, []);
-
-  // Fetch vouchers (mock function)
-  const fetchVouchers = () => {
-    setLoading(true);
-    setError(null);
-    
-    // Simulate API call with setTimeout
-    setTimeout(() => {
+    const fetchFacilities = async () => {
+      setFacilityLoading(true);
       try {
-        // In real implementation, this would be filtered by facilityId
-        setVouchers(mockVouchers);
-        setLoading(false);
+        const response = await facilityService.getFacilitiesDropdown();
+        setFacilities(response);
+        
+        // Get initial facility ID
+        const savedFacilityId = localStorage.getItem(SELECTED_FACILITY_KEY);
+        const isValidSavedId = savedFacilityId && response.some((f: FacilityDropdownItem) => f.id === savedFacilityId);
+        const initialFacilityId = isValidSavedId ? savedFacilityId : (response.length > 0 ? response[0].id : '');
+        
+        if (initialFacilityId) {
+          if (initialFacilityId !== savedFacilityId) {
+            localStorage.setItem(SELECTED_FACILITY_KEY, initialFacilityId);
+          }
+          dispatch(setSelectedFacilityId(initialFacilityId));
+          dispatch(fetchVouchers(initialFacilityId));
+        }
       } catch (error) {
-        setError('Có lỗi xảy ra khi tải dữ liệu. Vui lòng thử lại sau.');
-        setLoading(false);
-        console.error('Error fetching vouchers:', error);
+        console.error('Error fetching facilities:', error);
+      } finally {
+        setFacilityLoading(false);
       }
-    }, 500);
-  };
+    };
+    
+    fetchFacilities();
+  }, [dispatch]);
 
   // Handle facility change
   const handleFacilityChange = (value: string) => {
-    setSelectedFacilityId(value);
+    dispatch(setSelectedFacilityId(value));
     localStorage.setItem(SELECTED_FACILITY_KEY, value);
-    fetchVouchers();
+    dispatch(fetchVouchers(value));
   };
 
   // Navigate to create voucher page
@@ -88,13 +93,29 @@ const VoucherManagement: React.FC = () => {
 
   // Handle delete voucher
   const handleDeleteVoucher = (voucherId: number) => {
-    // Filter out the deleted voucher
-    setVouchers(prevVouchers => prevVouchers.filter(voucher => voucher.id !== voucherId));
-    
-    // Show success message
-    Modal.success({
-      title: 'Xóa voucher thành công',
-      content: 'Voucher đã được xóa khỏi hệ thống.'
+    Modal.confirm({
+      title: 'Xác nhận xóa',
+      content: 'Bạn có chắc chắn muốn xóa voucher này?',
+      okText: 'Xóa',
+      okType: 'danger',
+      cancelText: 'Hủy',
+      onOk: async () => {
+        try {
+          await dispatch(deleteVoucher(voucherId)).unwrap();
+          
+          // Show success message
+          Modal.success({
+            title: 'Xóa voucher thành công',
+            content: 'Voucher đã được xóa khỏi hệ thống.'
+          });
+        } catch (error) {
+          console.error('Error deleting voucher:', error);
+          Modal.error({
+            title: 'Lỗi',
+            content: 'Có lỗi xảy ra khi xóa voucher. Vui lòng thử lại sau.'
+          });
+        }
+      }
     });
   };
 
@@ -111,34 +132,28 @@ const VoucherManagement: React.FC = () => {
   };
 
   // Handle save voucher
-  const handleSaveVoucher = (values: VoucherFormData) => {
+  const handleSaveVoucher = async (values: VoucherFormData) => {
     if (!currentVoucher) return;
     
     setSubmitting(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      // Create updated voucher
-      const updatedVoucher: Voucher = {
-        ...currentVoucher,
+    try {
+      // Create updated voucher data
+      const updateData: Partial<Voucher> = {
+        id: currentVoucher.id,
         name: values.name,
-        code: values.code || currentVoucher.code,
+        code: values.code,
         startDate: values.startDate,
         endDate: values.endDate,
         voucherType: values.voucherType,
         discount: values.discount,
         minPrice: values.minPrice,
         maxDiscount: values.maxDiscount,
-        amount: values.amount,
-        updatedAt: new Date().toISOString()
+        amount: values.amount
       };
       
-      // Update vouchers list
-      setVouchers(prevVouchers => 
-        prevVouchers.map(voucher => 
-          voucher.id === currentVoucher.id ? updatedVoucher : voucher
-        )
-      );
+      // Dispatch update action
+      await dispatch(updateVoucher(updateData)).unwrap();
       
       setSubmitting(false);
       setEditModalVisible(false);
@@ -148,7 +163,15 @@ const VoucherManagement: React.FC = () => {
         title: 'Cập nhật thành công',
         content: 'Thông tin voucher đã được cập nhật thành công.'
       });
-    }, 1000);
+    } catch (error) {
+      console.error('Error updating voucher:', error);
+      setSubmitting(false);
+      
+      Modal.error({
+        title: 'Lỗi',
+        content: 'Có lỗi xảy ra khi cập nhật voucher. Vui lòng thử lại sau.'
+      });
+    }
   };
 
   // Filter and search vouchers
@@ -160,7 +183,7 @@ const VoucherManagement: React.FC = () => {
     // Filter by search term
     const searchMatch = !searchTerm || 
       voucher.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      voucher.code.toLowerCase().includes(searchTerm.toLowerCase());
+      voucher.code?.toLowerCase().includes(searchTerm.toLowerCase());
     
     return statusMatch && searchMatch;
   });
@@ -207,8 +230,9 @@ const VoucherManagement: React.FC = () => {
             value={selectedFacilityId || undefined}
             onChange={handleFacilityChange}
             popupMatchSelectWidth={false}
+            loading={facilityLoading}
           >
-            {mockFacilitiesDropdown.map((facility) => (
+            {facilities.map((facility) => (
               <Option key={facility.id} value={facility.id}>
                 {facility.name}
               </Option>
@@ -246,7 +270,7 @@ const VoucherManagement: React.FC = () => {
           <div className="p-4 bg-red-100 text-red-700 rounded-lg">
             {error}
           </div>
-        ) : loading ? (
+        ) : isLoading ? (
           <div className="flex justify-center items-center h-64">
             <p className="text-lg">Đang tải dữ liệu...</p>
           </div>
@@ -264,7 +288,7 @@ const VoucherManagement: React.FC = () => {
         ) : (
           <VoucherTable
             vouchers={filteredVouchers}
-            loading={loading}
+            loading={isLoading}
             onView={handleViewVoucher}
             onEdit={handleEditVoucher}
             onDelete={handleDeleteVoucher}

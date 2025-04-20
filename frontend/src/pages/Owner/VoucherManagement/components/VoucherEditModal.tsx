@@ -171,13 +171,13 @@ const VoucherEditModal: React.FC<VoucherEditModalProps> = ({
             <Input placeholder="Nhập tên voucher" />
           </Form.Item>
 
-          <Form.Item
+          {/* <Form.Item
             name="code"
             label="Mã voucher"
             rules={[{ required: true, message: 'Vui lòng nhập mã voucher' }]}
           >
             <Input placeholder="Nhập mã voucher" />
-          </Form.Item>
+          </Form.Item> */}
 
           <Form.Item
             name="voucherType"

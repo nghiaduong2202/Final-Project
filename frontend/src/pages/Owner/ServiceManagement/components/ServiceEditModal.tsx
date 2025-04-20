@@ -1,6 +1,6 @@
 import React from 'react';
 import { Modal, Form, Input, Typography, Select, InputNumber, Button } from 'antd';
-import { Service, UpdatedServiceValues } from '@/types/service.type';
+import { Service, UpdatedServiceValues, UnitEnum } from '@/types/service.type';
 import { Sport } from '@/types/sport.type';
 import { getSportNameInVietnamese } from '@/utils/translateSport';
 
@@ -111,7 +111,6 @@ const ServiceEditModal: React.FC<ServiceEditModalProps> = ({
               <Option value="rental">Cho thuê</Option>
               <Option value="coaching">Huấn luyện</Option>
               <Option value="equipment">Thiết bị</Option>
-              <Option value="food">Đồ uống/Thực phẩm</Option>
               <Option value="other">Khác</Option>
             </Select>
           </Form.Item>
@@ -151,12 +150,8 @@ const ServiceEditModal: React.FC<ServiceEditModalProps> = ({
               rules={[{ required: true, message: 'Vui lòng nhập đơn vị tính' }]}
             >
               <Select placeholder="Chọn đơn vị tính">
-                <Option value="giờ">Giờ</Option>
-                <Option value="ngày">Ngày</Option>
-                <Option value="buổi">Buổi</Option>
-                <Option value="chai">Chai</Option>
-                <Option value="cái">Cái</Option>
-                <Option value="bộ">Bộ</Option>
+                <Option value={UnitEnum.TIME}>Giờ</Option>
+                <Option value={UnitEnum.QUANTITY}>Sản phẩm</Option>
               </Select>
             </Form.Item>
           </div>

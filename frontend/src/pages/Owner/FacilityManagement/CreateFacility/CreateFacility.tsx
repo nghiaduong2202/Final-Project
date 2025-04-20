@@ -218,12 +218,17 @@ const CreateFacility: React.FC = () => {
         }
       } else if (current === 2) {
         // Validate field groups
-        if (formData.selectedSports.length === 0) {
-          message.error('Vui lòng chọn ít nhất một môn thể thao');
+        const hasSelectedSports = formData.selectedSports.length > 0;
+        const hasCompositeSport = formData.fieldGroups.some(group => group.sportIds.length > 1);
+        const hasFieldGroups = formData.fieldGroups.length > 0;
+        
+        // Cho phép trường hợp không có selectedSports nào khi tạo sân tổng hợp
+        if (!hasSelectedSports && !hasCompositeSport) {
+          message.error('Vui lòng chọn ít nhất một môn thể thao hoặc tạo sân tổng hợp');
           return;
         }
         
-        if (formData.fieldGroups.length === 0) {
+        if (!hasFieldGroups) {
           message.error('Vui lòng tạo ít nhất một nhóm sân');
           return;
         }

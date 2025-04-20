@@ -4,7 +4,9 @@ import { Form, Input, InputNumber, Select, DatePicker, Button, Card, Typography,
 import { ArrowLeftOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { VoucherFormData } from '@/types/voucher.type';
-import { mockFacilitiesDropdown } from '@/mocks/facility/mockFacilities';
+import { facilityService, FacilityDropdownItem } from '@/services/facility.service';
+import { useAppDispatch } from '@/hooks/reduxHooks';
+import { createVoucher } from '@/store/slices/voucherSlice';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -28,14 +30,44 @@ interface VoucherFormValues {
 
 const CreateVoucher: React.FC = () => {
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
   const [form] = Form.useForm();
   
   // States
-  const [selectedFacilityId, setSelectedFacilityId] = useState<string>(() => {
-    return localStorage.getItem(SELECTED_FACILITY_KEY) || '';
-  });
+  const [facilities, setFacilities] = useState<FacilityDropdownItem[]>([]);
+  const [selectedFacilityId, setSelectedFacilityId] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
   const [voucherType, setVoucherType] = useState<'cash' | 'percent'>('cash');
+  const [facilityLoading, setFacilityLoading] = useState(false);
+
+  // Load facilities dropdown
+  useEffect(() => {
+    const fetchFacilities = async () => {
+      setFacilityLoading(true);
+      try {
+        const response = await facilityService.getFacilitiesDropdown();
+        setFacilities(response);
+        
+        // Get initial facility ID
+        const savedFacilityId = localStorage.getItem(SELECTED_FACILITY_KEY);
+        const isValidSavedId = savedFacilityId && response.some((f: FacilityDropdownItem) => f.id === savedFacilityId);
+        const initialFacilityId = isValidSavedId ? savedFacilityId : (response.length > 0 ? response[0].id : '');
+        
+        if (initialFacilityId) {
+          if (initialFacilityId !== savedFacilityId) {
+            localStorage.setItem(SELECTED_FACILITY_KEY, initialFacilityId);
+          }
+          setSelectedFacilityId(initialFacilityId);
+        }
+      } catch (error) {
+        console.error('Error fetching facilities:', error);
+      } finally {
+        setFacilityLoading(false);
+      }
+    };
+    
+    fetchFacilities();
+  }, []);
 
   // Xử lý khi chọn cơ sở
   const handleFacilityChange = (value: string) => {
@@ -81,7 +113,7 @@ const CreateVoucher: React.FC = () => {
       content: 'Bạn có chắc chắn muốn tạo voucher này?',
       okText: 'Xác nhận',
       cancelText: 'Hủy',
-      onOk() {
+      onOk: async () => {
         setSubmitting(true);
 
         // Xử lý giá trị maxDiscount cho loại voucher cash
@@ -101,16 +133,19 @@ const CreateVoucher: React.FC = () => {
           minPrice: finalValues.minPrice,
           maxDiscount: finalValues.maxDiscount,
           amount: finalValues.amount,
-          facilityId: selectedFacilityId,
+          // facilityId: selectedFacilityId,
         };
 
-        // Simulate API call
-        setTimeout(() => {
-          console.log('Submitted voucher data:', voucherData);
+        try {
+          await dispatch(createVoucher({ facilityId: selectedFacilityId, voucherData })).unwrap();
           message.success('Tạo voucher thành công');
-          setSubmitting(false);
           navigate('/owner/voucher-management');
-        }, 1000);
+        } catch (error) {
+          message.error('Có lỗi xảy ra khi tạo voucher. Vui lòng thử lại sau.');
+          console.error('Error creating voucher:', error);
+        } finally {
+          setSubmitting(false);
+        }
       }
     });
   };
@@ -160,8 +195,9 @@ const CreateVoucher: React.FC = () => {
                   style={{ width: '100%' }}
                   value={selectedFacilityId || undefined}
                   onChange={handleFacilityChange}
+                  loading={facilityLoading}
                 >
-                  {mockFacilitiesDropdown.map((facility) => (
+                  {facilities.map((facility) => (
                     <Option key={facility.id} value={facility.id}>
                       {facility.name}
                     </Option>
@@ -181,7 +217,7 @@ const CreateVoucher: React.FC = () => {
               </Form.Item>
             </Col>
 
-            <Col xs={24} md={12}>
+            {/* <Col xs={24} md={12}>
               <Form.Item
                 name="code"
                 label="Mã Voucher"
@@ -189,7 +225,7 @@ const CreateVoucher: React.FC = () => {
               >
                 <Input placeholder="Nhập mã voucher (VD: WELCOME2023)" style={{ textTransform: 'uppercase' }} />
               </Form.Item>
-            </Col>
+            </Col> */}
 
             {/* Thời gian áp dụng */}
             <Col span={24}>

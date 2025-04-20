@@ -4,8 +4,7 @@ import { Button, Select, Card, Typography, Modal, Input, Radio, message } from '
 import { PlusOutlined, ArrowRightOutlined, SearchOutlined } from '@ant-design/icons';
 import { Service, UpdatedServiceValues, ServiceType } from '@/types/service.type';
 import { serviceService } from '@/services/service.service';
-import { facilityService } from '@/services/facility.service';
-import { FacilityDropdownItem } from '@/services/facility.service';
+import { facilityService, FacilityDropdownItem } from '@/services/facility.service';
 import serviceImage from '@/assets/Owner/content/service.png';
 import { formatPrice } from '@/utils/statusUtils';
 import { sportService } from '@/services/sport.service';
@@ -70,7 +69,6 @@ const ServiceManagement: React.FC = () => {
     { value: 'all', label: 'Tất cả' },
     { value: 'rental', label: 'Cho thuê' },
     { value: 'coaching', label: 'Huấn luyện' },
-    { value: 'food', label: 'Thức ăn' },
     { value: 'equipment', label: 'Thiết bị' },
     { value: 'other', label: 'Khác' }
   ];
@@ -90,11 +88,20 @@ const ServiceManagement: React.FC = () => {
           setSports(sportsData);
         }
         
-        // Lấy facilityId từ localStorage hoặc sử dụng cơ sở đầu tiên
+        // Lấy facilityId từ localStorage
         const savedFacilityId = localStorage.getItem(SELECTED_FACILITY_KEY);
-        const initialFacilityId = savedFacilityId || (facilitiesData.length > 0 ? facilitiesData[0].id : '');
+        
+        // Kiểm tra xem savedFacilityId có còn hợp lệ không (có tồn tại trong danh sách facilities không)
+        const isValidSavedId = savedFacilityId && facilitiesData.some(f => f.id === savedFacilityId);
+        
+        // Nếu ID trong localStorage không hợp lệ, sử dụng ID đầu tiên trong danh sách
+        const initialFacilityId = isValidSavedId ? savedFacilityId : (facilitiesData.length > 0 ? facilitiesData[0].id : '');
         
         if (initialFacilityId) {
+          // Nếu ID đã thay đổi, cập nhật lại localStorage
+          if (initialFacilityId !== savedFacilityId) {
+            localStorage.setItem(SELECTED_FACILITY_KEY, initialFacilityId);
+          }
           setSelectedFacilityId(initialFacilityId);
           fetchServices(initialFacilityId);
         }
