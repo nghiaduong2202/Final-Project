@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Dropdown, Avatar, Button, MenuProps } from 'antd';
-import { UserOutlined, LogoutOutlined, DashboardOutlined, MessageOutlined, CalendarOutlined, HeartOutlined } from '@ant-design/icons';
+import { UserOutlined, LogoutOutlined, DashboardOutlined, CalendarOutlined, HeartOutlined, TeamOutlined , TrophyOutlined} from '@ant-design/icons';
 import { useAppSelector, useAppDispatch } from '@/hooks/reduxHooks';
 import { logout, resetAuthChecks } from '@/store/slices/userSlice';
 import LoginModal from './LoginModal';
@@ -58,12 +58,7 @@ const TopbarProfile: React.FC = () => {
       onClick: () => navigate('/owner')
     }    
     ] : []),
-    ...(user?.role === 'player' ? [{
-      key: 'messages',
-      icon: <MessageOutlined />,
-      label: 'Tin nhắn',
-      onClick: () => navigate('/user/chat')
-    },    
+    ...(user?.role === 'player' ? [    
     {
       key: 'bookings',
       icon: <CalendarOutlined />,
@@ -75,6 +70,18 @@ const TopbarProfile: React.FC = () => {
       icon: <HeartOutlined />,
       label: 'Danh sách yêu thích',
       onClick: () => navigate('/user/favorite')
+    },
+    {
+      key: 'events',
+      icon: <TrophyOutlined />,
+      label: 'Sự kiện tham gia',
+      onClick: () => navigate('/user/events/manage')
+    },
+    {
+      key: 'playmate',
+      icon: <TeamOutlined />,
+      label: 'Quản lý tìm bạn chơi',
+      onClick: () => navigate('/user/playmate/manage')
     }
   ] : []),
     {

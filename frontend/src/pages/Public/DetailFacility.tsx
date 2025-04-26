@@ -16,7 +16,8 @@ import {
   Avatar,
   Row,
   Col,
-  Divider
+  Divider,
+  Modal
 } from 'antd';
 import { 
   EnvironmentOutlined, 
@@ -38,10 +39,14 @@ import type { Service } from '@/types/service.type';
 import type { Facility } from '@/types/facility.type';
 import type { FieldGroup } from '@/types/field.type';
 import type { Voucher } from '@/types/voucher.type';
+import type { Event, EventPrize, EventType } from '@/types/event.type';
 import { getSportNameInVietnamese } from '@/utils/translateSport';
 import { getMockCoordinates } from '@/utils/geocoding';
 import MapLocation from '@/components/MapLocation';
 import { facilityService } from '@/services/facility.service';
+import { reviewService } from '@/services/review.service';
+import { useAppSelector, useAppDispatch } from '@/hooks/reduxHooks';
+import { showLoginModal } from '@/store/slices/userSlice';
 import dayjs from 'dayjs';
 
 // Import CSS ghi đè Ant Design
@@ -50,84 +55,73 @@ import '@/styles/AntdOverride.css';
 
 const { Title, Text, Paragraph } = Typography;
 
-// Interface for reviews - we'll use this until a proper type is defined
+// Interface for reviews based on API response
 interface Review {
-  id: string;
-  userName: string;
-  userAvatar: string;
-  bookingId: string;
-  service: string;
+  id: number;
   rating: number;
   comment: string;
-  timestamp: string;
-  images?: string[];
-  reply?: {
-    content: string;
-    timestamp: string;
+  imageUrl: string[];
+  reviewAt: string;
+  feedbackAt?: string;
+  feedback?: string;
+  booking: {
+    id: string;
+    startTime: string;
+    endTime: string;
+    createdAt: string;
+    updatedAt: string;
+    status: string;
+    player: {
+      id: string;
+      name: string;
+      email: string;
+      password: string;
+      phoneNumber: string;
+      avatarUrl: string | null;
+      gender: string | null;
+      dob: string | null;
+      bankAccount: string | null;
+      role: string;
+      createdAt: string;
+      updatedAt: string;
+    };
+    bookingSlots: {
+      id: number;
+      date: string;
+    }[];
+    additionalServices: {
+      id: string;
+      name: string;
+      price: number;
+      amount: number;
+    }[];
   };
-  status: 'pending' | 'replied';
 }
 
-// Mock review data
-const mockReviews: Review[] = [
-  {
-    id: '1',
-    userName: 'Nguyễn Văn A',
-    userAvatar: 'https://randomuser.me/api/portraits/men/32.jpg',
-    bookingId: 'B0012345',
-    service: 'Sân cầu lông - Sân 3',
-    rating: 5,
-    comment: 'Sân rất tốt, nhân viên phục vụ chu đáo. Tôi rất hài lòng với trải nghiệm tại đây.',
-    timestamp: '2023-12-15T09:30:00Z',
-    images: [
-      'https://picsum.photos/id/26/200/200',
-      'https://picsum.photos/id/27/200/200'
-    ],
-    status: 'replied',
-    reply: {
-      content: 'Cảm ơn bạn đã đánh giá tốt cho sân của chúng tôi. Chúng tôi rất vui khi bạn có trải nghiệm tốt và mong sẽ được phục vụ bạn trong thời gian tới!',
-      timestamp: '2023-12-15T10:30:00Z'
-    }
-  },
-  {
-    id: '2',
-    userName: 'Trần Thị B',
-    userAvatar: 'https://randomuser.me/api/portraits/women/44.jpg',
-    bookingId: 'B0012346',
-    service: 'Sân cầu lông - Sân 2',
-    rating: 4,
-    comment: 'Sân đẹp, sạch sẽ. Tuy nhiên tôi nghĩ ánh sáng có thể được cải thiện thêm.',
-    timestamp: '2023-12-10T15:45:00Z',
-    status: 'pending'
-  },
-  {
-    id: '3',
-    userName: 'Lê Văn C',
-    userAvatar: 'https://randomuser.me/api/portraits/men/62.jpg',
-    bookingId: 'B0012350',
-    service: 'Sân cầu lông - Sân 1',
-    rating: 3,
-    comment: 'Sân ở mức trung bình, không quá tệ nhưng không tốt lắm. Tôi nghĩ cần cải thiện về chất lượng mặt sân và nhà vệ sinh.',
-    timestamp: '2023-12-05T18:20:00Z',
-    status: 'replied',
-    reply: {
-      content: 'Cảm ơn bạn đã góp ý. Chúng tôi đang có kế hoạch nâng cấp mặt sân và cải thiện các tiện ích trong thời gian tới.',
-      timestamp: '2023-12-05T20:30:00Z'
-    }
-  }
-];
+// Create a custom extended Event interface
+interface FacilityEvent extends Omit<Event, 'eventType'> {
+  currentParticipants?: number;
+  maxParticipants?: number;
+  prizes?: EventPrize[];
+  eventType?: EventType;
+  image?: string;
+}
 
 const DetailFacility: React.FC = () => {
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
   const { facilityId } = useParams<{ facilityId: string }>();
   const [activeTab, setActiveTab] = useState('general');
+  
+  // Get auth state from Redux
+  const { isAuthenticated, user } = useAppSelector(state => state.user);
   
   // States for data
   const [facility, setFacility] = useState<Facility | null>(null);
   const [fieldGroups, setFieldGroups] = useState<FieldGroup[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
-  const [events, setEvents] = useState<any[]>([]);
+  const [events, setEvents] = useState<FacilityEvent[]>([]);
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
   const [mainImage, setMainImage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -135,15 +129,25 @@ const DetailFacility: React.FC = () => {
   const [visibleReplies, setVisibleReplies] = useState<{ [key: string]: boolean }>({});
   const [isFavorite, setIsFavorite] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<{ [key: string]: boolean }>({});
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
+  const [confirmModalType, setConfirmModalType] = useState<'add' | 'remove'>('add');
 
-  // Initialize all replies as visible
+  // Check if facility is in user's favorites when component mounts
   useEffect(() => {
-    const initialVisibility: { [key: string]: boolean } = {};
-    mockReviews.forEach(review => {
-      initialVisibility[review.id] = true;
-    });
-    setVisibleReplies(initialVisibility);
-  }, []);
+    const checkFavoriteStatus = async () => {
+      if (isAuthenticated && user?.role === 'player' && facilityId) {
+        try {
+          const favorites = await facilityService.getFavoriteFacility();
+          const isFacilityFavorite = favorites.some(fav => fav.id === facilityId);
+          setIsFavorite(isFacilityFavorite);
+        } catch (error) {
+          console.error('Error checking favorite status:', error);
+        }
+      }
+    };
+
+    checkFavoriteStatus();
+  }, [isAuthenticated, user, facilityId]);
 
   const toggleReplyVisibility = (reviewId: string) => {
     setVisibleReplies(prev => ({
@@ -184,8 +188,22 @@ const DetailFacility: React.FC = () => {
         setEvents(facilityData.events || []);
         setVouchers(facilityData.vouchers || []);
 
-        // Set mock reviews (only data that needs to stay mocked)
-        setReviews(mockReviews);
+        // Fetch real reviews from API
+        try {
+          const reviewsData = await reviewService.getListReviewByFacilityId(facilityId);
+          setReviews(reviewsData);
+          
+          // Initialize visible replies for each review
+          const initialVisibility: { [key: string]: boolean } = {};
+          reviewsData.forEach((review: Review) => {
+            initialVisibility[review.id.toString()] = true;
+          });
+          setVisibleReplies(initialVisibility);
+        } catch (reviewError) {
+          console.error('Error fetching reviews:', reviewError);
+          // In case of error, set empty array
+          setReviews([]);
+        }
         
         setError(null);
       } catch (err) {
@@ -240,8 +258,40 @@ const DetailFacility: React.FC = () => {
   };
 
   const toggleFavorite = () => {
-    setIsFavorite(!isFavorite);
-    message.success(isFavorite ? 'Đã xóa khỏi danh sách yêu thích' : 'Đã thêm vào danh sách yêu thích');
+    // Check if user is authenticated and has player role
+    if (!isAuthenticated || user?.role !== 'player') {
+      // Show login modal if not authenticated
+      dispatch(showLoginModal({ path: `/facility/${facilityId}`, role: 'player' }));
+      message.info('Vui lòng đăng nhập với vai trò người chơi để thêm cơ sở vào danh sách yêu thích');
+      return;
+    }
+
+    // If authenticated, show confirmation modal
+    setConfirmModalType(isFavorite ? 'remove' : 'add');
+    setConfirmModalVisible(true);
+  };
+
+  const handleConfirmFavorite = async () => {
+    if (!facilityId) return;
+
+    try {
+      if (isFavorite) {
+        // Remove from favorites
+        await facilityService.removeFavoriteFacility(facilityId);
+        setIsFavorite(false);
+        message.success('Đã xóa khỏi danh sách yêu thích');
+      } else {
+        // Add to favorites
+        await facilityService.addFavoriteFacility(facilityId);
+        setIsFavorite(true);
+        message.success('Đã thêm vào danh sách yêu thích');
+      }
+    } catch (error) {
+      console.error('Error updating favorite status:', error);
+      message.error('Có lỗi xảy ra. Vui lòng thử lại sau');
+    } finally {
+      setConfirmModalVisible(false);
+    }
   };
 
   const handleMessageClick = () => {
@@ -309,6 +359,81 @@ const DetailFacility: React.FC = () => {
     );
   }
 
+  // Render the events tab content with fixed type reference
+  const renderEventsTab = () => (
+    <div>
+      <Title level={4} className="mb-3 md:mb-4 text-lg md:text-xl">Sự kiện & Giải đấu</Title>
+      {events.length > 0 ? (
+        <List
+          itemLayout="vertical"
+          dataSource={events}
+          renderItem={event => (
+            <Card 
+              className="mb-4 overflow-hidden" 
+              cover={
+                <img 
+                  alt={event.name} 
+                  src={event.image} 
+                  className="h-48 object-cover"
+                />
+              }
+            >
+              <div className="flex justify-between items-start mb-2">
+                <Title level={4} className="m-0 text-base md:text-lg">{event.name}</Title>
+                <Tag color={
+                  event.status === 'active' ? 'green' : 
+                  event.status === 'upcoming' ? 'blue' : 
+                  'default'
+                }>
+                  {event.status === 'active' ? 'Đang diễn ra' : 
+                    event.status === 'upcoming' ? 'Sắp diễn ra' : 
+                    'Đã kết thúc'}
+                </Tag>
+              </div>
+              
+              <Paragraph className="text-sm text-gray-600 mb-3">
+                {event.description}
+              </Paragraph>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
+                <div className="flex items-center">
+                  <CalendarOutlined className="mr-2 text-blue-500" />
+                  <Text className="text-sm">
+                    {dayjs(event.startDate).format('DD/MM/YYYY')} - {dayjs(event.endDate).format('DD/MM/YYYY')}
+                  </Text>
+                </div>
+                
+                {event.eventType === 'TOURNAMENT' && event.currentParticipants !== undefined && event.maxParticipants !== undefined && (
+                  <div className="flex items-center">
+                    <UserOutlined className="mr-2 text-blue-500" />
+                    <Text className="text-sm">
+                      {event.currentParticipants}/{event.maxParticipants} đã đăng ký
+                    </Text>
+                  </div>
+                )}
+              </div>
+              
+              {event.eventType === 'TOURNAMENT' && event.prizes && event.prizes.length > 0 && (
+                <div className="mb-3">
+                  <Text strong className="block mb-2">Giải thưởng:</Text>
+                  <ul className="list-disc pl-5 text-sm">
+                    {event.prizes.map((prize, index) => (
+                      <li key={index}>
+                        <Text>Hạng {prize.position}: {prize.prize}</Text>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </Card>
+          )}
+        />
+      ) : (
+        <Empty description="Hiện tại chưa có sự kiện hoặc giải đấu nào" />
+      )}
+    </div>
+  );
+
   return (
     <div className="w-full px-4 py-6">
       <div className="max-w-7xl mx-auto">
@@ -316,52 +441,52 @@ const DetailFacility: React.FC = () => {
         <section className="mb-6 md:mb-8">
           <Breadcrumb items={breadcrumbItems} className="mb-3 md:mb-4" />
 
-          <div className="flex flex-col sm:flex-row justify-between sm:items-center  gap-2">
+          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
             <Title level={2} className="m-0 text-xl md:text-2xl lg:text-3xl">{facility.name}</Title>
             {getStatusTag(facility.status)}
           </div>
           <div>              
-              <div className="flex items-center gap-3 mb-4 md:mb-6">
-                <Button 
-                  type="default"
-                  icon={isFavorite ? <HeartFilled style={{ color: '#ff4d4f' }}/> : <HeartOutlined />}
-                  onClick={toggleFavorite}
-                  className={isFavorite ? "border-red-400 text-red-500 hover:text-red-600 hover:border-red-500" : ""}
-                >
-                  {isFavorite ? 'Đã yêu thích' : 'Thêm vào yêu thích'}
-                </Button>
-                <Button 
-                  type="default"
-                  icon={<MessageOutlined />}
-                  onClick={handleMessageClick}
-                >
-                  Nhắn tin
-                </Button>                
-              </div>
+            <div className="flex items-center gap-3 mb-4 md:mb-6">
+              <Button 
+                type="default"
+                icon={isFavorite ? <HeartFilled style={{ color: '#ff4d4f' }}/> : <HeartOutlined />}
+                onClick={toggleFavorite}
+                className={isFavorite ? "border-red-400 text-red-500 hover:text-red-600 hover:border-red-500" : ""}
+              >
+                {isFavorite ? 'Đã yêu thích' : 'Thêm vào yêu thích'}
+              </Button>
+              <Button 
+                type="default"
+                icon={<MessageOutlined />}
+                onClick={handleMessageClick}
+              >
+                Nhắn tin
+              </Button>                
+            </div>
           </div>
 
           {/* Thay đổi layout hiển thị hình ảnh */}
           <div className="flex flex-col md:flex-row gap-2 md:gap-3 md:items-end">
             {/* Main image - ảnh chính */}            
-              <div className="relative w-full md:w-3/4" style={{ display: 'block' }}>
-                <div className="w-full h-full" style={{ display: 'block' }}>
-                  <Image
-                    src={mainImage || 'https://via.placeholder.com/800x400'}
-                    alt={facility.name}
-                    className="w-full rounded-lg"
-                    style={{ 
-                      height: '80vh', 
-                      maxHeight: '500px',
-                      objectFit: 'cover',
-                      display: 'block' // Ghi đè inline-block từ Ant Design
-                    }}
-                    preview={{
-                      mask: <div className="flex items-center justify-center"><ExpandOutlined /> Xem ảnh lớn</div>,
-                      toolbarRender: () => null,
-                    }}
-                  />
-                </div>
+            <div className="relative w-full md:w-3/4" style={{ display: 'block' }}>
+              <div className="w-full h-full" style={{ display: 'block' }}>
+                <Image
+                  src={mainImage || 'https://via.placeholder.com/800x400'}
+                  alt={facility.name}
+                  className="w-full rounded-lg"
+                  style={{ 
+                    height: '80vh', 
+                    maxHeight: '500px',
+                    objectFit: 'cover',
+                    display: 'block' // Ghi đè inline-block từ Ant Design
+                  }}
+                  preview={{
+                    mask: <div className="flex items-center justify-center"><ExpandOutlined /> Xem ảnh lớn</div>,
+                    toolbarRender: () => null,
+                  }}
+                />
               </div>
+            </div>
                         
             {/* Thumbnail gallery - các ảnh nhỏ */}
             <div className="flex gap-2 overflow-x-auto w-full md:w-1/4">
@@ -663,80 +788,7 @@ const DetailFacility: React.FC = () => {
               </div>
             )}
 
-            {activeTab === 'events' && (
-              <div>
-                <Title level={4} className="mb-3 md:mb-4 text-lg md:text-xl">Sự kiện & Giải đấu</Title>
-                {events.length > 0 ? (
-                  <List
-                    itemLayout="vertical"
-                    dataSource={events}
-                    renderItem={event => (
-                      <Card 
-                        className="mb-4 overflow-hidden" 
-                        cover={
-                          <img 
-                            alt={event.name} 
-                            src={event.image} 
-                            className="h-48 object-cover"
-                          />
-                        }
-                      >
-                        <div className="flex justify-between items-start mb-2">
-                          <Title level={4} className="m-0 text-base md:text-lg">{event.name}</Title>
-                          <Tag color={
-                              event.status === 'active' ? 'green' : 
-                              event.status === 'upcoming' ? 'blue' : 
-                              'default'
-                            }
-                          >
-                            {event.status === 'active' ? 'Đang diễn ra' : 
-                             event.status === 'upcoming' ? 'Sắp diễn ra' : 
-                             'Đã kết thúc'}
-                          </Tag>
-                        </div>
-                        
-                        <Paragraph className="text-sm text-gray-600 mb-3">
-                          {event.description}
-                        </Paragraph>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
-                          <div className="flex items-center">
-                            <CalendarOutlined className="mr-2 text-blue-500" />
-                            <Text className="text-sm">
-                              {dayjs(event.startDate).format('DD/MM/YYYY')} - {dayjs(event.endDate).format('DD/MM/YYYY')}
-                            </Text>
-                          </div>
-                          
-                          {event.eventType === 'TOURNAMENT' && (
-                            <div className="flex items-center">
-                              <UserOutlined className="mr-2 text-blue-500" />
-                              <Text className="text-sm">
-                                {event.currentParticipants}/{event.maxParticipants} đã đăng ký
-                              </Text>
-                            </div>
-                          )}
-                        </div>
-                        
-                        {event.eventType === 'TOURNAMENT' && event.prizes && (
-                          <div className="mb-3">
-                            <Text strong className="block mb-2">Giải thưởng:</Text>
-                            <ul className="list-disc pl-5 text-sm">
-                              {event.prizes.map((prize: {position: number; prize: string}, index: number) => (
-                                <li key={index}>
-                                  <Text>Hạng {prize.position}: {prize.prize}</Text>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </Card>
-                    )}
-                  />
-                ) : (
-                  <Empty description="Hiện tại chưa có sự kiện hoặc giải đấu nào" />
-                )}
-              </div>
-            )}
+            {activeTab === 'events' && renderEventsTab()}
 
             {activeTab === 'vouchers' && (
               <div>
@@ -797,35 +849,35 @@ const DetailFacility: React.FC = () => {
             <div className="bg-gradient-to-r from-blue-50 to-white p-4 mb-6 rounded-lg">
               <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-8">
                 {/* Rating Summary */}
-                <div className="text-center p-4 bg-white rounded-lg shadow-sm">
+                <div className="text-center p-4 bg-white rounded-lg shadow-sm mx-auto md:mx-0" style={{maxWidth: '200px'}}>
                   <Title level={1} className="m-0 text-blue-600 text-3xl md:text-5xl">{facility.avgRating.toFixed(1)}</Title>
                   <Rate disabled defaultValue={facility.avgRating} allowHalf className="my-2" />
                   <Text className="block mt-1 md:mt-2 text-sm text-gray-500">{facility.numberOfRating || 0} đánh giá</Text>
                 </div>
                 
                 {/* Rating Distribution */}
-                <div className="flex-1">
-                  <Title level={4} className="mb-3 text-base md:text-lg">Đánh giá từ người chơi</Title>
+                <div className="flex-1 w-full">
+                  <Title level={4} className="mb-3 text-base md:text-lg text-center md:text-left">Đánh giá từ người chơi</Title>
                   
-                  <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-3 max-w-lg mx-auto md:mx-0">
                     {[5, 4, 3, 2, 1].map(star => {
                       const count = reviews.filter(review => Math.floor(review.rating) === star).length;
                       const percentage = reviews.length > 0 ? (count / reviews.length) * 100 : 0;
                       
                       return (
                         <div key={star} className="flex items-center gap-3">
-                          <div className="flex items-center w-20">
+                          <div className="flex items-center w-16 md:w-20">
                             <Text className="mr-1 font-medium">{star}</Text>
                             <StarOutlined className="text-yellow-400 text-sm" />
                           </div>
-                          <div className="flex-1 bg-gray-100 rounded-full h-3">
+                          <div className="flex-1 bg-gray-100 rounded-full h-2 md:h-3">
                             <div 
-                              className="bg-yellow-400 h-3 rounded-full transition-all duration-300" 
+                              className="bg-yellow-400 h-2 md:h-3 rounded-full transition-all duration-300" 
                               style={{ width: `${percentage}%` }}
                             ></div>
                           </div>
-                          <Text className="w-12 text-right text-gray-500 text-sm">{count}</Text>
-                          <Text className="w-16 text-right text-gray-500 text-sm">({percentage.toFixed(0)}%)</Text>
+                          <Text className="w-8 md:w-12 text-right text-gray-500 text-xs md:text-sm">{count}</Text>
+                          <Text className="w-12 md:w-16 text-right text-gray-500 text-xs md:text-sm">({percentage.toFixed(0)}%)</Text>
                         </div>
                       );
                     })}
@@ -847,32 +899,31 @@ const DetailFacility: React.FC = () => {
               <div className="space-y-6">
                 {reviews.map(review => (
                   <div key={review.id} className="border-b pb-6 last:border-b-0">
-                    <div className="flex items-start gap-4">
+                    <div className="flex flex-col sm:flex-row items-start gap-4">
                       <Avatar 
-                        src={review.userAvatar} 
-                        size={56} 
+                        src={review.booking.player.avatarUrl}
+                        size={{ xs: 48, sm: 56 }}
                         icon={<UserOutlined />} 
-                        className="mt-1"
+                        className="mt-1 mx-auto sm:mx-0"
                       />
-                      <div className="flex-1">
+                      <div className="flex-1 w-full">
                         <div className="flex flex-wrap justify-between items-start gap-2 mb-2">
-                          <div>
-                            <Text strong className="text-base">{review.userName}</Text>
-                            <div className="flex items-center gap-2 my-1">
+                          <div className="w-full sm:w-auto">
+                            <Text strong className="text-base block text-center sm:text-left">{review.booking.player.name}</Text>
+                            <div className="flex items-center gap-2 my-1 justify-center sm:justify-start">
                               <Rate disabled defaultValue={review.rating} className="text-sm" />
                               <Text type="secondary" className="text-xs">
-                                {dayjs(review.timestamp).format('DD/MM/YYYY')}
+                                {dayjs(review.reviewAt).format('DD/MM/YYYY HH:mm')}
                               </Text>
-                            </div>
-                            <Text type="secondary" className="text-xs block mb-2">{review.service}</Text>
+                            </div>                            
                           </div>
                         </div>
                         
                         <Paragraph className="text-base mb-3">{review.comment}</Paragraph>
                         
-                        {review.images && review.images.length > 0 && (
-                          <div className="flex mt-2 mb-4 gap-2 overflow-x-auto pb-2">
-                            {review.images.map((image, index) => (
+                        {review.imageUrl && review.imageUrl.length > 0 && (
+                          <div className="flex flex-wrap mt-2 mb-4 gap-2 overflow-x-auto pb-2">
+                            {review.imageUrl.map((image, index) => (
                               <Image
                                 key={index}
                                 src={image}
@@ -885,13 +936,13 @@ const DetailFacility: React.FC = () => {
                           </div>
                         )}
                         
-                        {review.reply && (
+                        {review.feedback && (
                           <div className="mt-4">
                             <div 
-                              className="flex items-center cursor-pointer text-blue-600 hover:text-blue-800 mb-2"
-                              onClick={() => toggleReplyVisibility(review.id)}
+                              className="flex items-center cursor-pointer text-blue-600 hover:text-blue-800 mb-2 justify-center sm:justify-start"
+                              onClick={() => toggleReplyVisibility(review.id.toString())}
                             >
-                              {visibleReplies[review.id] ? (
+                              {visibleReplies[review.id.toString()] ? (
                                 <div className="flex items-center">
                                   <UserOutlined className="mr-1" />
                                   <Text className="text-blue-600">Ẩn phản hồi từ {facility.name}</Text>
@@ -904,15 +955,15 @@ const DetailFacility: React.FC = () => {
                               )}
                             </div>
                             
-                            {visibleReplies[review.id] && (
-                              <div className="bg-gray-50 p-4 rounded-md border-l-4 border-blue-400 ml-2">
-                                <div className="flex justify-between items-center mb-2">
+                            {visibleReplies[review.id.toString()] && (
+                              <div className="bg-gray-50 p-4 rounded-md border-l-4 border-blue-400 ml-0 sm:ml-2">
+                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2">
                                   <Text strong className="text-sm text-blue-600">{facility.name}</Text>
-                                  <Text type="secondary" className="text-xs">
-                                    {dayjs(review.reply.timestamp).format('DD/MM/YYYY')}
+                                  <Text type="secondary" className="text-xs mt-1 sm:mt-0">
+                                    {dayjs(review.feedbackAt).format('DD/MM/YYYY HH:mm')}
                                   </Text>
                                 </div>
-                                <Paragraph className="text-sm m-0">{review.reply.content}</Paragraph>
+                                <Paragraph className="text-sm m-0">{review.feedback}</Paragraph>
                               </div>
                             )}
                           </div>
@@ -950,6 +1001,26 @@ const DetailFacility: React.FC = () => {
             </div>
           </section>
       </div>
+
+      {/* Confirmation Modal for Add/Remove Favorite */}
+      <Modal
+        title={confirmModalType === 'add' ? "Thêm vào danh sách yêu thích" : "Xóa khỏi danh sách yêu thích"}
+        open={confirmModalVisible}
+        onOk={handleConfirmFavorite}
+        onCancel={() => setConfirmModalVisible(false)}
+        okText={confirmModalType === 'add' ? "Thêm" : "Xóa"}
+        cancelText="Hủy"
+        okButtonProps={{ 
+          danger: confirmModalType === 'remove',
+          type: confirmModalType === 'add' ? 'primary' : 'default'
+        }}
+      >
+        <p>
+          {confirmModalType === 'add' 
+            ? `Bạn có chắc chắn muốn thêm "${facility?.name}" vào danh sách yêu thích không?` 
+            : `Bạn có chắc chắn muốn xóa "${facility?.name}" khỏi danh sách yêu thích không?`}
+        </p>
+      </Modal>
     </div>
   );
 };

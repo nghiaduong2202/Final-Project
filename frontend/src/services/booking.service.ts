@@ -219,7 +219,8 @@ export const bookingService = {
       console.error('Error fetching booking schedule:', error);
       throw error;
     }
-  }
+  },
+
   
   
 };

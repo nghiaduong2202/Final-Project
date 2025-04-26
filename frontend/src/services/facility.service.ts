@@ -288,8 +288,36 @@ class FacilityService {
       throw error;
     }
   }
-  
 
+  async getFavoriteFacility(): Promise<Facility[]> {
+    try {
+      const response = await api.get(`/facility/favorite`);
+      return response.data;
+    } catch (error) {
+      console.error('API call failed:', error);
+      throw error;
+    }
+  }
+
+  async addFavoriteFacility(facilityId: string) {
+    try {
+      const response = await api.post(`/facility/${facilityId}/favorite`);
+      return response.data;
+    } catch (error) {
+      console.error('Error adding favorite facility:', error);
+      throw error;
+    }
+  }
+
+  async removeFavoriteFacility(facilityId: string) {
+    try {
+      const response = await api.delete(`/facility/${facilityId}/favorite`);
+      return response.data;
+    } catch (error) {
+      console.error('Error removing favorite facility:', error);  
+      throw error;
+    }
+  }
 }
 
 // Export instance of the service

@@ -1,19 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Select, Card, Typography, Radio, Modal, Input } from 'antd';
-import { PlusOutlined, ArrowRightOutlined, SearchOutlined } from '@ant-design/icons';
-import { Event, EventStatus } from '@/types/event.type';
+import { Button, Select, Card, Typography, Modal, Input, Tabs, Tag, Empty, Row, Col, Badge } from 'antd';
+import { PlusOutlined, SearchOutlined, CalendarOutlined, TeamOutlined } from '@ant-design/icons';
+import { Event, EventType } from '@/types/event.type';
 import { mockEvents } from '@/mocks/event/eventData';
 import { mockFacilitiesDropdown } from '@/mocks/facility/mockFacilities';
-import eventImage from '@/assets/Owner/content/event.png';
-import type { RadioChangeEvent } from 'antd';
+import { getRegistrationCountsByStatus } from '@/mocks/event/registrationData';
 
 // Components
 import EventTable from './components/EventTable';
 import EventDetailModal from './components/EventDetailModal';
 import EventEditModal from './components/EventEditModal';
+import RegistrationManagement from './components/RegistrationManagement';
 
 const { Title, Text } = Typography;
+const { TabPane } = Tabs;
 const { Option } = Select;
 
 // Local storage key
@@ -24,17 +25,21 @@ const EventManagement: React.FC = () => {
   
   // States
   const [events, setEvents] = useState<Event[]>([]);
-  const [selectedFacilityId, setSelectedFacilityId] = useState<string>('');
-  const [activeFilter, setActiveFilter] = useState<string>('all');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedFacility, setSelectedFacility] = useState<string | null>(null);
+  const [filter, setFilter] = useState<string>('all');
+  const [eventTypeFilter, setEventTypeFilter] = useState<EventType | 'all'>('all');
+  const [search, setSearch] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
 
   // Modal states
-  const [detailModalVisible, setDetailModalVisible] = useState(false);
-  const [editModalVisible, setEditModalVisible] = useState(false);
-  const [currentEvent, setCurrentEvent] = useState<Event | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [detailModalVisible, setDetailModalVisible] = useState<boolean>(false);
+  const [editModalVisible, setEditModalVisible] = useState<boolean>(false);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  
+  // Registration management
+  const [activeTab, setActiveTab] = useState<string>('events');
+  const [registrationManagementVisible, setRegistrationManagementVisible] = useState<boolean>(false);
+  const [selectedEventForRegistration, setSelectedEventForRegistration] = useState<Event | null>(null);
 
   // Filter options
   const filterOptions = [
@@ -42,6 +47,13 @@ const EventManagement: React.FC = () => {
     { value: 'active', label: 'Đang diễn ra' },
     { value: 'upcoming', label: 'Sắp diễn ra' },
     { value: 'expired', label: 'Đã kết thúc' }
+  ];
+
+  // Event type filter options
+  const eventTypeOptions = [
+    { value: 'all', label: 'Tất cả loại' },
+    { value: 'TOURNAMENT', label: 'Giải đấu' },
+    { value: 'DISCOUNT', label: 'Khuyến mãi' }
   ];
 
   // Load initial facility from localStorage
@@ -59,53 +71,70 @@ const EventManagement: React.FC = () => {
       if (initialFacilityId !== savedFacilityId) {
         localStorage.setItem(SELECTED_FACILITY_KEY, initialFacilityId);
       }
-      setSelectedFacilityId(initialFacilityId);
-      fetchEvents(initialFacilityId, activeFilter);
+      setSelectedFacility(initialFacilityId);
+      fetchEvents();
     }
   }, []);
 
-  // Fetch events based on selected facility and filter
-  const fetchEvents = (facilityId: string, filter: string) => {
+  const fetchEvents = useCallback(() => {
     setLoading(true);
-    setError(null);
     
-    // Simulate API call with setTimeout
+    // Simulate API call with a delay
     setTimeout(() => {
-      try {
-        let filteredEvents = mockEvents;
-        
-        // Filter by facility (in a real implementation)
-        if (facilityId) {
-          filteredEvents = filteredEvents.filter(event => event.facilityId === facilityId);
-        }
-        
-        // Filter by status if not 'all'
-        if (filter !== 'all') {
-          filteredEvents = filteredEvents.filter(event => event.status === filter as EventStatus);
-        }
-        
-        setEvents(filteredEvents);
-        setLoading(false);
-      } catch (error) {
-        setError('Có lỗi xảy ra khi tải dữ liệu. Vui lòng thử lại sau.');
-        setLoading(false);
-        console.error('Error fetching events:', error);
+      let filteredEvents = [...mockEvents];
+      
+      // Filter by facility if selected
+      if (selectedFacility) {
+        filteredEvents = filteredEvents.filter(event => event.facilityId === selectedFacility);
       }
+      
+      // Apply status filter
+      if (filter !== 'all') {
+        filteredEvents = filteredEvents.filter(event => event.status === filter);
+      }
+      
+      // Apply event type filter
+      if (eventTypeFilter !== 'all') {
+        filteredEvents = filteredEvents.filter(event => event.eventType === eventTypeFilter);
+      }
+      
+      // Apply search filter
+      if (search) {
+        const lowerCaseSearch = search.toLowerCase();
+        filteredEvents = filteredEvents.filter(
+          event => 
+            event.name.toLowerCase().includes(lowerCaseSearch) || 
+            event.description.toLowerCase().includes(lowerCaseSearch)
+        );
+      }
+      
+      setEvents(filteredEvents);
+      setLoading(false);
     }, 500);
-  };
+  }, [selectedFacility, filter, eventTypeFilter, search]);
+  
+  useEffect(() => {
+    fetchEvents();
+  }, [fetchEvents]);
 
   // Handle facility change
-  const handleFacilityChange = (value: string) => {
-    setSelectedFacilityId(value);
-    localStorage.setItem(SELECTED_FACILITY_KEY, value);
-    fetchEvents(value, activeFilter);
+  const handleFacilityChange = (value: string | null) => {
+    setSelectedFacility(value);
   };
 
   // Handle filter change
-  const handleFilterChange = (e: RadioChangeEvent) => {
-    const filter = e.target.value;
-    setActiveFilter(filter);
-    fetchEvents(selectedFacilityId, filter);
+  const handleFilterChange = (value: string) => {
+    setFilter(value);
+  };
+
+  // Handle event type filter change
+  const handleEventTypeFilterChange = (value: EventType | 'all') => {
+    setEventTypeFilter(value);
+  };
+
+  // Handle search change
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearch(e.target.value);
   };
 
   // Navigate to create event page
@@ -133,19 +162,19 @@ const EventManagement: React.FC = () => {
 
   // Handle view event details
   const handleViewEvent = (event: Event) => {
-    setCurrentEvent(event);
+    setSelectedEvent(event);
     setDetailModalVisible(true);
   };
 
   // Handle edit event
   const handleEditEvent = (event: Event) => {
-    setCurrentEvent(event);
+    setSelectedEvent(event);
     setEditModalVisible(true);
   };
 
   // Handle save updates and handle submitting state
   const handleSaveEvent = (updatedEvent: Event) => {
-    setSubmitting(true);
+    setLoading(true);
     
     // Simulate API call
     setTimeout(() => {
@@ -156,7 +185,7 @@ const EventManagement: React.FC = () => {
         )
       );
       
-      setSubmitting(false);
+      setLoading(false);
       setEditModalVisible(false);
       
       // Show success message
@@ -167,115 +196,200 @@ const EventManagement: React.FC = () => {
     }, 800);
   };
 
-  // Filter events by search term
-  const filteredEvents = events.filter(event => {
-    return !searchTerm || 
-      event.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      event.description.toLowerCase().includes(searchTerm.toLowerCase());
-  });
+  // New function for managing registrations
+  const handleManageRegistrations = (event: Event) => {
+    setSelectedEventForRegistration(event);
+    setRegistrationManagementVisible(true);
+    setActiveTab('registrations');
+  };
+
+  // Get registration count badge for an event
+  const getRegistrationBadge = (eventId: number) => {
+    const counts = getRegistrationCountsByStatus(eventId);
+    if (counts.total === 0) return null;
+    
+    return (
+      <Badge count={counts.pending} size="small">
+        <Tag color="blue" style={{ marginLeft: 8 }}>
+          <TeamOutlined /> {counts.total} đăng ký
+        </Tag>
+      </Badge>
+    );
+  };
 
   return (
-    <div className="flex flex-col w-full min-h-screen p-6">
-      {/* Banner Section */}
-      <Card className="mb-8">
-        <div className="flex flex-wrap justify-between items-center gap-6">
-          <div className="flex-1 min-w-[300px]">
-            <Title level={3} className="mb-4">
-              Tạo ngay Event để thu hút người chơi đến cơ sở của bạn nào!
-            </Title>
-            <Text className="block mb-6 text-gray-600">
-              Cơ hội tăng đến 43% đơn đặt sân và 28% doanh thu khi tạo Event cho Khách hàng.
-            </Text>
-            <Button 
-              type="primary" 
-              size="large"
-              icon={<PlusOutlined />}
-              onClick={handleCreateEvent}
-              className="bg-[#cc440a] hover:bg-[#b33a08]"
-            >
-              Tạo Event ngay! <ArrowRightOutlined />
-            </Button>
-          </div>
-          <div className="flex-shrink-0 w-full max-w-[400px]">
-            <img src={eventImage} alt="Event Promotion" className="w-full h-auto rounded-lg" />
-          </div>
-        </div>
-      </Card>
-
-      {/* Event List Section */}
-      <Card title="Danh sách sự kiện" className="mb-8">
-        {/* Facility selector */}
-        <div className="mb-6">
-          <Select
-            placeholder="Chọn cơ sở của bạn"
-            style={{ width: '100%' }}
-            value={selectedFacilityId || undefined}
-            onChange={handleFacilityChange}
-          >
-            {mockFacilitiesDropdown.map((facility) => (
-              <Option key={facility.id} value={facility.id}>
-                {facility.name}
-              </Option>
-            ))}
-          </Select>
-        </div>
-
-        {selectedFacilityId ? (
-          <>
-            {/* Search and filters */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-              <div className="overflow-x-auto w-full md:w-auto pb-2 md:pb-0">
-                <Radio.Group 
-                  options={filterOptions} 
-                  onChange={handleFilterChange}
-                  value={activeFilter}
-                  optionType="button"
-                  className="flex-nowrap"
-                />
-              </div>
+    <div className="container mx-auto p-4">
+      <Tabs 
+        activeKey={activeTab} 
+        onChange={setActiveTab}
+        className="event-management-tabs"
+      >
+        <TabPane
+          tab={
+            <span>
+              <CalendarOutlined />
+              Danh sách sự kiện
+            </span>
+          }
+          key="events"
+        >
+          {/* Banner for creating new events */}
+          <Card className="mb-4 bg-gradient-to-r from-blue-50 to-indigo-50">
+            <Row align="middle" justify="space-between">
+              <Col>
+                <Title level={4} className="m-0">Quản lý sự kiện</Title>
+                <Text>Tạo và quản lý các sự kiện của cơ sở thể thao của bạn</Text>
+              </Col>
+              <Col>
+                <Button 
+                  type="primary" 
+                  icon={<PlusOutlined />} 
+                  onClick={handleCreateEvent}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  Tạo sự kiện mới
+                </Button>
+              </Col>
+            </Row>
+          </Card>
+          
+          {/* Filters */}
+          <div className="bg-white p-4 rounded-lg shadow-sm mb-4">
+            <Row gutter={[16, 16]} align="middle">
+              <Col xs={24} sm={12} md={6} lg={5}>
+                <Text strong>Cơ sở:</Text>
+                <Select
+                  placeholder="Chọn cơ sở"
+                  style={{ width: '100%', marginTop: 8 }}
+                  onChange={handleFacilityChange}
+                  allowClear
+                  value={selectedFacility}
+                >
+                  {mockFacilitiesDropdown.map(facility => (
+                    <Option key={facility.id} value={facility.id}>
+                      {facility.name}
+                    </Option>
+                  ))}
+                </Select>
+              </Col>
               
-              <Input
-                placeholder="Tìm kiếm sự kiện"
-                prefix={<SearchOutlined />}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                style={{ maxWidth: 300, width: '100%' }}
-              />
-            </div>
-
-            {/* Events Table */}
+              <Col xs={24} sm={12} md={6} lg={5}>
+                <Text strong>Trạng thái:</Text>
+                <Select
+                  placeholder="Chọn trạng thái"
+                  style={{ width: '100%', marginTop: 8 }}
+                  onChange={handleFilterChange}
+                  value={filter}
+                >
+                  {filterOptions.map(option => (
+                    <Option key={option.value} value={option.value}>
+                      {option.label}
+                    </Option>
+                  ))}
+                </Select>
+              </Col>
+              
+              <Col xs={24} sm={12} md={6} lg={5}>
+                <Text strong>Loại sự kiện:</Text>
+                <Select
+                  placeholder="Chọn loại sự kiện"
+                  style={{ width: '100%', marginTop: 8 }}
+                  onChange={handleEventTypeFilterChange}
+                  value={eventTypeFilter}
+                >
+                  {eventTypeOptions.map(option => (
+                    <Option key={option.value} value={option.value}>
+                      {option.label}
+                    </Option>
+                  ))}
+                </Select>
+              </Col>
+              
+              <Col xs={24} sm={12} md={6} lg={9}>
+                <Text strong>Tìm kiếm:</Text>
+                <Input 
+                  placeholder="Tìm kiếm theo tên sự kiện" 
+                  onChange={handleSearchChange}
+                  value={search}
+                  prefix={<SearchOutlined />}
+                  style={{ marginTop: 8 }}
+                />
+              </Col>
+            </Row>
+          </div>
+          
+          {/* Events Table */}
+          {events.length > 0 ? (
             <EventTable 
-              events={filteredEvents}
+              events={events}
               loading={loading}
               onView={handleViewEvent}
               onEdit={handleEditEvent}
               onDelete={handleDeleteEvent}
+              onManageRegistrations={handleManageRegistrations}
+              getRegistrationBadge={getRegistrationBadge}
             />
-            
-            {error && <div className="text-red-500 mt-4">{error}</div>}
-          </>
-        ) : (
-          <div className="text-center py-8">
-            <Text className="text-gray-500">Vui lòng chọn cơ sở để xem danh sách sự kiện</Text>
-          </div>
-        )}
-      </Card>
-
+          ) : (
+            <Empty 
+              description="Không tìm thấy sự kiện nào" 
+              className="bg-white p-8 rounded-lg shadow-sm"
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+            />
+          )}
+        </TabPane>
+        
+        <TabPane
+          tab={
+            <span>
+              <TeamOutlined />
+              Quản lý đăng ký
+            </span>
+          }
+          key="registrations"
+        >
+          {selectedEventForRegistration ? (
+            <RegistrationManagement 
+              visible={registrationManagementVisible}
+              event={selectedEventForRegistration}
+              onClose={() => {
+                setRegistrationManagementVisible(false);
+                setActiveTab('events');
+                setSelectedEventForRegistration(null);
+              }}
+            />
+          ) : (
+            <Card className="text-center p-6">
+              <Empty 
+                description="Vui lòng chọn một sự kiện để quản lý đăng ký" 
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+              />
+              <Button 
+                type="primary" 
+                onClick={() => setActiveTab('events')}
+                className="mt-4"
+              >
+                Quay lại danh sách sự kiện
+              </Button>
+            </Card>
+          )}
+        </TabPane>
+      </Tabs>
+      
       {/* Event Detail Modal */}
-      <EventDetailModal
+      <EventDetailModal 
         visible={detailModalVisible}
-        event={currentEvent}
+        event={selectedEvent}
         onClose={() => setDetailModalVisible(false)}
         onEdit={handleEditEvent}
       />
-
+      
       {/* Event Edit Modal */}
-      <EventEditModal
+      <EventEditModal 
         visible={editModalVisible}
-        event={currentEvent}
+        event={selectedEvent}
         onClose={() => setEditModalVisible(false)}
         onSubmit={handleSaveEvent}
-        submitting={submitting}
+        submitting={loading}
       />
     </div>
   );

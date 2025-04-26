@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Select, Dropdown, Button, Badge, Popover, Input, Space, Divider, Modal } from 'antd';
 import { 
   BellOutlined, QuestionCircleOutlined, GlobalOutlined, DownOutlined, 
-  SearchOutlined, LoginOutlined, TrophyOutlined
+  SearchOutlined, LoginOutlined, TrophyOutlined, TeamOutlined
 } from '@ant-design/icons';
 import TopbarProfile from '@/components/LoginModal/TopbarProfile';
 import Logo from '@/assets/Logo.svg';
@@ -384,8 +384,8 @@ const Header = () => {
             {/* Events & Tournaments */}
             <a 
               href="/events" 
-              target="_blank" 
-              rel="noopener noreferrer"
+              // target="_blank" 
+              // rel="noopener noreferrer"
               className="no-underline"
             >
               <Button 
@@ -394,6 +394,20 @@ const Header = () => {
               >
                 <TrophyOutlined className="text-lg" />
                 <span className="hidden md:inline ml-1">Sự kiện & Giải đấu</span>
+              </Button>
+            </a>
+
+            {/* Playmate Feature */}
+            <a 
+              href="/user/playmate" 
+              className="no-underline"
+            >
+              <Button 
+                type="text" 
+                className="flex items-center justify-center text-sm px-3 h-10"
+              >
+                <TeamOutlined className="text-lg" />
+                <span className="hidden md:inline ml-1">Tìm bạn chơi</span>
               </Button>
             </a>
 

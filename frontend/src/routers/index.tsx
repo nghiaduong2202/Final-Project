@@ -11,10 +11,13 @@ import HomePage from '@/pages/Public/Home';
 import UserProfile from '@/pages/Public/UserProfile';
 import DetailFacility from '@/pages/Public/DetailFacility';
 import ResultSearch from '@/pages/Public/ResultSearch';
-import HelpCenter from '@/pages/Public/HelpCenter';
-import FAQ from '@/pages/Public/FAQ';
-import ContactSupport from '@/pages/Public/ContactSupport';
-import EventList from '@/pages/Public/EventList';
+import HelpCenter from '@/pages/Public/Help-center/HelpCenter';
+import FAQ from '@/pages/Public/Help-center/FAQ';
+import ContactSupport from '@/pages/Public/Help-center/ContactSupport';
+import EventList from '@/pages/Public/EventAndTournament/EventList';
+import EventDetail from '@/pages/Public/EventAndTournament/EventDetail';
+import PlaymateList from '@/pages/Public/PLaymate/PlaymateList';
+import PlaymateDetail from '@/pages/Public/PLaymate/PlaymateDetail';
 
 // Player pages
 import BookingPage from '@/pages/Player/Booking/Booking';
@@ -23,6 +26,9 @@ import BookingDetail from '@/pages/Player/BookingDetail/BookingDetail';
 import BookingReview from '@/pages/Player/BookingReview/BookingReview';
 import FavoriteList from '@/pages/Player/FavoriteList/FavoriteList';
 import ResultBookingVNPay from '@/pages/Player/Booking/ResultBookingVNPay';
+import PlaymateCreate from '@/pages/Player/Playmate/PlaymateCreate';
+import PlaymateManage from '@/pages/Player/Playmate/PlaymateManage';
+import EventParticipate from '@/pages/Player/EventParticipate/EventParticipate';
 
 // Owner pages
 import PlaySchedule from '@/pages/Owner/PlaySchedule/PlaySchedule';
@@ -66,7 +72,10 @@ const AppRouter: React.FC = () => {
         <Route path='/faq' element={<FAQ />} />
         <Route path='/contact-support' element={<ContactSupport />} />
         <Route path='/events' element={<EventList />} />
+        <Route path='/event/:eventId' element={<EventDetail />} />
         <Route path='/error' element={<ErrorPage />} />
+        <Route path='/user/playmate' element={<PlaymateList />} />   
+        <Route path='/user/playmate/:id' element={<PlaymateDetail />} />   
       </Route> 
 
       {/* player routes */}
@@ -80,8 +89,11 @@ const AppRouter: React.FC = () => {
         <Route path='/user/history-booking' element={<HistoryBooking />} />
         <Route path='/user/booking/detail/:bookingId' element={<BookingDetail />} />
         <Route path='/user/booking/review/:bookingId' element={<BookingReview />} />
-        <Route path='/user/favorite' element={<FavoriteList />} />        
+        <Route path='/user/favorite' element={<FavoriteList />} />          
+        <Route path='/user/playmate/create' element={<PlaymateCreate />} />   
+        <Route path='/user/playmate/manage' element={<PlaymateManage />} />         
         <Route path='/user/profile' element={<UserProfile />} />
+        <Route path='/user/events/manage' element={<EventParticipate />} />
       </Route>
 
       {/* owner routes */}
