@@ -5,7 +5,7 @@ export type PlaymateSearchType = 'INDIVIDUAL' | 'GROUP';
 export type SkillLevel = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | 'PROFESSIONAL' | 'ANY';
 
 // Trạng thái tìm kiếm
-export type PlaymateStatus = 'ACTIVE' | 'COMPLETED' | 'CANCELLED' ;
+export type PlaymateStatus = 'ACTIVE' | 'COMPLETED' | 'CANCELLED' | 'EXPIRED';
 
 // Giới tính ưu tiên
 export type GenderPreference = 'MALE' | 'FEMALE' | 'ANY';

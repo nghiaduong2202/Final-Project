@@ -1,16 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
-import { PlaymateFormData, SkillLevel, PlaymateSearchType, GenderPreference, CostType, PlaymateSearch } from '@/types/playmate.type';
+import { PlaymateFormData } from '@/types/playmate.type';
 import { createPlaymateSearch } from '@/services/playmate.service';
 import { sportService } from '@/services/sport.service';
-
-// Định nghĩa interface cho Sport
-interface Sport {
-  id: number;
-  name: string;
-}
-
+// import { facilityService } from '@/services/facility.service';
 import {
   Form,
   Input,
@@ -27,44 +21,44 @@ import {
   message,
   Breadcrumb,
   Space,
-  Checkbox
+  Checkbox,
+  Upload,
+  Divider,
+  Modal
 } from 'antd';
 import {
-  ArrowLeftOutlined,
-  PlusOutlined
+  PlusOutlined,
+  UploadOutlined,
+  CalendarOutlined,
+  ClockCircleOutlined,
+  EnvironmentOutlined,
+  DollarOutlined,
+  TeamOutlined,
+  UserOutlined,
+  InfoCircleOutlined,
+  ExclamationCircleOutlined,
+  CheckCircleOutlined
 } from '@ant-design/icons';
 import locale from 'antd/es/date-picker/locale/vi_VN';
 import { RadioChangeEvent } from 'antd/lib/radio';
 import type { ValidateErrorEntity } from 'rc-field-form/lib/interface';
+import dayjs from 'dayjs';
+import type { UploadFile } from 'antd/es/upload/interface';
 
-const { Title } = Typography;
+// Định nghĩa interface cho Sport và Facility
+interface Sport {
+  id: number;
+  name: string;
+}
+
+interface Facility {
+  id: string;
+  name: string;
+}
+
+const { Title, Text } = Typography;
 const { TextArea } = Input;
 const { Option } = Select;
-
-// Add moment type
-import { Moment } from 'moment';
-
-// Interface cho values của form
-interface FormValues {
-  title: string;
-  sportId: number;
-  facilityId: string;
-  location?: string;
-  date: Moment;
-  timeRange: [Moment, Moment];
-  description?: string;
-  price?: number;
-  costMale?: number;
-  costFemale?: number;
-  costType: CostType;
-  costDetails?: string;
-  searchType: PlaymateSearchType;
-  requiredParticipants: number;
-  maximumParticipants?: number;
-  genderPreference: GenderPreference;
-  requiredSkillLevel: SkillLevel[];
-  communicationDescription?: string;
-}
 
 // Interface cho response từ API
 interface PlaymateSearchResponse {
@@ -72,73 +66,97 @@ interface PlaymateSearchResponse {
   [key: string]: unknown;
 }
 
+// Extend PlaymateFormData với các trường cần thiết cho form
+interface PlaymateFormValues extends Omit<PlaymateFormData, 'date' | 'startTime' | 'endTime' | 'applicationDeadline'> {
+  date: dayjs.Dayjs;
+  timeRange: [dayjs.Dayjs, dayjs.Dayjs];
+  applicationDeadline?: dayjs.Dayjs;
+}
+
 const PlaymateCreate: React.FC = () => {
   const navigate = useNavigate();
-  const [form] = Form.useForm();
+  const [form] = Form.useForm<PlaymateFormValues>();
   const [sports, setSports] = useState<Sport[]>([]);
+  const [facilities, setFacilities] = useState<Facility[]>([]);
   const [submitting, setSubmitting] = useState<boolean>(false);
-  const [costType, setCostType] = useState<CostType>('PER_PERSON');
+  const [costType, setCostType] = useState<PlaymateFormData['costType']>('PER_PERSON');
+  const [loading, setLoading] = useState<boolean>(true);
+  const [confirmModalVisible, setConfirmModalVisible] = useState<boolean>(false);
+  const [formValues, setFormValues] = useState<PlaymateFormValues | null>(null);
+  
 
   useEffect(() => {
-    // Fetch sports list
-    const fetchSports = async () => {
+    // Fetch sports and facilities list
+    const fetchData = async () => {
+      setLoading(true);
       try {
-        const data = await sportService.getSport();
-        setSports(data || []);
-      } catch (error) {
-        console.error('Error fetching sports:', error);
-        message.error('Không thể lấy danh sách môn thể thao');
-        // Fallback to mock data if API fails
-        setSports([
-          { id: 1, name: 'Bóng đá' },
-          { id: 2, name: 'Bóng rổ' },
-          { id: 3, name: 'Cầu lông' },
-          { id: 4, name: 'Tennis' },
-          { id: 5, name: 'Yoga' },
-          { id: 6, name: 'Golf' },
-          { id: 7, name: 'Bơi lội' },
-          { id: 8, name: 'Bóng chuyền' },
-          { id: 9, name: 'Đạp xe' },
+        // Fetch sports data
+        const sportsData = await sportService.getSport();
+        setSports(sportsData || []);
+        
+        // Mock facilities data - replace with actual API call if available
+        // const facilitiesData = await facilityService.getFacilitiesDropdown();
+        setFacilities([
+          { id: 'facility1', name: 'Sân vận động ABC' },
+          { id: 'facility2', name: 'Trung tâm thể thao XYZ' },
+          { id: 'facility3', name: 'Sân bóng 123' },
         ]);
+      
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        message.error('Không thể lấy dữ liệu. Đang sử dụng dữ liệu mẫu.');
+        
+      } finally {
+        setLoading(false);
       }
     };
     
-    fetchSports();
+    fetchData();
   }, []);
 
   const handleCostTypeChange = (e: RadioChangeEvent) => {
-    setCostType(e.target.value as CostType);
+    setCostType(e.target.value as PlaymateFormData['costType']);
   };
 
-  const onFinish = async (values: FormValues) => {
+  const handleSubmit = (values: PlaymateFormValues) => {
+    setFormValues(values);
+    setConfirmModalVisible(true);
+  };
+
+  const handleConfirmSubmit = async () => {
+    if (!formValues) return;
+    
     setSubmitting(true);
+    setConfirmModalVisible(false);
     
     try {
       // Chuẩn bị dữ liệu theo cấu trúc PlaymateFormData
       const playmateFormData: PlaymateFormData = {
-        title: values.title,
-        description: values.description,
-        sportId: values.sportId,
-        facilityId: values.facilityId || 'default',  // Temporary, until facility selection is implemented
-        date: values.date.format('YYYY-MM-DD'),
-        startTime: values.timeRange[0].format('HH:mm'),
-        endTime: values.timeRange[1].format('HH:mm'),
-        location: values.location,
-        price: values.price,
-        costMale: values.costMale,
-        costFemale: values.costFemale,
-        costType: values.costType,
-        costDetails: values.costDetails,
-        searchType: values.searchType,
-        requiredParticipants: values.requiredParticipants,
-        maximumParticipants: values.maximumParticipants,
-        genderPreference: values.genderPreference,
-        requiredSkillLevel: values.requiredSkillLevel,
-        communicationDescription: values.communicationDescription
+        title: formValues.title,
+        description: formValues.description,
+        image: formValues.image,
+        sportId: formValues.sportId,
+        facilityId: formValues.facilityId,
+        date: formValues.date.format('YYYY-MM-DD'),
+        startTime: formValues.timeRange[0].format('HH:mm'),
+        endTime: formValues.timeRange[1].format('HH:mm'),
+        location: formValues.location,
+        applicationDeadline: formValues.applicationDeadline?.format('YYYY-MM-DD HH:mm'),
+        price: formValues.price,
+        costMale: formValues.costMale,
+        costFemale: formValues.costFemale,
+        costType: formValues.costType,
+        costDetails: formValues.costDetails,
+        searchType: formValues.searchType,
+        requiredParticipants: formValues.requiredParticipants,
+        maximumParticipants: formValues.maximumParticipants,
+        genderPreference: formValues.genderPreference,
+        requiredSkillLevel: formValues.requiredSkillLevel,
+        communicationDescription: formValues.communicationDescription
       };
       
       // Tạo bài đăng
-      const response = await createPlaymateSearch(playmateFormData as unknown as Omit<PlaymateSearch, "id" | "createdAt" | "updatedAt">);
+      const response = await createPlaymateSearch(playmateFormData);
       const newSearch = response as unknown as PlaymateSearchResponse;
       message.success('Đã tạo bài đăng tìm bạn chơi thành công!');
       navigate(`/user/playmate/${newSearch.id}`);
@@ -150,7 +168,11 @@ const PlaymateCreate: React.FC = () => {
     }
   };
 
-  const onFinishFailed = (errorInfo: ValidateErrorEntity<FormValues>) => {
+  const handleCancelSubmit = () => {
+    setConfirmModalVisible(false);
+  };
+
+  const onFinishFailed = (errorInfo: ValidateErrorEntity<PlaymateFormValues>) => {
     message.error('Vui lòng kiểm tra lại thông tin đã nhập');
     console.log('Failed:', errorInfo);
   };
@@ -165,41 +187,73 @@ const PlaymateCreate: React.FC = () => {
     return Number(value.replace(/\s?|(,*)/g, ''));
   };
 
+  // File upload normalization
+  const normFile = (e: { fileList?: UploadFile[] }): UploadFile[] => {
+    if (Array.isArray(e)) {
+      return e;
+    }
+    return e?.fileList || [];
+  };
+
   return (
-    <div className="w-full px-4 py-6 bg-white min-h-screen">
+    <div className="w-full px-4 py-6 bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto">
         {/* Breadcrumb */}
-        <Breadcrumb className="mb-4 md:mb-6">
-          <Breadcrumb.Item>
-            <Link to="/user/dashboard">Trang chủ</Link>
-          </Breadcrumb.Item>
-          <Breadcrumb.Item>
-            <Link to="/user/playmate">Tìm bạn chơi</Link>
-          </Breadcrumb.Item>
-          <Breadcrumb.Item>Tạo mới</Breadcrumb.Item>
-        </Breadcrumb>
+        <Breadcrumb className="mb-4 md:mb-6"
+          items={[
+            {
+              title: <Link to="/">Trang chủ</Link>
+            },
+            {
+              title: <Link to="/user/playmate">Tìm bạn chơi</Link>
+            },
+            {
+              title: 'Tạo mới'
+            }
+          ]}
+        />
 
         <Row gutter={[16, 16]}>
-          <Col span={24}>
-            <Button 
-              onClick={handleGoBack} 
-              icon={<ArrowLeftOutlined />} 
-              className="mb-4"
-            >
-              Quay lại
-            </Button>
-            <Card className="shadow-md">
+          <Col span={24}>            
+            <Card className="shadow-md playmate-inner-card">
               <Title level={2} className="mb-6 text-xl md:text-2xl">Tạo bài đăng tìm bạn chơi</Title>
+              <Text type="secondary" className="block mb-6">
+                Điền đầy đủ thông tin bên dưới để tạo bài đăng tìm bạn chơi. Thông tin chi tiết sẽ giúp bạn tìm được người phù hợp.
+              </Text>
+              
               <Form
                 form={form}
                 layout="vertical"
-                onFinish={onFinish}
+                onFinish={handleSubmit}
                 onFinishFailed={onFinishFailed}
                 requiredMark="optional"
                 scrollToFirstError
+                disabled={loading}
+                className="playmate-form"
+                initialValues={{
+                  title: '',
+                  sportId: undefined,
+                  facilityId: undefined,
+                  costType: 'PER_PERSON',
+                  searchType: 'INDIVIDUAL',
+                  requiredParticipants: 0,
+                  genderPreference: 'ANY',
+                  requiredSkillLevel: ['BEGINNER'],
+                  date: undefined,
+                  timeRange: [undefined, undefined],
+                  applicationDeadline: undefined
+                }}
               >
-                <Card title="Thông tin cơ bản" className="mb-4 border border-gray-200">
-                  <Row gutter={16}>
+                <Card 
+                  title={
+                    <span>
+                      <InfoCircleOutlined className="mr-2" />
+                      Thông tin cơ bản
+                    </span>
+                  } 
+                  className="mb-6 border border-gray-200 rounded-lg playmate-inner-card"
+                >
+                  <Row gutter={[16, 16]}>
                     <Col xs={24} md={16}>
                       <Form.Item
                         label="Tiêu đề"
@@ -215,7 +269,7 @@ const PlaymateCreate: React.FC = () => {
                         name="sportId"
                         rules={[{ required: true, message: 'Vui lòng chọn môn thể thao!' }]}
                       >
-                        <Select placeholder="Chọn môn thể thao">
+                        <Select placeholder="Chọn môn thể thao" loading={loading}>
                           {sports.map(sport => (
                             <Option key={sport.id} value={sport.id}>{sport.name}</Option>
                           ))}
@@ -225,15 +279,46 @@ const PlaymateCreate: React.FC = () => {
                   </Row>
 
                   <Form.Item
-                    label="Địa điểm"
-                    name="location"
-                    rules={[{ required: true, message: 'Vui lòng nhập địa điểm!' }]}
+                    label="Hình ảnh minh họa"
+                    name="image"
+                    valuePropName="fileList"
+                    getValueFromEvent={normFile}
                   >
-                    <Input placeholder="Nhập địa điểm (VD: Sân bóng ABC, 123 Đường XYZ)" />
+                    <Upload listType="picture" beforeUpload={() => false} maxCount={5}>
+                      <Button icon={<UploadOutlined />}>Tải lên hình ảnh</Button>
+                    </Upload>
                   </Form.Item>
 
-                  <Row gutter={16}>
+                  <Row gutter={[16, 16]}>
                     <Col xs={24} md={12}>
+                      <Form.Item
+                        label="Cơ sở thể thao"
+                        name="facilityId"
+                        rules={[{ required: true, message: 'Vui lòng chọn cơ sở thể thao!' }]}
+                      >
+                        <Select placeholder="Chọn cơ sở thể thao" loading={loading}>
+                          {facilities.map(facility => (
+                            <Option key={facility.id} value={facility.id}>{facility.name}</Option>
+                          ))}
+                        </Select>
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} md={12}>
+                      <Form.Item
+                        label="Địa điểm cụ thể"
+                        name="location"
+                        tooltip="Nhập địa chỉ cụ thể hoặc mô tả vị trí"
+                      >
+                        <Input 
+                          prefix={<EnvironmentOutlined className="text-gray-400" />}
+                          placeholder="Nhập địa điểm (VD: Sân số 3, Khu A)" 
+                        />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+
+                  <Row gutter={[16, 16]}>
+                    <Col xs={24} md={8}>
                       <Form.Item
                         label="Ngày"
                         name="date"
@@ -244,10 +329,11 @@ const PlaymateCreate: React.FC = () => {
                           format="DD/MM/YYYY" 
                           className="w-full" 
                           placeholder="Chọn ngày" 
+                          suffixIcon={<CalendarOutlined />}
                         />
                       </Form.Item>
                     </Col>
-                    <Col xs={24} md={12}>
+                    <Col xs={24} md={8}>
                       <Form.Item
                         label="Thời gian"
                         name="timeRange"
@@ -257,6 +343,22 @@ const PlaymateCreate: React.FC = () => {
                           format="HH:mm" 
                           className="w-full" 
                           placeholder={['Từ', 'Đến']} 
+                          suffixIcon={<ClockCircleOutlined />}
+                        />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} md={8}>
+                      <Form.Item
+                        label="Hạn đăng ký"
+                        name="applicationDeadline"
+                        tooltip="Thời hạn cuối để người khác đăng ký tham gia"
+                      >
+                        <DatePicker 
+                          locale={locale} 
+                          format="DD/MM/YYYY HH:mm" 
+                          className="w-full" 
+                          placeholder="Chọn hạn đăng ký" 
+                          showTime={{ format: 'HH:mm' }}
                         />
                       </Form.Item>
                     </Col>
@@ -284,22 +386,31 @@ const PlaymateCreate: React.FC = () => {
                   </Form.Item>
                 </Card>
 
-                <Card title="Chi phí" className="mb-4 border border-gray-200">
+                <Card 
+                  title={
+                    <span>
+                      <DollarOutlined className="mr-2" />
+                      Chi phí
+                    </span>
+                  } 
+                  className="mb-6 border border-gray-200 rounded-lg playmate-inner-card"
+                >
                   <Form.Item
                     label="Loại chi phí"
                     name="costType"
-                    initialValue="PER_PERSON"
                     rules={[{ required: true, message: 'Vui lòng chọn loại chi phí!' }]}
                   >
                     <Radio.Group onChange={handleCostTypeChange}>
-                      <Radio value="PER_PERSON">Tính trên đầu người</Radio>
-                      <Radio value="TOTAL">Tổng chi phí</Radio>
-                      <Radio value="FREE">Miễn phí</Radio>
-                      <Radio value="GENDER_BASED">Theo giới tính</Radio>
+                      <Space direction="vertical">
+                        <Radio value="PER_PERSON">Tính trên đầu người</Radio>
+                        <Radio value="TOTAL">Tổng chi phí</Radio>
+                        <Radio value="FREE">Miễn phí</Radio>
+                        <Radio value="GENDER_BASED">Theo giới tính</Radio>
+                      </Space>
                     </Radio.Group>
                   </Form.Item>
                 
-                  {costType === 'PER_PERSON' || costType === 'TOTAL' ? (
+                  {(costType === 'PER_PERSON' || costType === 'TOTAL') && (
                     <Form.Item
                       label="Chi phí dự kiến"
                       name="price"
@@ -312,9 +423,11 @@ const PlaymateCreate: React.FC = () => {
                         formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                         parser={numberParser}
                         placeholder="Nhập chi phí" 
+                        prefix={<DollarOutlined />}
+                        addonAfter="VND"
                       />
                     </Form.Item>
-                  ) : null}
+                  )}
                   
                   {costType === 'GENDER_BASED' && (
                     <Row gutter={16}>
@@ -331,6 +444,8 @@ const PlaymateCreate: React.FC = () => {
                             formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                             parser={numberParser}
                             placeholder="Nhập chi phí cho nam" 
+                            prefix={<DollarOutlined />}
+                            addonAfter="VND"
                           />
                         </Form.Item>
                       </Col>
@@ -347,6 +462,8 @@ const PlaymateCreate: React.FC = () => {
                             formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                             parser={numberParser}
                             placeholder="Nhập chi phí cho nữ" 
+                            prefix={<DollarOutlined />}
+                            addonAfter="VND"
                           />
                         </Form.Item>
                       </Col>
@@ -364,39 +481,46 @@ const PlaymateCreate: React.FC = () => {
                   </Form.Item>
                 </Card>
 
-                <Card title="Thông tin tìm kiếm" className="mb-4 border border-gray-200">
+                <Card 
+                  title={
+                    <span>
+                      <TeamOutlined className="mr-2" />
+                      Thông tin tìm kiếm
+                    </span>
+                  } 
+                  className="mb-6 border border-gray-200 rounded-lg playmate-inner-card"
+                >
                   <Form.Item
                     label="Loại tìm kiếm"
                     name="searchType"
-                    initialValue="INDIVIDUAL"
                     rules={[{ required: true, message: 'Vui lòng chọn loại tìm kiếm!' }]}
                   >
-                    <Radio.Group>
-                      <Radio value="INDIVIDUAL">Tìm cá nhân</Radio>
-                      <Radio value="GROUP">Tìm nhóm</Radio>
+                    <Radio.Group buttonStyle="solid">
+                      <Radio.Button value="INDIVIDUAL">Tìm cá nhân</Radio.Button>
+                      <Radio.Button value="GROUP">Tìm đội/nhóm</Radio.Button>
                     </Radio.Group>
                   </Form.Item>
                 
                   <Row gutter={16}>
                     <Col xs={24} md={12}>
                       <Form.Item
-                        label="Số người cần thiết"
+                        label="Số người/đội cần thiết"
                         name="requiredParticipants"
-                        initialValue={2}
-                        rules={[{ required: true, message: 'Vui lòng nhập số người cần thiết!' }]}
+                        rules={[{ required: true, message: 'Vui lòng nhập số người/đội cần thiết!' }]}
                       >
                         <InputNumber 
                           min={1} 
                           max={50} 
                           className="w-full" 
-                          placeholder="Số người cần thiết"
+                          placeholder="Số người/đội cần thiết"
                         />
                       </Form.Item>
                     </Col>
                     <Col xs={24} md={12}>
                       <Form.Item
-                        label="Số người tối đa"
+                        label="Số người/đội tối đa"
                         name="maximumParticipants"
+                        tooltip="Để trống nếu không giới hạn"
                       >
                         <InputNumber 
                           min={1} 
@@ -409,11 +533,18 @@ const PlaymateCreate: React.FC = () => {
                   </Row>
                 </Card>
 
-                <Card title="Yêu cầu người tham gia" className="mb-4 border border-gray-200">
+                <Card 
+                  title={
+                    <span>
+                      <UserOutlined className="mr-2" />
+                      Yêu cầu người tham gia
+                    </span>
+                  } 
+                  className="mb-6 border border-gray-200 rounded-lg playmate-inner-card"
+                >
                   <Form.Item
                     label="Giới tính"
                     name="genderPreference"
-                    initialValue="ANY"
                     rules={[{ required: true, message: 'Vui lòng chọn giới tính!' }]}
                   >
                     <Select placeholder="Chọn giới tính">
@@ -426,24 +557,23 @@ const PlaymateCreate: React.FC = () => {
                   <Form.Item
                     label="Trình độ yêu cầu"
                     name="requiredSkillLevel"
-                    initialValue={['BEGINNER']}
                     rules={[{ required: true, message: 'Vui lòng chọn trình độ yêu cầu!' }]}
                   >
                     <Checkbox.Group>
-                      <Row>
-                        <Col span={8}>
+                      <Row gutter={[8, 8]}>
+                        <Col xs={12} md={8}>
                           <Checkbox value="BEGINNER">Mới bắt đầu</Checkbox>
                         </Col>
-                        <Col span={8}>
+                        <Col xs={12} md={8}>
                           <Checkbox value="INTERMEDIATE">Trung cấp</Checkbox>
                         </Col>
-                        <Col span={8}>
+                        <Col xs={12} md={8}>
                           <Checkbox value="ADVANCED">Nâng cao</Checkbox>
                         </Col>
-                        <Col span={8}>
+                        <Col xs={12} md={8}>
                           <Checkbox value="PROFESSIONAL">Chuyên nghiệp</Checkbox>
                         </Col>
-                        <Col span={8}>
+                        <Col xs={12} md={8}>
                           <Checkbox value="ANY">Không giới hạn</Checkbox>
                         </Col>
                       </Row>
@@ -451,18 +581,26 @@ const PlaymateCreate: React.FC = () => {
                   </Form.Item>
                 </Card>
 
-                <Form.Item>
-                  <Space>
+                <Divider />
+
+                <Form.Item className="text-center">
+                  <Space size="middle">
                     <Button 
                       type="primary" 
                       htmlType="submit" 
                       icon={<PlusOutlined />} 
                       loading={submitting}
                       size="large"
+                      className="min-w-[150px]"
                     >
                       Tạo bài đăng
                     </Button>
-                    <Button onClick={handleGoBack} size="large">Hủy</Button>
+                    <Button 
+                      onClick={handleGoBack} 
+                      size="large"
+                    >
+                      Hủy
+                    </Button>
                   </Space>
                 </Form.Item>
               </Form>
@@ -470,8 +608,74 @@ const PlaymateCreate: React.FC = () => {
           </Col>
         </Row>
       </div>
+      
+      {/* Modal xác nhận tạo bài đăng */}
+      <Modal
+        title={
+          <div className="flex items-center">
+            <ExclamationCircleOutlined className="text-yellow-500 mr-2 text-xl" />
+            <span>Xác nhận tạo bài đăng</span>
+          </div>
+        }
+        open={confirmModalVisible}
+        onOk={handleConfirmSubmit}
+        onCancel={handleCancelSubmit}
+        okText="Xác nhận"
+        cancelText="Hủy"
+        okButtonProps={{ 
+          icon: <CheckCircleOutlined />,
+          loading: submitting 
+        }}
+        centered
+      >
+        <p>Bạn có chắc chắn muốn tạo bài đăng tìm bạn chơi này không?</p>
+        <p>Sau khi tạo, bài đăng sẽ được hiển thị công khai và người dùng khác có thể đăng ký tham gia.</p>
+      </Modal>
+      
+      {/* Add custom styling for form */}
+      <style>{`
+        .playmate-form .ant-form-item-label > label {
+          font-weight: 500;
+        }
+        .playmate-form .ant-card-head-title {
+          font-weight: 600;
+        }
+        .playmate-form .ant-input-number-group-wrapper {
+          width: 100%;
+        }
+        /* Fix cho vấn đề nhảy lên xuống khi hover */
+        .playmate-inner-card.ant-card:hover {
+          transform: none !important;
+          box-shadow: 0 1px 2px -2px rgba(0, 0, 0, 0.16), 
+                      0 3px 6px 0 rgba(0, 0, 0, 0.12), 
+                      0 5px 12px 4px rgba(0, 0, 0, 0.09);
+          transition: box-shadow 0.3s ease;
+        }
+        .playmate-inner-card .ant-card-body {
+          padding: 20px !important;
+          height: auto !important;
+          min-height: 0 !important;
+        }
+        .playmate-card .ant-card-body {
+          padding: 24px !important;
+          height: auto !important;
+          overflow: visible !important;
+        }
+        /* Responsive container adjustments */
+        @media (min-width: 1280px) {
+          .max-w-7xl {
+            max-width: 1280px;
+          }
+        }
+        @media (min-width: 1536px) {
+          .max-w-7xl {
+            max-width: 1400px;
+          }
+        }
+      `}</style>
     </div>
   );
 };
 
+// Export component
 export default PlaymateCreate; 

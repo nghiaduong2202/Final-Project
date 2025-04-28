@@ -10,7 +10,8 @@ import {
   Tabs, 
   Card,
   Typography,
-  Space
+  Space,
+  Spin
 } from 'antd';
 import { 
   SearchOutlined, 
@@ -21,164 +22,65 @@ import {
   MoreOutlined,
   UserOutlined,
   EllipsisOutlined,
-  DeleteOutlined,
   CheckOutlined,
   ShopOutlined
 } from '@ant-design/icons';
+import { Message, Conversation } from '@/types/chat.type';
+import { useSocketService } from '@/hooks/useSocketService';
+import { ChatService } from '@/services/chat.service';
+import { useAppSelector } from '@/hooks/reduxHooks';
 import './ChatManagement.css';
 
 const { Title, Text } = Typography;
 
-interface Message {
-  id: string;
-  conversationId: string;
-  senderId: string;
-  senderName?: string;
-  senderAvatar?: string;
-  content: string;
-  timestamp: string;
-  isRead: boolean;
-}
-
-interface Conversation {
-  id: string;
-  name: string;
-  avatar: string;
-  lastMessage: string;
-  lastMessageTime: string;
-  unreadCount: number;
-  isSaved: boolean;
-  facility?: string;
-}
-
-const mockConversations: Conversation[] = [
-  {
-    id: '1',
-    name: 'Nguyễn Tuấn Anh',
-    avatar: 'https://randomuser.me/api/portraits/men/32.jpg',
-    lastMessage: 'Tôi muốn đặt sân ngày mai có được không?',
-    lastMessageTime: '2023-07-10T14:30:00',
-    unreadCount: 3,
-    isSaved: true,
-    facility: 'Sân bóng đá Mini 5v5'
-  },
-  {
-    id: '2',
-    name: 'Trần Thị Hoa',
-    avatar: 'https://randomuser.me/api/portraits/women/44.jpg',
-    lastMessage: 'Sân có mở cửa vào chủ nhật không?',
-    lastMessageTime: '2023-07-09T18:45:00',
-    unreadCount: 0,
-    isSaved: false,
-    facility: 'Sân cầu lông số 3'
-  },
-  {
-    id: '3',
-    name: 'Phạm Văn Đức',
-    avatar: 'https://randomuser.me/api/portraits/men/62.jpg',
-    lastMessage: 'Cảm ơn bạn đã hỗ trợ!',
-    lastMessageTime: '2023-07-08T09:15:00',
-    unreadCount: 0,
-    isSaved: false,
-    facility: 'Sân bóng đá 7v7'
-  },
-  {
-    id: '4',
-    name: 'Lê Minh Tâm',
-    avatar: 'https://randomuser.me/api/portraits/women/22.jpg',
-    lastMessage: 'Tôi sẽ đến vào lúc 7h tối',
-    lastMessageTime: '2023-07-07T20:30:00',
-    unreadCount: 1,
-    isSaved: true,
-    facility: 'Sân cầu lông số 1'
-  },
-  {
-    id: '5',
-    name: 'Hoàng Quốc Bảo',
-    avatar: 'https://randomuser.me/api/portraits/men/36.jpg',
-    lastMessage: 'Giá thuê sân trong bao lâu vậy?',
-    lastMessageTime: '2023-07-06T15:20:00',
-    unreadCount: 0,
-    isSaved: false,
-    facility: 'Sân bóng rổ'
-  }
-];
-
-const mockMessages: Message[] = [
-  {
-    id: 'm1',
-    conversationId: '1',
-    senderId: 'customer',
-    content: 'Xin chào! Tôi muốn đặt sân ngày mai, cụ thể là sân bóng đá Mini 5v5 từ 18h-20h có được không?',
-    timestamp: '2023-07-10T14:30:00',
-    isRead: false
-  },
-  {
-    id: 'm2',
-    conversationId: '1',
-    senderId: 'owner',
-    content: 'Chào bạn! Cảm ơn bạn đã liên hệ với chúng tôi. Để mình kiểm tra lịch đặt sân ngay.',
-    timestamp: '2023-07-10T14:35:00',
-    isRead: true
-  },
-  {
-    id: 'm3',
-    conversationId: '1',
-    senderId: 'owner',
-    content: 'Sân bóng đá Mini 5v5 vào ngày mai từ 18h-20h vẫn còn trống. Bạn có muốn đặt luôn không?',
-    timestamp: '2023-07-10T14:38:00',
-    isRead: true
-  },
-  {
-    id: 'm4',
-    conversationId: '1',
-    senderId: 'customer',
-    content: 'Tốt quá! Vâng, tôi muốn đặt ngay. Giá thuê sân là bao nhiêu vậy?',
-    timestamp: '2023-07-10T14:40:00',
-    isRead: false
-  },
-  {
-    id: 'm5',
-    conversationId: '1',
-    senderId: 'customer',
-    content: 'Và tôi có thể thanh toán qua hình thức nào?',
-    timestamp: '2023-07-10T14:41:00',
-    isRead: false
-  },
-  {
-    id: 'm6',
-    conversationId: '2',
-    senderId: 'customer',
-    content: 'Xin chào, sân có mở cửa vào chủ nhật không?',
-    timestamp: '2023-07-09T18:45:00',
-    isRead: true
-  },
-  {
-    id: 'm7',
-    conversationId: '2',
-    senderId: 'owner',
-    content: 'Chào bạn, sân chúng tôi mở cửa tất cả các ngày trong tuần từ 6h sáng đến 22h tối.',
-    timestamp: '2023-07-09T18:50:00',
-    isRead: true
-  },
-  {
-    id: 'm8',
-    conversationId: '4',
-    senderId: 'customer',
-    content: 'Tôi đã đặt sân cầu lông số 1 vào tối nay. Tôi sẽ đến vào lúc 7h tối.',
-    timestamp: '2023-07-07T20:30:00',
-    isRead: false
-  }
-];
-
 const ChatManagement: React.FC = () => {
+  const { user } = useAppSelector(state => state.user);
   const [currentTab, setCurrentTab] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeConversation, setActiveConversation] = useState<string | null>(null);
   const [currentMessage, setCurrentMessage] = useState('');
-  const [conversations, setConversations] = useState<Conversation[]>(mockConversations);
-  const [messages, setMessages] = useState<Message[]>(mockMessages);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [savedConversations, setSavedConversations] = useState<string[]>([]);
+  
+  // Get socket service
+  const socketService = useSocketService();
+  
+  // Fetch conversations when component mounts
+  useEffect(() => {
+    const fetchConversations = async () => {
+      try {
+        setIsLoading(true);
+        const conversationsData = await ChatService.getConversations();
+        setConversations(conversationsData);
+        
+        // Get saved conversations from localStorage
+        const saved = localStorage.getItem('owner_saved_conversations');
+        if (saved) {
+          setSavedConversations(JSON.parse(saved));
+        }
+      } catch (error) {
+        console.error('Error fetching conversations:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchConversations();
+    
+    // Listen for new conversations from socket
+    const subscription = socketService.getConversations().subscribe(
+      convos => {
+        if (convos.length > 0) {
+          setConversations(convos);
+        }
+      }
+    );
+    
+    return () => subscription.unsubscribe();
+  }, [socketService]);
   
   // Scroll to bottom when messages change or conversation is opened
   useEffect(() => {
@@ -187,27 +89,27 @@ const ChatManagement: React.FC = () => {
     }
   }, [messages, activeConversation]);
 
+  // Subscribe to messages for active conversation
+  useEffect(() => {
+    if (!activeConversation) return;
+    
+    // Mark conversation as seen when opened
+    socketService.markAsSeen(activeConversation);
+    
+    // Subscribe to messages for this conversation
+    const subscription = socketService.getMessages(activeConversation)
+      .subscribe(msgs => {
+        setMessages(msgs);
+      });
+    
+    return () => subscription.unsubscribe();
+  }, [activeConversation, socketService]);
+
   const handleSendMessage = () => {
     if (!currentMessage.trim() || !activeConversation) return;
     
-    const newMessage: Message = {
-      id: `msg-${Date.now()}`,
-      conversationId: activeConversation,
-      senderId: 'owner',
-      content: currentMessage,
-      timestamp: new Date().toISOString(),
-      isRead: true,
-    };
-    
-    setMessages([...messages, newMessage]);
+    socketService.sendMessage(activeConversation, currentMessage);
     setCurrentMessage('');
-    
-    // Update conversation's last message
-    setConversations(prev => prev.map((conv: Conversation) => 
-      conv.id === activeConversation 
-        ? { ...conv, lastMessage: currentMessage, lastMessageTime: new Date().toISOString() } 
-        : conv
-    ));
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -218,44 +120,43 @@ const ChatManagement: React.FC = () => {
 
   const filteredConversations = conversations.filter((conv: Conversation) => {
     // Filter by search query
+    const otherParticipant = conv.participants.find(p => p.person.id !== user?.id);
     const matchesSearch = searchQuery === '' || 
-      conv.name.toLowerCase().includes(searchQuery.toLowerCase());
+      (otherParticipant?.person.name || '').toLowerCase().includes(searchQuery.toLowerCase());
     
     // Filter by tab
     if (currentTab === 'unread') {
-      return matchesSearch && conv.unreadCount > 0;
+      return matchesSearch && (conv.unreadMessageCount || 0) > 0;
     } else if (currentTab === 'saved') {
-      return matchesSearch && conv.isSaved;
+      return matchesSearch && savedConversations.includes(conv.id);
     }
     
     return matchesSearch;
   });
 
-  const conversationMessages = messages.filter((msg: Message) => 
-    msg.conversationId === activeConversation
-  );
-
-  const markAsRead = (conversationId: string) => {
-    setConversations(prev => prev.map((conv: Conversation) => 
-      conv.id === conversationId 
-        ? { ...conv, unreadCount: 0 } 
-        : conv
-    ));
-
-    setMessages(prev => prev.map((msg: Message) => 
-      msg.conversationId === conversationId 
-        ? { ...msg, isRead: true } 
-        : msg
-    ));
-  };
-
   const handleConversationClick = (conversationId: string) => {
     setActiveConversation(conversationId);
-    markAsRead(conversationId);
+    socketService.markAsSeen(conversationId);
+  };
+
+  const toggleSaveConversation = (conversationId: string) => {
+    let updated;
+    if (savedConversations.includes(conversationId)) {
+      updated = savedConversations.filter(id => id !== conversationId);
+    } else {
+      updated = [...savedConversations, conversationId];
+    }
+    
+    setSavedConversations(updated);
+    localStorage.setItem('owner_saved_conversations', JSON.stringify(updated));
   };
 
   const getCurrentConversation = () => {
     return conversations.find(c => c.id === activeConversation);
+  };
+
+  const getOtherParticipant = (conversation: Conversation) => {
+    return conversation?.participants.find(p => p.person.id !== user?.id);
   };
 
   const handleTabChange = (key: string) => {
@@ -285,7 +186,7 @@ const ChatManagement: React.FC = () => {
                 {
                   key: 'unread',
                   label: (
-                    <Badge count={conversations.filter(c => c.unreadCount > 0).length} size="small">
+                    <Badge count={conversations.filter(c => (c.unreadMessageCount || 0) > 0).length} size="small">
                       Chưa đọc
                     </Badge>
                   ),
@@ -310,78 +211,71 @@ const ChatManagement: React.FC = () => {
             </div>
 
             <div className="chat-list">
-              {filteredConversations.length > 0 ? (
-                filteredConversations.map(conversation => (
-                  <div 
-                    key={conversation.id} 
-                    className={`chat-item ${activeConversation === conversation.id ? 'active' : ''} ${conversation.unreadCount > 0 ? 'unread' : ''}`}
-                    onClick={() => handleConversationClick(conversation.id)}
-                  >
-                    <Badge count={conversation.unreadCount} size="small" className="badge-notify">
-                      <Avatar src={conversation.avatar} size={40} icon={<UserOutlined />} />
-                    </Badge>
-                    <div className="chat-item-content">
-                      <div className="chat-item-header">
-                        <span className="chat-item-name">{conversation.name}</span>
-                        <span className="chat-item-time">
-                          {new Date(conversation.lastMessageTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                        </span>
+              {isLoading ? (
+                <div className="loading-container">
+                  <Spin size="large" />
+                  <p className="mt-3">Đang tải dữ liệu...</p>
+                </div>
+              ) : filteredConversations.length > 0 ? (
+                filteredConversations.map(conversation => {
+                  const otherParticipant = getOtherParticipant(conversation);
+                  // Lấy thông tin thời gian tin nhắn cuối
+                  const lastMessage = conversation.messages && conversation.messages.length > 0 
+                    ? conversation.messages[conversation.messages.length - 1]
+                    : null;
+                    
+                  return (
+                    <div 
+                      key={conversation.id} 
+                      className={`chat-item ${activeConversation === conversation.id ? 'active' : ''} ${(conversation.unreadMessageCount || 0) > 0 ? 'unread' : ''}`}
+                      onClick={() => handleConversationClick(conversation.id)}
+                    >
+                      <Badge count={conversation.unreadMessageCount || 0} size="small" className="badge-notify">
+                        <Avatar src={otherParticipant?.person.avatar} size={40} icon={<UserOutlined />} />
+                      </Badge>
+                      <div className="chat-item-content">
+                        <div className="chat-item-header">
+                          <span className="chat-item-name">{otherParticipant?.person.name || 'Không xác định'}</span>
+                          <span className="chat-item-time">
+                            {lastMessage ? new Date(lastMessage.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}
+                          </span>
+                        </div>
+                        <div className="chat-item-message">
+                          {lastMessage ? lastMessage.content : 'Bắt đầu cuộc trò chuyện'}
+                        </div>
                       </div>
-                      <div className="chat-item-facility">{conversation.facility}</div>
-                      <div className="chat-item-message">
-                        {conversation.lastMessage}
-                      </div>
-                    </div>
-                    <Dropdown menu={{ 
-                      items: [
-                        { 
-                          key: '1', 
-                          label: 'Đánh dấu đã đọc',
-                          icon: <CheckOutlined />,
-                          onClick: (e) => {
-                            e.domEvent.stopPropagation();
-                            markAsRead(conversation.id);
-                          }
-                        },
-                        { 
-                          key: '2', 
-                          label: conversation.isSaved ? 'Bỏ ghim' : 'Ghim trò chuyện',
-                          icon: <PushpinOutlined />,
-                          onClick: (e) => {
-                            e.domEvent.stopPropagation();
-                            setConversations(prev => prev.map((conv: Conversation) => 
-                              conv.id === conversation.id 
-                                ? { ...conv, isSaved: !conv.isSaved } 
-                                : conv
-                            ));
-                          }
-                        },
-                        { 
-                          key: '3', 
-                          label: 'Xóa trò chuyện',
-                          icon: <DeleteOutlined />,
-                          danger: true,
-                          onClick: (e) => {
-                            e.domEvent.stopPropagation();
-                            setConversations(prev => 
-                              prev.filter((conv: Conversation) => conv.id !== conversation.id)
-                            );
-                            if (activeConversation === conversation.id) {
-                              setActiveConversation(null);
+                      <Dropdown menu={{ 
+                        items: [
+                          { 
+                            key: '1', 
+                            label: 'Đánh dấu đã đọc',
+                            icon: <CheckOutlined />,
+                            onClick: (e) => {
+                              e.domEvent.stopPropagation();
+                              socketService.markAsSeen(conversation.id);
+                            }
+                          },
+                          { 
+                            key: '2', 
+                            label: savedConversations.includes(conversation.id) ? 'Bỏ ghim' : 'Ghim trò chuyện',
+                            icon: <PushpinOutlined />,
+                            onClick: (e) => {
+                              e.domEvent.stopPropagation();
+                              toggleSaveConversation(conversation.id);
                             }
                           }
-                        },
-                      ] 
-                    }} trigger={['click']} placement="bottomRight">
-                      <Button 
-                        type="text" 
-                        icon={<EllipsisOutlined />} 
-                        onClick={(e) => e.stopPropagation()}
-                        className="chat-item-more"
-                      />
-                    </Dropdown>
-                  </div>
-                ))
+                        ] 
+                      }} trigger={['click']} placement="bottomRight">
+                        <Button 
+                          type="text" 
+                          icon={<EllipsisOutlined />} 
+                          onClick={(e) => e.stopPropagation()}
+                          className="chat-item-more"
+                        />
+                      </Dropdown>
+                    </div>
+                  );
+                })
               ) : (
                 <Empty 
                   description="Không tìm thấy cuộc trò chuyện nào" 
@@ -397,17 +291,14 @@ const ChatManagement: React.FC = () => {
                 <div className="conversation-header">
                   <div className="conversation-info">
                     <Avatar 
-                      src={getCurrentConversation()?.avatar} 
+                      src={getOtherParticipant(getCurrentConversation() as Conversation)?.person.avatar} 
                       size="small" 
                       icon={<UserOutlined />}
                       className="header-avatar"
                     />
                     <div className="header-info">
                       <span className="conversation-name">
-                        {getCurrentConversation()?.name}
-                      </span>
-                      <span className="conversation-facility">
-                        {getCurrentConversation()?.facility}
+                        {getOtherParticipant(getCurrentConversation() as Conversation)?.person.name || 'Không xác định'}
                       </span>
                     </div>
                   </div>
@@ -419,38 +310,20 @@ const ChatManagement: React.FC = () => {
                         icon: <CheckOutlined />,
                         onClick: () => {
                           if (activeConversation) {
-                            markAsRead(activeConversation);
+                            socketService.markAsSeen(activeConversation);
                           }
                         }
                       },
                       { 
                         key: '2', 
-                        label: getCurrentConversation()?.isSaved ? 'Bỏ ghim' : 'Ghim trò chuyện',
+                        label: savedConversations.includes(activeConversation) ? 'Bỏ ghim' : 'Ghim trò chuyện',
                         icon: <PushpinOutlined />,
                         onClick: () => {
                           if (activeConversation) {
-                            setConversations(prev => prev.map((conv: Conversation) => 
-                              conv.id === activeConversation 
-                                ? { ...conv, isSaved: !conv.isSaved } 
-                                : conv
-                            ));
+                            toggleSaveConversation(activeConversation);
                           }
                         }
-                      },
-                      { 
-                        key: '3', 
-                        label: 'Xóa trò chuyện',
-                        icon: <DeleteOutlined />,
-                        danger: true,
-                        onClick: () => {
-                          if (activeConversation) {
-                            setConversations(prev => 
-                              prev.filter((conv: Conversation) => conv.id !== activeConversation)
-                            );
-                            setActiveConversation(null);
-                          }
-                        }
-                      },
+                      }
                     ] 
                   }} placement="bottomRight">
                     <Button type="text" icon={<MoreOutlined />} />
@@ -458,31 +331,46 @@ const ChatManagement: React.FC = () => {
                 </div>
 
                 <div className="messages-container">
-                  {conversationMessages.map(msg => (
-                    <div 
-                      key={msg.id} 
-                      className={`message ${msg.senderId === 'owner' ? 'sent' : 'received'}`}
-                    >
-                      {msg.senderId !== 'owner' && (
-                        <Avatar 
-                          src={getCurrentConversation()?.avatar} 
-                          size="small"
-                          icon={<UserOutlined />}
-                        />
-                      )}
-                      <div className="message-content">
-                        <div className="message-bubble">{msg.content}</div>
-                        <div className="message-time">
-                          {new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                          {msg.senderId === 'owner' && (
-                            <span className="message-status">
-                              {msg.isRead ? ' · Đã xem' : ''}
-                            </span>
-                          )}
+                  {messages.length > 0 ? (
+                    messages.map(msg => (
+                      <div 
+                        key={msg.id} 
+                        className={`message ${msg.sender.personId === user?.id ? 'sent' : 'received'}`}
+                      >
+                        {msg.sender.personId !== user?.id && (
+                          <Avatar 
+                            src={getOtherParticipant(getCurrentConversation() as Conversation)?.person.avatar} 
+                            size="small"
+                            icon={<UserOutlined />}
+                          />
+                        )}
+                        <div className="message-content">
+                          <div className="message-bubble">
+                            {msg.content}
+                            {msg.imageUrls && msg.imageUrls.length > 0 && (
+                              <div className="message-images">
+                                {msg.imageUrls.map((url, idx) => (
+                                  <img key={idx} src={url} alt="Hình ảnh" />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <div className="message-time">
+                            {new Date(msg.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                            {msg.sender.personId === user?.id && (
+                              <span className="message-status">
+                                {msg.sender.seen ? ' · Đã xem' : ''}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
+                    ))
+                  ) : (
+                    <div className="empty-messages">
+                      <p>Hãy bắt đầu cuộc trò chuyện</p>
                     </div>
-                  ))}
+                  )}
                   <div ref={messagesEndRef} />
                 </div>
 

@@ -8,6 +8,7 @@ import { useAuthInitialization } from './hooks/useAuth';
 import { hidePlayerRoleModal, hideOwnerRoleModal, hideRoleModal, showLoginModal, resetAuthChecks } from './store/slices/userSlice';
 import PlayerRoleModal from './components/LoginModal/PlayerRoleModal';
 import OwnerRoleModal from './components/LoginModal/OwnerRoleModal';
+import { SocketServiceProvider } from './providers/SocketServiceProvider';
 
 const App: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -53,10 +54,11 @@ const App: React.FC = () => {
 
 
   return (
-    <BrowserRouter>    
-      <AppRouter />
-      {loginModalVisible && <LoginModal visible={loginModalVisible} requiredRole={selectedRole || undefined} />}
-      {roleModalVisible && (
+    <SocketServiceProvider>
+      <BrowserRouter>    
+        <AppRouter />
+        {loginModalVisible && <LoginModal visible={loginModalVisible} requiredRole={selectedRole || undefined} />}
+        {roleModalVisible && (
         <RoleSelectionModal 
           visible={roleModalVisible} 
           onClose={handleCloseRoleModal} 
@@ -78,6 +80,7 @@ const App: React.FC = () => {
         />
       )}
     </BrowserRouter>
+    </SocketServiceProvider>
   );
 };
 

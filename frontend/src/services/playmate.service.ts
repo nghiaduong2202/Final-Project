@@ -1,4 +1,4 @@
-import { PlaymateSearch, PlaymateApplication, SkillLevel, PlaymateSearchType, PlaymateStatus } from "@/types/playmate.type";
+import { PlaymateSearch, PlaymateApplication, SkillLevel, PlaymateSearchType, PlaymateStatus, PlaymateFormData } from "@/types/playmate.type";
 import { mockPlaymateSearches, mockPlaymateApplications } from "@/mocks/playmate/playmate.mock";
 
 // Flag để chuyển đổi giữa mock data và API thực tế
@@ -71,12 +71,40 @@ export const getUserPlaymateSearches = async (userId: string): Promise<PlaymateS
 /**
  * Tạo bài đăng tìm bạn chơi mới
  */
-export const createPlaymateSearch = async (playmateSearch: Omit<PlaymateSearch, 'id' | 'createdAt' | 'updatedAt'>): Promise<PlaymateSearch> => {
+export const createPlaymateSearch = async (formData: PlaymateFormData): Promise<PlaymateSearch> => {
   if (USE_MOCK) {
     // Sử dụng mock data - chỉ giả lập
     const newSearch: PlaymateSearch = {
-      ...playmateSearch,
       id: Math.max(...mockPlaymateSearches.map(s => s.id)) + 1,
+      userId: 'current-user-id', // Giả định ID người dùng hiện tại
+      userInfo: {
+        name: 'Người dùng hiện tại', // Giả định tên người dùng hiện tại
+      },
+      sportId: formData.sportId,
+      sportName: 'Mock Sport', // Giả định tên môn thể thao
+      title: formData.title,
+      description: formData.description,
+      image: formData.image ? ['https://example.com/image.jpg'] : undefined,
+      requiredSkillLevel: formData.requiredSkillLevel.includes('ANY') ? 'ANY' : formData.requiredSkillLevel[0],
+      facilityId: formData.facilityId,
+      facilityName: 'Mock Facility', // Giả định tên cơ sở
+      location: formData.location,
+      date: formData.date,
+      startTime: formData.startTime,
+      endTime: formData.endTime,
+      applicationDeadline: formData.applicationDeadline,
+      communicationDescription: formData.communicationDescription,
+      playmateSearchType: formData.searchType, // Chuyển đổi từ searchType
+      requiredParticipants: formData.requiredParticipants,
+      maximumParticipants: formData.maximumParticipants,
+      currentParticipants: 1, // Mặc định là 1 (người tạo)
+      genderPreference: formData.genderPreference,
+      price: formData.price,
+      costType: formData.costType,
+      costMale: formData.costMale,
+      costFemale: formData.costFemale,
+      costDetails: formData.costDetails,
+      status: 'ACTIVE', // Mặc định là ACTIVE
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       applications: []
@@ -85,12 +113,19 @@ export const createPlaymateSearch = async (playmateSearch: Omit<PlaymateSearch, 
   } else {
     // Sử dụng API thực tế
     try {
+      // Chuyển đổi từ FormData sang định dạng API cần
+      const apiData = {
+        ...formData,
+        requiredSkillLevel: formData.requiredSkillLevel.includes('ANY') ? 'ANY' : formData.requiredSkillLevel[0],
+        playmateSearchType: formData.searchType
+      };
+      
       const response = await fetch('/api/playmate/searches', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(playmateSearch),
+        body: JSON.stringify(apiData),
       });
       if (!response.ok) throw new Error('Failed to create playmate search');
       return await response.json();

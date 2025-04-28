@@ -22,7 +22,9 @@ import {
   Input,
   message,
   Spin,
-  Result
+  Result,
+  Image,
+  Tabs
 } from 'antd';
 import {
   CalendarOutlined,
@@ -32,7 +34,9 @@ import {
   TeamOutlined,
   MoneyCollectOutlined,
   TrophyOutlined,
-  ArrowLeftOutlined
+  ArrowLeftOutlined,
+  ExpandOutlined,
+  InfoCircleOutlined
 } from '@ant-design/icons';
 
 const { Title, Text, Paragraph } = Typography;
@@ -55,6 +59,7 @@ const PlaymateDetail: React.FC = () => {
   const [playmateSearch, setPlaymateSearch] = useState<PlaymateSearch | null>(null);
   const [isModalVisible, setIsModalVisible] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const [mainImage, setMainImage] = useState<string>('');
   
   // Mock: Thông tin người dùng hiện tại
   const currentUser = {
@@ -80,6 +85,11 @@ const PlaymateDetail: React.FC = () => {
         }
         
         setPlaymateSearch(data);
+        
+        // Set main image if available
+        if (data.image && data.image.length > 0) {
+          setMainImage(data.image[0]);
+        }
       } catch (error) {
         console.error('Error fetching playmate search:', error);
         setError('Đã có lỗi xảy ra khi tải dữ liệu. Vui lòng thử lại sau.');
@@ -186,10 +196,14 @@ const PlaymateDetail: React.FC = () => {
   };
   
   // Format date time
-  // const formatDateTime = (date: string, time: string) => {
-  //   const formattedDate = moment(date, 'YYYY-MM-DD').format('DD/MM/YYYY');
-  //   return `${formattedDate} ${time}`;
-  // };
+  const formatDate = (date: string) => {
+    return moment(date).format('DD/MM/YYYY');
+  };
+  
+  // Handle thumbnail click
+  const handleImageClick = (image: string) => {
+    setMainImage(image);
+  };
   
   // Get skill level display
   const getSkillLevelDisplay = (level: SkillLevel) => {
@@ -238,208 +252,311 @@ const PlaymateDetail: React.FC = () => {
     );
   }
   
-  return (
-    <div className="min-h-screen bg-white p-4">
-      <div className="max-w-4xl mx-auto">
-        {/* Breadcrumb */}
-        <Breadcrumb className="mb-4">
-          <Breadcrumb.Item>
-            <Link to="/user/dashboard">Trang chủ</Link>
-          </Breadcrumb.Item>
-          <Breadcrumb.Item>
-            <Link to="/user/playmate">Tìm bạn chơi</Link>
-          </Breadcrumb.Item>
-          <Breadcrumb.Item>Chi tiết</Breadcrumb.Item>
-        </Breadcrumb>
-        
-        {/* Back button */}
-        <Button 
-          icon={<ArrowLeftOutlined />} 
-          onClick={() => navigate('/user/playmate')}
-          className="mb-4"
-        >
-          Quay lại
-        </Button>
-        
-        {/* Header */}
-        <Card className="mb-4">
+  // Tab items
+  const tabItems = [
+    {
+      key: 'info',
+      label: 'Thông tin chi tiết',
+      children: (
+        <div className="py-4">
           <Row gutter={[16, 16]}>
-            <Col xs={24} md={18}>
-              <Space direction="vertical" size={8} className="w-full">
-                {/* Title */}
-                <Title level={3}>{playmateSearch.title}</Title>
-                
-                {/* Tags */}
-                <Space wrap>
-                  {playmateSearch.sportName && (
-                    <Tag color="blue">{playmateSearch.sportName}</Tag>
-                  )}
-                  <Tag color={playmateSearch.playmateSearchType === 'INDIVIDUAL' ? 'green' : 'purple'}>
-                    {playmateSearch.playmateSearchType === 'INDIVIDUAL' ? 'Cá nhân' : 'Nhóm'}
-                  </Tag>
-                  <Tag color="orange">
-                    {getSkillLevelDisplay(playmateSearch.requiredSkillLevel)}
-                  </Tag>
-                  {!isActive && (
-                    <Tag color="red">
-                      {playmateSearch.status === 'COMPLETED' ? 'Đã hoàn thành' : 'Đã hủy'}
-                    </Tag>
-                  )}
-                </Space>
-              </Space>
-            </Col>
-            
-            <Col xs={24} md={6} className="flex justify-end items-start">
-              {!isOwner && isActive && (
-                <Button 
-                  type="primary" 
-                  size="large"
-                  onClick={showModal}
-                  disabled={hasApplied || isFull || isFull === null}
-                >
-                  {hasApplied ? 'Đã đăng ký' : (isFull ? 'Đã đủ người' : 'Đăng ký tham gia')}
-                </Button>
-              )}
-              {isOwner && (
-                <Button 
-                  type="primary" 
-                  onClick={() => navigate(`/user/playmate/manage/${id}`)}
-                >
-                  Quản lý bài đăng
-                </Button>
-              )}
-            </Col>
-          </Row>
-        </Card>
-        
-        {/* Main content */}
-        <Row gutter={[16, 16]}>
-          {/* Left column - details */}
-          <Col xs={24} md={16}>
-            <Card className="mb-4">
-              <Space direction="vertical" size={16} className="w-full">
-                {/* Time and location */}
-                <Space direction="vertical" size={8} className="w-full">
-                  <Space align="center">
-                    <CalendarOutlined className="text-gray-500" />
-                    <Text>{moment(playmateSearch.date).format('DD/MM/YYYY')}</Text>
-                  </Space>
-                  
-                  <Space align="center">
-                    <ClockCircleOutlined className="text-gray-500" />
-                    <Text>{`${playmateSearch.startTime} - ${playmateSearch.endTime}`}</Text>
-                  </Space>
-                  
-                  {playmateSearch.location && (
+            <Col xs={24} md={16}>
+              <Card className="mb-4 shadow-sm">
+                <Space direction="vertical" size={16} className="w-full">
+                  {/* Time and location */}
+                  <Space direction="vertical" size={8} className="w-full">
                     <Space align="center">
-                      <EnvironmentOutlined className="text-gray-500" />
-                      <Text>{playmateSearch.location}</Text>
+                      <CalendarOutlined className="text-blue-600" />
+                      <Text>{formatDate(playmateSearch.date)}</Text>
                     </Space>
-                  )}
-                </Space>
-                
-                <Divider />
-                
-                {/* Description */}
-                <div>
-                  <Title level={5}>Mô tả</Title>
-                  <Paragraph>
-                    {playmateSearch.description || 'Không có mô tả chi tiết.'}
-                  </Paragraph>
-                </div>
-                
-                {playmateSearch.communicationDescription && (
-                  <>
-                    <Divider />
-                    <div>
-                      <Title level={5}>Thông tin liên hệ</Title>
-                      <Paragraph>
-                        {playmateSearch.communicationDescription}
-                      </Paragraph>
-                    </div>
-                  </>
-                )}
-              </Space>
-            </Card>
-          </Col>
-          
-          {/* Right column - summary */}
-          <Col xs={24} md={8}>
-            {/* Creator info */}
-            <Card className="mb-4">
-              <Space direction="vertical" size={16} className="w-full">
-                <Title level={5}>Người tạo</Title>
-                <Space>
-                  <Avatar 
-                    size={64} 
-                    src={playmateSearch.userInfo.avatar} 
-                    icon={<UserOutlined />} 
-                  />
-                  <Space direction="vertical" size={0}>
-                    <Text strong>{playmateSearch.userInfo.name}</Text>
-                    {playmateSearch.userInfo.phoneNumber && (
-                      <Text>{playmateSearch.userInfo.phoneNumber}</Text>
+                    
+                    <Space align="center">
+                      <ClockCircleOutlined className="text-blue-600" />
+                      <Text>{`${playmateSearch.startTime} - ${playmateSearch.endTime}`}</Text>
+                    </Space>
+                    
+                    {playmateSearch.location && (
+                      <Space align="center">
+                        <EnvironmentOutlined className="text-blue-600" />
+                        <Text>{playmateSearch.location}</Text>
+                      </Space>
                     )}
                   </Space>
+                  
+                  <Divider />
+                  
+                  {/* Description */}
+                  <div>
+                    <Title level={5}>Mô tả</Title>
+                    <Paragraph>
+                      {playmateSearch.description || 'Không có mô tả chi tiết.'}
+                    </Paragraph>
+                  </div>
+                  
+                  {playmateSearch.communicationDescription && (
+                    <>
+                      <Divider />
+                      <div>
+                        <Title level={5}>Thông tin liên hệ</Title>
+                        <Paragraph>
+                          {playmateSearch.communicationDescription}
+                        </Paragraph>
+                      </div>
+                    </>
+                  )}
                 </Space>
-              </Space>
-            </Card>
+              </Card>
+            </Col>
             
-            {/* Details box */}
-            <Card className="mb-4">
-              <Descriptions title="Thông tin chi tiết" column={1} bordered>
-                <Descriptions.Item label="Số người cần thiết">
+            <Col xs={24} md={8}>
+              {/* Creator info */}
+              <Card className="mb-4 shadow-sm">
+                <Space direction="vertical" size={16} className="w-full">
+                  <Title level={5}>Người tạo</Title>
                   <Space>
-                    <TeamOutlined />
-                    <Text>{`${playmateSearch.currentParticipants || 1}/${playmateSearch.requiredParticipants}`}</Text>
-                  </Space>
-                </Descriptions.Item>
-                
-                {playmateSearch.maximumParticipants && (
-                  <Descriptions.Item label="Số người tối đa">
-                    <Space>
-                      <TeamOutlined />
-                      <Text>{playmateSearch.maximumParticipants}</Text>
+                    <Avatar 
+                      size={64} 
+                      src={playmateSearch.userInfo.avatar} 
+                      icon={<UserOutlined />} 
+                    />
+                    <Space direction="vertical" size={0}>
+                      <Text strong>{playmateSearch.userInfo.name}</Text>
+                      {playmateSearch.userInfo.phoneNumber && (
+                        <Text>{playmateSearch.userInfo.phoneNumber}</Text>
+                      )}
                     </Space>
-                  </Descriptions.Item>
-                )}
-                
-                <Descriptions.Item label="Trình độ yêu cầu">
-                  <Space>
-                    <TrophyOutlined />
-                    <Text>{getSkillLevelDisplay(playmateSearch.requiredSkillLevel)}</Text>
                   </Space>
-                </Descriptions.Item>
-                
-                {playmateSearch.genderPreference && (
-                  <Descriptions.Item label="Giới tính ưu tiên">
-                    <Space>
-                      <UserOutlined />
-                      <Text>
-                        {playmateSearch.genderPreference === 'MALE' ? 'Nam' : 
-                         playmateSearch.genderPreference === 'FEMALE' ? 'Nữ' : 
-                         'Không giới hạn'}
-                      </Text>
-                    </Space>
+                </Space>
+              </Card>
+              
+              {/* Details box */}
+              <Card className="mb-4 shadow-sm">
+                <Descriptions title="Thông tin chi tiết" column={1}>
+                  <Descriptions.Item 
+                    label={<span className="font-medium"><TeamOutlined className="mr-2" />Số người cần thiết</span>}
+                  >
+                    {`${playmateSearch.currentParticipants || 1}/${playmateSearch.requiredParticipants}`}
                   </Descriptions.Item>
-                )}
-                
-                <Descriptions.Item label="Chi phí">
-                  <Space>
-                    <MoneyCollectOutlined />
+                  
+                  {playmateSearch.maximumParticipants && (
+                    <Descriptions.Item 
+                      label={<span className="font-medium"><TeamOutlined className="mr-2" />Số người tối đa</span>}
+                    >
+                      {playmateSearch.maximumParticipants}
+                    </Descriptions.Item>
+                  )}
+                  
+                  <Descriptions.Item 
+                    label={<span className="font-medium"><TrophyOutlined className="mr-2" />Trình độ yêu cầu</span>}
+                  >
+                    {getSkillLevelDisplay(playmateSearch.requiredSkillLevel)}
+                  </Descriptions.Item>
+                  
+                  {playmateSearch.genderPreference && (
+                    <Descriptions.Item 
+                      label={<span className="font-medium"><UserOutlined className="mr-2" />Giới tính ưu tiên</span>}
+                    >
+                      {playmateSearch.genderPreference === 'MALE' ? 'Nam' : 
+                       playmateSearch.genderPreference === 'FEMALE' ? 'Nữ' : 
+                       'Không giới hạn'}
+                    </Descriptions.Item>
+                  )}
+                  
+                  <Descriptions.Item 
+                    label={<span className="font-medium"><MoneyCollectOutlined className="mr-2" />Chi phí</span>}
+                  >
                     {getCostDisplay()}
-                  </Space>
-                </Descriptions.Item>
-                
-                {playmateSearch.costDetails && (
-                  <Descriptions.Item label="Chi tiết chi phí">
-                    <Text>{playmateSearch.costDetails}</Text>
                   </Descriptions.Item>
+                  
+                  {playmateSearch.costDetails && (
+                    <Descriptions.Item 
+                      label={<span className="font-medium"><InfoCircleOutlined className="mr-2" />Chi tiết chi phí</span>}
+                    >
+                      {playmateSearch.costDetails}
+                    </Descriptions.Item>
+                  )}
+                </Descriptions>
+              </Card>
+            </Col>
+          </Row>
+        </div>
+      )
+    },
+    {
+      key: 'images',
+      label: 'Hình ảnh',
+      children: (
+        <div className="py-4">
+          {playmateSearch.image && playmateSearch.image.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {playmateSearch.image.map((img, index) => (
+                <Image
+                  key={index}
+                  src={img}
+                  alt={`${playmateSearch.title} - Hình ${index + 1}`}
+                  className="rounded-lg object-cover h-48 w-full"
+                  preview={{
+                    src: img,
+                    mask: <div className="flex items-center justify-center"><ExpandOutlined /> Xem ảnh lớn</div>,
+                  }}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <Text type="secondary">Không có hình ảnh</Text>
+            </div>
+          )}
+        </div>
+      )
+    }
+  ];
+  
+  return (
+    <div className="w-full px-4 py-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Section 1: Breadcrumb, Title, Status, and Image */}
+        <section className="mb-6 md:mb-8">
+          {/* Breadcrumb */}
+          <Breadcrumb className="mb-3" items={[
+            { title: <Link to="/">Trang chủ</Link> },
+            { title: <Link to="/user/playmate">Tìm bạn chơi</Link> },
+            { title: "Chi tiết" }
+          ]} />
+          
+          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 mb-3">
+            <Title level={2} className="m-0 text-xl md:text-2xl lg:text-3xl">{playmateSearch.title}</Title>
+            <div className="flex gap-2">
+              <Tag color={isActive ? 'green' : 'red'}>
+                {isActive ? 'Đang hoạt động' : 'Đã kết thúc'}
+              </Tag>
+              <Tag color={playmateSearch.playmateSearchType === 'INDIVIDUAL' ? 'blue' : 'purple'}>
+                {playmateSearch.playmateSearchType === 'INDIVIDUAL' ? 'Cá nhân' : 'Nhóm'}
+              </Tag>
+            </div>
+          </div>
+          
+          <div className="mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Main Image */}
+              <div>
+                <div className="relative w-full h-auto">
+                  <Image
+                    src={mainImage || (playmateSearch.image && playmateSearch.image.length > 0 ? 
+                      playmateSearch.image[0] : 'https://via.placeholder.com/800x400?text=No+Image')}
+                    alt={playmateSearch.title}
+                    className="w-full rounded-lg"
+                    style={{ 
+                      height: 'auto', 
+                      maxHeight: '400px', 
+                      objectFit: 'cover' 
+                    }}
+                    preview={{
+                      mask: <div className="flex items-center justify-center"><ExpandOutlined /> Xem ảnh lớn</div>,
+                    }}
+                  />
+                </div>
+                
+                {/* Thumbnail Gallery */}
+                {playmateSearch.image && playmateSearch.image.length > 1 && (
+                  <div className="flex gap-2 mt-2 overflow-x-auto">
+                    {playmateSearch.image.map((img, index) => (
+                      <div 
+                        key={index} 
+                        className={`relative cursor-pointer border-2 rounded-lg overflow-hidden flex-shrink-0 
+                          ${mainImage === img ? 'border-blue-500' : 'border-transparent'}`}
+                        onClick={() => handleImageClick(img)}
+                        style={{ width: '70px', height: '50px' }}
+                      >
+                        <Image
+                          src={img}
+                          alt={`Thumbnail ${index + 1}`}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          preview={false}
+                        />
+                      </div>
+                    ))}
+                  </div>
                 )}
-              </Descriptions>
-            </Card>
-          </Col>
-        </Row>
+              </div>
+              
+              {/* Info Card */}
+              <div className="bg-white p-4 rounded-lg shadow-md">
+                <div className="mb-4">
+                  <Title level={4}>Thông tin chung</Title>
+                  <Divider className="my-3" />
+                  
+                  <Descriptions column={1} className="mb-3">
+                    <Descriptions.Item label={<span className="font-medium"><CalendarOutlined className="mr-2" />Ngày</span>}>
+                      {formatDate(playmateSearch.date)}
+                    </Descriptions.Item>
+                    
+                    <Descriptions.Item label={<span className="font-medium"><ClockCircleOutlined className="mr-2" />Thời gian</span>}>
+                      {`${playmateSearch.startTime} - ${playmateSearch.endTime}`}
+                    </Descriptions.Item>
+                    
+                    <Descriptions.Item label={<span className="font-medium"><EnvironmentOutlined className="mr-2" />Địa điểm</span>}>
+                      {playmateSearch.location}
+                    </Descriptions.Item>
+                    
+                    <Descriptions.Item label={<span className="font-medium"><TeamOutlined className="mr-2" />Số người tham gia</span>}>
+                      {`${playmateSearch.currentParticipants || 1}/${playmateSearch.requiredParticipants}`}
+                      {playmateSearch.maximumParticipants && ` (tối đa ${playmateSearch.maximumParticipants})`}
+                    </Descriptions.Item>
+                    
+                    <Descriptions.Item label={<span className="font-medium"><TrophyOutlined className="mr-2" />Trình độ yêu cầu</span>}>
+                      {getSkillLevelDisplay(playmateSearch.requiredSkillLevel)}
+                    </Descriptions.Item>
+                    
+                    <Descriptions.Item label={<span className="font-medium"><MoneyCollectOutlined className="mr-2" />Chi phí</span>}>
+                      {getCostDisplay()}
+                    </Descriptions.Item>
+                  </Descriptions>
+                  
+                  <div className="flex gap-2 mt-6">
+                    {!isOwner && isActive ? (
+                      <Button 
+                        type="primary" 
+                        size="large"
+                        onClick={showModal}
+                        disabled={hasApplied || isFull || !isActive}
+                      >
+                        {hasApplied ? 'Đã đăng ký' : (isFull ? 'Đã đủ người' : 'Đăng ký tham gia')}
+                      </Button>
+                    ) : isOwner ? (
+                      <Button 
+                        type="primary" 
+                        size="large"
+                        onClick={() => navigate(`/user/playmate/manage/${id}`)}
+                      >
+                        Quản lý bài đăng
+                      </Button>
+                    ) : null}
+                    
+                    <Button 
+                      type="default" 
+                      size="large"
+                      onClick={() => navigate('/user/playmate')}
+                      icon={<ArrowLeftOutlined />}
+                    >
+                      Quay lại danh sách
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+        
+        {/* Section 2: Event Details */}
+        <section className="mb-6">
+          <Card>
+            <Tabs 
+              defaultActiveKey="info" 
+              items={tabItems}
+            />
+          </Card>
+        </section>
       </div>
 
       {/* Application Modal */}
@@ -491,6 +608,21 @@ const PlaymateDetail: React.FC = () => {
           </Form.Item>
         </Form>
       </Modal>
+      
+      <style>{`
+        .ant-descriptions-item-label {
+          font-weight: 500;
+        }
+        
+        .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
+          color: #1890ff;
+          font-weight: 500;
+        }
+        
+        .ant-image {
+          display: block;
+        }
+      `}</style>
     </div>
   );
 };

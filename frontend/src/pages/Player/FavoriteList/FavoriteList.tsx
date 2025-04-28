@@ -259,8 +259,7 @@ const FavoriteList: React.FC = () => {
       
       {/* Header */}
       <div className="mb-6">
-        <Title level={3}>
-          <HeartFilled className="text-red-500 mr-2" /> 
+        <Title level={3}>          
           Danh sách sân yêu thích
         </Title>
         <Text type="secondary">

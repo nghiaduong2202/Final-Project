@@ -47,6 +47,7 @@ import { facilityService } from '@/services/facility.service';
 import { reviewService } from '@/services/review.service';
 import { useAppSelector, useAppDispatch } from '@/hooks/reduxHooks';
 import { showLoginModal } from '@/store/slices/userSlice';
+import { ChatService } from '@/services/chat.service';
 import dayjs from 'dayjs';
 
 // Import CSS ghi đè Ant Design
@@ -294,9 +295,37 @@ const DetailFacility: React.FC = () => {
     }
   };
 
-  const handleMessageClick = () => {
-    message.info('Chức năng nhắn tin đang được phát triển');
-    // Sau này sẽ điều hướng đến trang chat hoặc mở modal chat
+  const handleMessageClick = async () => {
+    // Kiểm tra đăng nhập
+    if (!isAuthenticated || user?.role !== 'player') {
+      dispatch(showLoginModal({ path: `/facility/${facilityId}`, role: 'player' }));
+      message.info('Vui lòng đăng nhập với vai trò người chơi để nhắn tin với chủ sở hữu');
+      return;
+    }
+
+    if (!facility?.owner?.id) {
+      message.error('Không thể tìm thấy thông tin chủ sở hữu');
+      return;
+    }
+
+    try {
+      // Tạo hoặc mở cuộc trò chuyện với owner
+      message.loading({ content: 'Đang kết nối...', key: 'createChat' });
+      const conversation = await ChatService.createConversation(facility.owner.id);
+      message.success({ content: 'Đã kết nối với chủ sở hữu', key: 'createChat' });
+      
+      // Mở chat widget sau khi tạo cuộc trò chuyện
+      // Việc này sẽ được xử lý bởi ChatWidget component
+      
+      // Lưu conversationId vào localStorage để ChatWidget hiển thị cuộc trò chuyện này
+      localStorage.setItem('active_conversation', conversation.id);
+      
+      // Dispatch event để ChatWidget biết cần mở và hiển thị cuộc trò chuyện
+      window.dispatchEvent(new CustomEvent('open_chat', { detail: { conversationId: conversation.id } }));
+    } catch (error) {
+      console.error('Error creating conversation:', error);
+      message.error({ content: 'Không thể kết nối với chủ sở hữu. Vui lòng thử lại sau.', key: 'createChat' });
+    }
   };
 
   // Define breadcrumb items
