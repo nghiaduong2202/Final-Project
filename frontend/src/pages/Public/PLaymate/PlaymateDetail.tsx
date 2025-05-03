@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { PlaymateSearch, SkillLevel } from '@/types/playmate.type';
-import { getPlaymateSearchById, createApplication } from '@/services/playmate.service';
+import { PlaymateSearch, SkillLevel, PlaymateApplicationFormData } from '@/types/playmate.type';
+import playmateService from '@/services/playmate.service';
 import moment from 'moment';
+import { useSelector } from 'react-redux';
+import { RootState } from '@/store';
 
 import {
   Card,
@@ -43,16 +45,11 @@ const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
 const { TextArea } = Input;
 
-// Interface cho form đăng ký
-interface ApplicationFormValues {
-  skillLevel?: SkillLevel;
-  message?: string;
-}
-
 const PlaymateDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [form] = Form.useForm();
+  const user = useSelector((state: RootState) => state.user.user);
   
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -60,15 +57,6 @@ const PlaymateDetail: React.FC = () => {
   const [isModalVisible, setIsModalVisible] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [mainImage, setMainImage] = useState<string>('');
-  
-  // Mock: Thông tin người dùng hiện tại
-  const currentUser = {
-    id: 'user123',
-    name: 'Nguyễn Văn A',
-    avatar: 'https://randomuser.me/api/portraits/men/85.jpg',
-    gender: 'male',
-    phoneNumber: '0987123456'
-  };
 
   // Fetch playmate search data
   useEffect(() => {
@@ -77,7 +65,7 @@ const PlaymateDetail: React.FC = () => {
       
       try {
         setLoading(true);
-        const data = await getPlaymateSearchById(Number(id));
+        const data = await playmateService.getPlaymateSearchById(id);
         
         if (!data) {
           setError('Không tìm thấy bài đăng.');
@@ -102,16 +90,20 @@ const PlaymateDetail: React.FC = () => {
   }, [id]);
 
   // Check if user has already applied
-  const hasApplied = playmateSearch?.applications?.some(app => app.userId === currentUser.id);
+  const hasApplied = playmateSearch?.participants?.some(app => app.playerId === user?.id);
   
   // Check if the search is created by current user
-  const isOwner = playmateSearch?.userId === currentUser.id;
+  const isOwner = playmateSearch?.userId === user?.id;
   
-  // Check if the search is full
+  // Check if the search is full - count accepted participants plus creator
+  const acceptedParticipants = playmateSearch?.participants ? 
+    playmateSearch.participants.filter(p => p.status === 'accepted' || p.status === 'ACCEPTED').length : 0;
+  
+  const currentCount = 1 + acceptedParticipants; // +1 for the creator
+  
   const isFull = playmateSearch && 
-    playmateSearch.currentParticipants !== undefined && 
     playmateSearch.maximumParticipants !== undefined && 
-    playmateSearch.currentParticipants >= playmateSearch.maximumParticipants;
+    currentCount >= playmateSearch.maximumParticipants;
 
   // Check if the search is active
   const isActive = playmateSearch?.status === 'ACTIVE';
@@ -128,32 +120,25 @@ const PlaymateDetail: React.FC = () => {
   };
   
   // Handle application form submission
-  const handleApply = async (values: ApplicationFormValues) => {
-    if (!playmateSearch || !id) return;
+  const handleApply = async (values: { skillLevel: string; note?: string }) => {
+    if (!playmateSearch || !id || !user) return;
     
     try {
       setSubmitting(true);
       
-      const applicationData = {
-        playmateSearchId: Number(id),
-        userId: currentUser.id,
-        userInfo: {
-          name: currentUser.name,
-          avatar: currentUser.avatar,
-          gender: currentUser.gender,
-          phoneNumber: currentUser.phoneNumber
-        },
+      const applicationData: PlaymateApplicationFormData = {
+        playmateId: id,
         skillLevel: values.skillLevel,
-        message: values.message
+        note: values.note
       };
       
-      await createApplication(applicationData);
+      await playmateService.createApplication(applicationData);
       
       message.success('Đăng ký thành công!');
       setIsModalVisible(false);
       
       // Reload data to show updated application status
-      const updatedData = await getPlaymateSearchById(Number(id));
+      const updatedData = await playmateService.getPlaymateSearchById(id);
       setPlaymateSearch(updatedData || null);
     } catch (error) {
       console.error('Error applying to playmate search:', error);
@@ -167,19 +152,17 @@ const PlaymateDetail: React.FC = () => {
   const getCostDisplay = () => {
     if (!playmateSearch) return null;
     
-    if (!playmateSearch.costType || playmateSearch.costType === 'FREE') {
+    const costType = playmateSearch.costType;
+    
+    if (!costType || costType === 'FREE' || costType === 'free') {
       return <Tag color="success">Miễn phí</Tag>;
     }
-    
-    if (playmateSearch.costType === 'PER_PERSON' && playmateSearch.price) {
-      return <Text>{playmateSearch.price.toLocaleString('vi-VN')}đ/người</Text>;
-    }
-    
-    if (playmateSearch.costType === 'TOTAL' && playmateSearch.price) {
+           
+    if ((costType === 'TOTAL' || costType === 'total') && playmateSearch.price) {
       return <Text>{playmateSearch.price.toLocaleString('vi-VN')}đ tổng</Text>;
     }
     
-    if (playmateSearch.costType === 'GENDER_BASED') {
+    if (costType === 'GENDER_BASED' || costType === 'genderBased') {
       return (
         <Space direction="vertical" size={0}>
           {playmateSearch.costMale && (
@@ -207,7 +190,9 @@ const PlaymateDetail: React.FC = () => {
   
   // Get skill level display
   const getSkillLevelDisplay = (level: SkillLevel) => {
-    switch (level) {
+    const levelUpper = level.toUpperCase() as SkillLevel;
+    
+    switch (levelUpper) {
       case 'BEGINNER':
         return 'Mới bắt đầu';
       case 'INTERMEDIATE':
@@ -316,7 +301,7 @@ const PlaymateDetail: React.FC = () => {
                   <Space>
                     <Avatar 
                       size={64} 
-                      src={playmateSearch.userInfo.avatar} 
+                      src={playmateSearch.userInfo.avatar || playmateSearch.userInfo.avatarUrl} 
                       icon={<UserOutlined />} 
                     />
                     <Space direction="vertical" size={0}>
@@ -333,9 +318,9 @@ const PlaymateDetail: React.FC = () => {
               <Card className="mb-4 shadow-sm">
                 <Descriptions title="Thông tin chi tiết" column={1}>
                   <Descriptions.Item 
-                    label={<span className="font-medium"><TeamOutlined className="mr-2" />Số người cần thiết</span>}
+                    label={<span className="font-medium"><TeamOutlined className="mr-2" />Số người tham gia</span>}
                   >
-                    {`${playmateSearch.currentParticipants || 1}/${playmateSearch.requiredParticipants}`}
+                    {`${currentCount}/${playmateSearch.requiredParticipants}`}
                   </Descriptions.Item>
                   
                   {playmateSearch.maximumParticipants && (
@@ -356,8 +341,8 @@ const PlaymateDetail: React.FC = () => {
                     <Descriptions.Item 
                       label={<span className="font-medium"><UserOutlined className="mr-2" />Giới tính ưu tiên</span>}
                     >
-                      {playmateSearch.genderPreference === 'MALE' ? 'Nam' : 
-                       playmateSearch.genderPreference === 'FEMALE' ? 'Nữ' : 
+                      {playmateSearch.genderPreference.toUpperCase() === 'MALE' ? 'Nam' : 
+                       playmateSearch.genderPreference.toUpperCase() === 'FEMALE' ? 'Nữ' : 
                        'Không giới hạn'}
                     </Descriptions.Item>
                   )}
@@ -500,7 +485,7 @@ const PlaymateDetail: React.FC = () => {
                     </Descriptions.Item>
                     
                     <Descriptions.Item label={<span className="font-medium"><TeamOutlined className="mr-2" />Số người tham gia</span>}>
-                      {`${playmateSearch.currentParticipants || 1}/${playmateSearch.requiredParticipants}`}
+                      {`${currentCount}/${playmateSearch.requiredParticipants}`}
                       {playmateSearch.maximumParticipants && ` (tối đa ${playmateSearch.maximumParticipants})`}
                     </Descriptions.Item>
                     
@@ -579,15 +564,16 @@ const PlaymateDetail: React.FC = () => {
             rules={[{ required: true, message: 'Vui lòng chọn trình độ!' }]}
           >
             <Select placeholder="Chọn trình độ của bạn">
-              <Option value="BEGINNER">Mới bắt đầu</Option>
-              <Option value="INTERMEDIATE">Trung cấp</Option>
-              <Option value="ADVANCED">Nâng cao</Option>
-              <Option value="PROFESSIONAL">Chuyên nghiệp</Option>
+              <Option value="beginner">Mới bắt đầu</Option>
+              <Option value="intermediate">Trung cấp</Option>
+              <Option value="advanced">Nâng cao</Option>
+              <Option value="professional">Chuyên nghiệp</Option>
+              <Option value="any">Không xác định</Option>
             </Select>
           </Form.Item>
 
           <Form.Item
-            name="message"
+            name="note"
             label="Lời nhắn"
           >
             <TextArea

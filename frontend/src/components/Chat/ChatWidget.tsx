@@ -1,42 +1,48 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Badge, Button, Input, Avatar, Empty, Dropdown, Tooltip } from 'antd';
+import React, { useEffect, useRef } from 'react';
+import { Badge, Button, Input, Avatar, Empty, Dropdown } from 'antd';
 import { 
   MessageOutlined, 
   CloseOutlined, 
   SendOutlined, 
-  SmileOutlined, 
-  PictureOutlined,
-  PushpinOutlined,
   MoreOutlined,
   SearchOutlined,
   UserOutlined,
-  EllipsisOutlined,
   ArrowLeftOutlined,
-  ShopOutlined
+  CheckOutlined
 } from '@ant-design/icons';
+import { useChat } from '@/hooks/useChat';
 import { useAppSelector } from '@/hooks/reduxHooks';
-import { Message, Conversation } from "@/types/chat.type";
-import { useSocketService } from '@/hooks/useSocketService';
-import { ChatService } from '@/services/chat.service';
+import MessageBubble from './MessageBubble';
 import './ChatWidget.css';
+import { useSocketService } from '@/hooks/useSocketService';
 
 const ChatWidget: React.FC = () => {
-  const { isAuthenticated, user } = useAppSelector(state => state.user);
-  const [isOpen, setIsOpen] = useState(false);
-  const [currentTab, setCurrentTab] = useState<'all' | 'unread' | 'saved'>('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeConversation, setActiveConversation] = useState<string | null>(null);
-  const [currentMessage, setCurrentMessage] = useState('');
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [currentMessage, setCurrentMessage] = React.useState('');
+  const [searchQuery, setSearchQuery] = React.useState('');
+  const [currentTab, setCurrentTab] = React.useState('all');
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const [isLoading, setIsLoading] = useState(false);
-  const [savedConversations, setSavedConversations] = useState<string[]>([]);
+  const [isMobile, setIsMobile] = React.useState(window.innerWidth < 768);
   
-  // Get socket service
+  const { user } = useAppSelector(state => state.user);
+  const {
+    conversations,
+    messages,
+    isLoading,
+    isChatWidgetOpen,
+    isConversationOpen,
+    activeConversationId,
+    isOnline,
+    fetchConversations,
+    handleConversationClick,
+    handleSendMessage,
+    toggleChat,
+    toggleConversationView,
+    getCurrentConversation,
+    getOtherParticipant,
+  } = useChat();
+
   const socketService = useSocketService();
-  
+
   // Responsive handler
   useEffect(() => {
     const handleResize = () => {
@@ -46,191 +52,112 @@ const ChatWidget: React.FC = () => {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-  
-  // Fetch conversations when component mounts or auth state changes
-  useEffect(() => {
-    const fetchConversations = async () => {
-      if (!isAuthenticated) return;
-      
-      try {
-        setIsLoading(true);
-        const conversationsData = await ChatService.getConversations();
-        setConversations(conversationsData);
-        
-        // Get saved conversations from localStorage
-        const saved = localStorage.getItem('saved_conversations');
-        if (saved) {
-          setSavedConversations(JSON.parse(saved));
-        }
-      } catch (error) {
-        console.error('Error fetching conversations:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
 
-    fetchConversations();
-    
-    // Listen for new conversations from socket
-    if (isAuthenticated) {
-      const subscription = socketService.getConversations().subscribe(
-        convos => {
-          if (convos.length > 0) {
-            setConversations(convos);
-          }
-        }
-      );
-      
-      return () => subscription.unsubscribe();
+  // Initial fetch when component mounts
+  useEffect(() => {
+    if (isChatWidgetOpen) {
+      fetchConversations();
     }
-  }, [isAuthenticated, socketService]);
-  
+  }, [isChatWidgetOpen, fetchConversations]);
+
+  // Reset unread counts when a conversation is active
+  useEffect(() => {
+    if (activeConversationId && isChatWidgetOpen) {
+      // Mark the active conversation as read
+      const convo = conversations.find(c => c.id === activeConversationId);
+      if (convo && convo.messages && convo.messages.length > 0) {
+        const lastMessage = convo.messages[convo.messages.length - 1];
+        if (lastMessage.sender.id !== user?.id) {
+          socketService.markAsSeen(activeConversationId, lastMessage.id);
+        }
+      }
+    }
+  }, [activeConversationId, isChatWidgetOpen, conversations, user, socketService]);
+
+  // Scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, activeConversationId]);
+
   // Listen for "open_chat" events
   useEffect(() => {
     const handleOpenChat = (event: CustomEvent) => {
       const { conversationId } = event.detail;
       if (conversationId) {
-        setIsOpen(true);
-        setActiveConversation(conversationId);
+        // Mở chat widget nếu đang đóng
+        if (!isChatWidgetOpen) {
+          toggleChat();
+        }
+        // Chọn conversation
+        handleConversationClick(conversationId);
+        // Mở conversation view nếu đang ở mobile
+        if (isMobile && !isConversationOpen) {
+          toggleConversationView();
+        }
       }
     };
     
     window.addEventListener('open_chat', handleOpenChat as EventListener);
-    
-    return () => {
-      window.removeEventListener('open_chat', handleOpenChat as EventListener);
-    };
-  }, []);
-  
-  // Check for active_conversation in localStorage on mount
-  useEffect(() => {
-    const activeConvId = localStorage.getItem('active_conversation');
-    if (activeConvId) {
-      setActiveConversation(activeConvId);
-      setIsOpen(true);
-      localStorage.removeItem('active_conversation'); // Clear after use
-    }
-  }, []);
-  
-  // Scroll to bottom when messages change or conversation is opened
-  useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages, activeConversation]);
-
-  // Subscribe to messages for active conversation
-  useEffect(() => {
-    if (!activeConversation || !isAuthenticated) return;
-    
-    // Mark conversation as seen when opened
-    socketService.markAsSeen(activeConversation);
-    
-    // Subscribe to messages for this conversation
-    const subscription = socketService.getMessages(activeConversation)
-      .subscribe(msgs => {
-        setMessages(msgs);
-      });
-    
-    return () => subscription.unsubscribe();
-  }, [activeConversation, socketService, isAuthenticated]);
-
-  const toggleChat = () => {
-    setIsOpen(!isOpen);
-  };
-
-  const handleSendMessage = () => {
-    if (!currentMessage.trim() || !activeConversation || !isAuthenticated) return;
-    
-    socketService.sendMessage(activeConversation, currentMessage);
-    setCurrentMessage('');
-  };
+    return () => window.removeEventListener('open_chat', handleOpenChat as EventListener);
+  }, [toggleChat, handleConversationClick, isChatWidgetOpen, isMobile, isConversationOpen, toggleConversationView]);
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      handleSendMessage();
+    if (e.key === 'Enter' && currentMessage.trim()) {
+      handleSendMessage(currentMessage);
+      setCurrentMessage('');
     }
   };
 
-  const calculateUnreadCount = (conversations: Conversation[]) => {
-    return conversations.reduce((total, conv) => total + (conv.unreadMessageCount || 0), 0);
+  const handleSendClick = () => {
+    if (currentMessage.trim()) {
+      console.log('ChatWidget sending message:', currentMessage);
+      handleSendMessage(currentMessage);
+      setCurrentMessage('');
+    }
   };
 
-  const filteredConversations = conversations.filter((conv: Conversation) => {
-    // Filter by search query
-    const otherParticipant = conv.participants.find(p => p.person.id !== user?.id);
+  const filteredConversations = conversations.filter((conv) => {
+    const otherParticipant = getOtherParticipant(conv);
     const matchesSearch = searchQuery === '' || 
       (otherParticipant?.person.name || '').toLowerCase().includes(searchQuery.toLowerCase());
     
-    // Filter by tab
     if (currentTab === 'unread') {
       return matchesSearch && (conv.unreadMessageCount || 0) > 0;
-    } else if (currentTab === 'saved') {
-      return matchesSearch && savedConversations.includes(conv.id);
     }
     
     return matchesSearch;
   });
 
-  const handleConversationClick = (conversationId: string) => {
-    setActiveConversation(conversationId);
-    socketService.markAsSeen(conversationId);
-  };
-
-  const closeConversation = () => {
-    if (isMobile) {
-      setActiveConversation(null);
-    }
-  };
-
-  const toggleSaveConversation = (conversationId: string) => {
-    let updated;
-    if (savedConversations.includes(conversationId)) {
-      updated = savedConversations.filter(id => id !== conversationId);
-    } else {
-      updated = [...savedConversations, conversationId];
-    }
-    
-    setSavedConversations(updated);
-    localStorage.setItem('saved_conversations', JSON.stringify(updated));
-  };
-
-  // Render chat sidebar (conversation list)
   const renderChatSidebar = () => (
-    <div className={`chat-sidebar ${isMobile && activeConversation ? 'hidden' : ''}`}>
+    <div className="chat-sidebar">
       <div className="chat-header">
-        <h3>Chat</h3>
+        <h3>Tin nhắn</h3>
         <Button 
           type="text" 
           icon={<CloseOutlined />} 
-          onClick={toggleChat} 
-          className="close-button"
+          onClick={toggleChat}
         />
       </div>
 
       <div className="chat-filter">
         <div className="filter-tabs">
-          <span 
+          <div 
             className={`filter-tab ${currentTab === 'all' ? 'active' : ''}`}
             onClick={() => setCurrentTab('all')}
           >
             Tất cả
-          </span>
-          <span 
+          </div>
+          <div 
             className={`filter-tab ${currentTab === 'unread' ? 'active' : ''}`}
             onClick={() => setCurrentTab('unread')}
           >
             Chưa đọc
-          </span>
-          <span 
-            className={`filter-tab ${currentTab === 'saved' ? 'active' : ''}`}
-            onClick={() => setCurrentTab('saved')}
-          >
-            Đã Ghim
-          </span>
+          </div>
         </div>
-        <Input 
-          placeholder="Tìm theo tên" 
+        <Input
+          placeholder="Tìm kiếm cuộc trò chuyện..."
           prefix={<SearchOutlined />}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
@@ -246,24 +173,17 @@ const ChatWidget: React.FC = () => {
           </div>
         ) : filteredConversations.length > 0 ? (
           filteredConversations.map(conversation => {
-            // Tìm người tham gia khác (không phải user hiện tại)
-            const otherParticipant = conversation.participants.find(
-              p => p.person.id !== user?.id
-            );
+            const otherParticipant = getOtherParticipant(conversation);
+            const lastMessage = conversation.messages?.[conversation.messages.length - 1];
             
-            // Lấy thông tin thời gian tin nhắn cuối
-            const lastMessage = conversation.messages && conversation.messages.length > 0 
-              ? conversation.messages[conversation.messages.length - 1]
-              : null;
-              
             return (
               <div 
                 key={conversation.id} 
-                className={`chat-item ${activeConversation === conversation.id ? 'active' : ''} ${(conversation.unreadMessageCount || 0) > 0 ? 'unread' : ''}`}
+                className={`chat-item ${activeConversationId === conversation.id ? 'active' : ''} ${(conversation.unreadMessageCount || 0) > 0 ? 'unread' : ''}`}
                 onClick={() => handleConversationClick(conversation.id)}
               >
                 <Badge count={conversation.unreadMessageCount || 0} size="small" className="badge-notify">
-                  <Avatar src={otherParticipant?.person.avatar} size={40} icon={<UserOutlined />} />
+                  <Avatar src={otherParticipant?.person.avatarUrl} size={40} icon={<UserOutlined />} />
                 </Badge>
                 <div className="chat-item-content">
                   <div className="chat-item-header">
@@ -273,54 +193,26 @@ const ChatWidget: React.FC = () => {
                     </span>
                   </div>
                   <div className="chat-item-message">
-                    {lastMessage ? lastMessage.content : 'Bắt đầu cuộc trò chuyện'}
+                    {lastMessage ? (
+                      <div className="truncate-text">
+                        {lastMessage.sender.id === user?.id && <span className="message-status-inline"><CheckOutlined /></span>}
+                        {lastMessage.content}
+                      </div>
+                    ) : 'Bắt đầu cuộc trò chuyện'}
                   </div>
                 </div>
-                <Dropdown menu={{ 
-                  items: [
-                    { 
-                      key: '1', 
-                      label: 'Đánh dấu đã đọc',
-                      onClick: (e) => {
-                        e.domEvent.stopPropagation();
-                        socketService.markAsSeen(conversation.id);
-                      }
-                    },
-                    { 
-                      key: '2', 
-                      label: savedConversations.includes(conversation.id) ? 'Bỏ ghim' : 'Ghim trò chuyện',
-                      icon: <PushpinOutlined />,
-                      onClick: (e) => {
-                        e.domEvent.stopPropagation();
-                        toggleSaveConversation(conversation.id);
-                      }
-                    },
-                  ] 
-                }} trigger={['click']} placement="bottomRight">
-                  <Button 
-                    type="text" 
-                    icon={<EllipsisOutlined />} 
-                    onClick={(e) => e.stopPropagation()}
-                    className="chat-item-more"
-                    style={{ position: 'absolute', right: 8, top: 12 }}
-                  />
-                </Dropdown>
               </div>
             );
           })
         ) : (
-          <Empty 
-            description="Không tìm thấy cuộc trò chuyện nào" 
-            image={Empty.PRESENTED_IMAGE_SIMPLE} 
-          />
+          <Empty description="Không có cuộc trò chuyện nào" />
         )}
       </div>
     </div>
   );
 
-  // Render chat detail view
   const renderChatDetail = () => {
-    if (!activeConversation) {
+    if (!activeConversationId) {
       if (!isMobile) {
         return (
           <div className="chat-conversation-wrapper">
@@ -333,45 +225,43 @@ const ChatWidget: React.FC = () => {
       return null;
     }
 
-    const currentConversation = conversations.find(c => c.id === activeConversation);
-    // Tìm người tham gia khác (không phải user hiện tại)
-    const otherParticipant = currentConversation?.participants.find(
-      p => p.person.id !== user?.id
-    );
+    const currentConversation = getCurrentConversation();
+    const otherParticipant = currentConversation ? getOtherParticipant(currentConversation) : null;
     
     return (
-      <div className={`chat-conversation-wrapper ${isMobile && !activeConversation ? 'hidden' : ''}`}>
+      <div className={`chat-conversation-wrapper ${isMobile && !isConversationOpen ? 'hidden' : ''}`}>
         <div className="chat-conversation">
           <div className="conversation-header">
             {isMobile && (
               <Button 
                 type="text" 
                 icon={<ArrowLeftOutlined />} 
-                onClick={closeConversation}
+                onClick={toggleConversationView}
                 className="conversation-back-btn"
               />
             )}
             <div className="conversation-info">
-              <span className="conversation-name">
-                {otherParticipant?.person.name || 'Không xác định'}
-              </span>
-              <span className="conversation-status">Online</span>
+              <Avatar 
+                src={otherParticipant?.person.avatarUrl} 
+                size="small" 
+                icon={<UserOutlined />} 
+                className="mr-2" 
+              />
+              <div>
+                <span className="conversation-name">
+                  {otherParticipant?.person.name || 'Không xác định'}
+                </span>
+                <span className={`conversation-status ${isOnline ? 'online' : 'offline'}`}>
+                  {isOnline ? 'Đang hoạt động' : 'Không hoạt động'}
+                </span>
+              </div>
             </div>
             <Dropdown menu={{ 
               items: [
                 { 
                   key: '1', 
                   label: 'Đánh dấu đã đọc',
-                  onClick: () => {
-                    socketService.markAsSeen(activeConversation);
-                  }
-                },
-                { 
-                  key: '2', 
-                  label: savedConversations.includes(activeConversation) ? 'Bỏ ghim' : 'Ghim trò chuyện',
-                  onClick: () => {
-                    toggleSaveConversation(activeConversation);
-                  }
+                  onClick: () => handleConversationClick(activeConversationId)
                 }
               ] 
             }} placement="bottomRight">
@@ -379,61 +269,28 @@ const ChatWidget: React.FC = () => {
             </Dropdown>
           </div>
 
-          <div className="shop-info">
-            <Avatar src={otherParticipant?.person.avatar} size={40} icon={<ShopOutlined />} className="shop-avatar" />
-            <div className="shop-detail">
-              <div className="shop-name">{otherParticipant?.person.name || 'Không xác định'}</div>
-              <div className="shop-description">Thường phản hồi trong vòng 5 phút</div>
-            </div>
-          </div>
-
           <div className="messages-container">
             {messages.length > 0 ? (
-              messages.map(msg => (
-                <div 
-                  key={msg.id} 
-                  className={`message ${msg.sender.personId === user?.id ? 'sent' : 'received'}`}
-                >
-                  {msg.sender.personId !== user?.id && (
-                    <Avatar 
-                      src={otherParticipant?.person.avatar} 
-                      size="small"
-                    />
-                  )}
-                  <div className="message-content">
-                    <div className="message-bubble">
-                      {msg.content}
-                      {msg.imageUrls && msg.imageUrls.length > 0 && (
-                        <div className="message-images">
-                          {msg.imageUrls.map((url, idx) => (
-                            <img key={idx} src={url} alt="Hình ảnh" />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <div className="message-time">
-                      {new Date(msg.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                    </div>
-                  </div>
-                </div>
-              ))
+              <div className="messages-list">
+                {messages.map(msg => (
+                  <MessageBubble
+                    key={msg.id}
+                    message={msg}
+                    isOwnMessage={msg.sender.id === user?.id}
+                    otherParticipant={otherParticipant || undefined}
+                  />
+                ))}
+              </div>
             ) : (
               <div className="empty-messages">
-                <p>Hãy bắt đầu cuộc trò chuyện</p>
+                <p>Chưa có tin nhắn nào</p>
+                <p className="text-sm text-gray-500">Hãy gửi tin nhắn để bắt đầu cuộc trò chuyện</p>
               </div>
             )}
             <div ref={messagesEndRef} />
           </div>
 
           <div className="chat-input-container">
-            <div className="input-actions">
-              <Tooltip title="Gửi hình ảnh">
-                <Button type="text" icon={<PictureOutlined />} />
-              </Tooltip>
-              <Tooltip title="Chèn biểu tượng cảm xúc">
-                <Button type="text" icon={<SmileOutlined />} />
-              </Tooltip>
-            </div>
             <Input 
               placeholder="Nhập tin nhắn..." 
               value={currentMessage}
@@ -443,7 +300,7 @@ const ChatWidget: React.FC = () => {
                 <Button 
                   type="text" 
                   icon={<SendOutlined />} 
-                  onClick={handleSendMessage}
+                  onClick={handleSendClick}
                   disabled={!currentMessage.trim()}
                   className="send-button"
                 />
@@ -455,43 +312,12 @@ const ChatWidget: React.FC = () => {
     );
   };
 
-  if (!isAuthenticated) {
-    return (
-      <div className="chat-widget">
-        <Button 
-          className="chat-toggle-button"
-          type="primary" 
-          shape="circle" 
-          icon={<MessageOutlined />} 
-          onClick={toggleChat}
-        />
-        
-        {isOpen && (
-          <div className="chat-container login-required">
-            <div className="chat-header">
-              <h3>Chat</h3>
-              <Button 
-                type="text" 
-                icon={<CloseOutlined />} 
-                onClick={toggleChat} 
-                className="close-button"
-              />
-            </div>
-            <div className="chat-login-prompt">
-              <MessageOutlined style={{ fontSize: '48px', color: '#1890ff', marginBottom: '16px' }} />
-              <p>Vui lòng đăng nhập để sử dụng tính năng chat</p>
-              <Button type="primary">Đăng nhập</Button>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // Main chat interface for authenticated users
   return (
     <div className="chat-widget">
-      <Badge count={calculateUnreadCount(conversations)} className="badge-notify">
+      <Badge 
+        count={conversations.reduce((total, conv) => total + (conv.unreadMessageCount || 0), 0)} 
+        className="badge-notify"
+      >
         <Button 
           className="chat-toggle-button"
           type="primary" 
@@ -501,10 +327,10 @@ const ChatWidget: React.FC = () => {
         />
       </Badge>
 
-      {isOpen && (
-        <div className={`chat-container ${!isMobile && activeConversation ? 'split-view' : ''}`}>
+      {isChatWidgetOpen && (
+        <div className={`chat-container ${!isMobile && activeConversationId ? 'split-view' : ''}`}>
           {renderChatSidebar()}
-          {(activeConversation || !isMobile) && renderChatDetail()}
+          {(activeConversationId || !isMobile) && renderChatDetail()}
         </div>
       )}
     </div>

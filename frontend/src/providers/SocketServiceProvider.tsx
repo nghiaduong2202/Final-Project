@@ -12,6 +12,7 @@ export const SocketServiceProvider: React.FC<SocketServiceProviderProps> = ({ ch
   useEffect(() => {
     return () => {
       socketService.disconnect();
+      
     };
   }, [socketService]);
 

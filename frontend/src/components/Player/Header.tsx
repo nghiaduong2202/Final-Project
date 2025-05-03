@@ -34,7 +34,7 @@ const Header = () => {
   const { isAuthenticated } = useAppSelector(state => state.user);
   const [language, setLanguage] = useState<'vi' | 'en'>('vi');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedSport, setSelectedSport] = useState('all');
+  const [selectedSports, setSelectedSports] = useState<string[]>([]);
   const [selectedProvince, setSelectedProvince] = useState('all');
   const [selectedDistrict, setSelectedDistrict] = useState('all');
   const [loginPromptVisible, setLoginPromptVisible] = useState(false);
@@ -196,18 +196,24 @@ const Header = () => {
     // Tạo query params từ các filter đã chọn
     const queryParams = new URLSearchParams();
     if (searchQuery) queryParams.set('query', searchQuery);
-    if (selectedSport !== 'all') queryParams.set('sport', selectedSport);
+    
+    // Chuyển đổi các ID từ string sang number và đảm bảo là mảng
+    if (selectedSports.length > 0) {
+      const sportIdsArray = selectedSports.map(id => parseInt(id));
+      queryParams.set('sport', JSON.stringify(sportIdsArray));
+    }
+    
     if (selectedProvince !== 'all') queryParams.set('province', selectedProvince);
     if (selectedDistrict !== 'all') queryParams.set('district', selectedDistrict);
     
     // Chuyển đến trang kết quả tìm kiếm với filter đã chọn
-    navigate(`/search?${queryParams.toString()}`);
+    navigate(`/result-search?${queryParams.toString()}`);
   };
 
   // Reset tất cả filter
   const handleResetFilters = () => {
     setSearchQuery('');
-    setSelectedSport('all');
+    setSelectedSports([]);
     setSelectedProvince('all');
     setSelectedDistrict('all');
   };
@@ -248,15 +254,18 @@ const Header = () => {
       <div className="mb-3">
         <div className="font-medium mb-2">Môn thể thao</div>
         <Select 
-          value={selectedSport}
-          onChange={value => setSelectedSport(value)}
+          mode="multiple"
+          value={selectedSports}
+          onChange={values => setSelectedSports(values)}
           style={{ width: '100%' }}
           className="rounded-lg"
           loading={loadingSports}
           showSearch
           optionFilterProp="children"
+          placeholder="Chọn môn thể thao"
+          maxTagCount={2}
+          allowClear
         >
-          <Option key="all" value="all">Tất cả môn thể thao</Option>
           {sports.map(sport => (
             <Option key={sport.id.toString()} value={sport.id.toString()}>
               {getSportNameInVietnamese(sport.name)}

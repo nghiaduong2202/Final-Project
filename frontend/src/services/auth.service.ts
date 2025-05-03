@@ -66,7 +66,7 @@ export const authService = {
   },
   
   refreshToken: async (refreshToken: string) => {
-    const response = await api.post('/auth/refresh-token', { refreshToken });
+    const response = await api.put('/auth/refresh-token', { refreshToken });
     return response.data;
   }
 };

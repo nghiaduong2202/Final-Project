@@ -38,7 +38,7 @@ interface PromotionData {
 }
 
 interface SearchParamsType {
-  sport: string | undefined;
+  sports: string[];
   location: string;
   timeRange: RangePickerProps['value'];
   facilityName: string;
@@ -52,7 +52,7 @@ const HomePage = () => {
   
   // States
   const [searchParams, setSearchParams] = useState<SearchParamsType>({
-    sport: undefined,
+    sports: [],
     location: '',
     timeRange: null,
     facilityName: '',
@@ -219,7 +219,13 @@ const HomePage = () => {
     // Tạo query params từ các filter đã chọn
     const queryParams = new URLSearchParams();
     if (searchParams.facilityName) queryParams.set('query', searchParams.facilityName);
-    if (searchParams.sport) queryParams.set('sport', searchParams.sport);
+    
+    // Chuyển đổi các ID từ string sang number và đảm bảo là mảng
+    if (searchParams.sports.length > 0) {
+      const sportIdsArray = searchParams.sports.map(id => parseInt(id));
+      queryParams.set('sport', JSON.stringify(sportIdsArray));
+    }
+    
     if (searchParams.province !== 'all') queryParams.set('province', searchParams.province);
     if (searchParams.district !== 'all') queryParams.set('district', searchParams.district);
     if (searchParams.timeRange && searchParams.timeRange[0] && searchParams.timeRange[1]) {
@@ -235,7 +241,7 @@ const HomePage = () => {
   const handleResetFilters = () => {
     setSearchParams({
       facilityName: '',
-      sport: undefined,
+      sports: [],
       location: '',
       timeRange: null,
       province: 'all',
@@ -278,15 +284,17 @@ const HomePage = () => {
           <div className="flex-1">
             <div className="mb-1 text-sm font-medium">Môn thể thao</div>
             <Select
+              mode="multiple"
               placeholder="Chọn môn thể thao"
               style={{ width: '100%' }}
-              onChange={(value) => setSearchParams(prev => ({ ...prev, sport: value }))}
-              value={searchParams.sport}
+              onChange={(values) => setSearchParams(prev => ({ ...prev, sports: values }))}
+              value={searchParams.sports}
               loading={loadingSports}
               showSearch
               optionFilterProp="children"
+              maxTagCount={2}
+              allowClear
             >
-              <Option value="all">Tất cả môn thể thao</Option>
               {sports.map(sport => (
                 <Option key={sport.id.toString()} value={sport.id.toString()}>
                   {getSportNameInVietnamese(sport.name)}

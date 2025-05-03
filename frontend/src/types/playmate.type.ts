@@ -2,37 +2,85 @@
 export type PlaymateSearchType = 'INDIVIDUAL' | 'GROUP';
 
 // Mức độ kỹ năng
-export type SkillLevel = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | 'PROFESSIONAL' | 'ANY';
+export type SkillLevel = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | 'PROFESSIONAL' | 'ANY' | 'any';
 
 // Trạng thái tìm kiếm
-export type PlaymateStatus = 'ACTIVE' | 'COMPLETED' | 'CANCELLED' | 'EXPIRED';
+export type PlaymateStatus = 'ACTIVE' | 'COMPLETED' | 'CANCELLED' | 'EXPIRED' | 'pending' | 'accepted' | 'rejected';
 
 // Giới tính ưu tiên
-export type GenderPreference = 'MALE' | 'FEMALE' | 'ANY';
+export type GenderPreference = 'MALE' | 'FEMALE' | 'ANY' | 'male' | 'female' | 'any';
 
 // Loại chi phí
-export type CostType = 'PER_PERSON' | 'TOTAL' | 'FREE' |'GENDER_BASED';
+export type CostType ='TOTAL' | 'FREE' |'GENDER_BASED' | 'perPerson' | 'total' | 'free' | 'genderBased';
 
 // Trạng thái đơn đăng ký
-export type ApplicationStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED';
+export type ApplicationStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED' | 'pending' | 'accepted' | 'rejected';
 
 // Thông tin người tạo/đăng ký
 export interface UserInfo {
+  id?: string;
   name: string;
   avatar?: string;
+  avatarUrl?: string;
   gender?: string;
   age?: number;
   phoneNumber?: string;
   email?: string;
 }
 
+// Booking slot interface
+export interface BookingSlot {
+  id: number;
+  date: string;
+  booking: {
+    id: string;
+    startTime: string;
+    endTime: string;
+    createdAt: string;
+    updatedAt: string;
+    status: string;
+    player?: UserInfo;
+  };
+}
+
+// Interface cho Participant 
+export interface Participant {
+  playmateId: string;
+  playerId: string;
+  status: ApplicationStatus;
+  skillLevel: SkillLevel;
+  note?: string;
+}
+
+// Interface API PlaymateSearch response
+export interface ApiPlaymateSearch {
+  id: string;
+  title: string;
+  imagesUrl: string[];
+  bookingSlot: BookingSlot;
+  desciption?: string;
+  additionalInfo?: string;
+  costType: string;
+  totalCost?: number;
+  maleCost?: number;
+  femaleCost?: number;
+  detailOfCost?: string;
+  isTeam: boolean;
+  minParticipant: number;
+  maxParticipant: number;
+  genderPreference: string;
+  skillLevel: string;
+  participants: Participant[];
+  createdAt: string;
+}
+
 // Interface cho việc hiển thị danh sách tìm kiếm hoặc hiển thị thông tin chi tiết 
 // (PlaymateList và PlaymateManage và PlaymateDetail) 
 export interface PlaymateSearch {
-  id: number;
+  id: string;
   userId: string;
   userInfo: UserInfo;
-  sportId: number;
+  sportId?: number;
   sportName?: string;
   title: string;
   description?: string;
@@ -71,27 +119,50 @@ export interface PlaymateSearch {
   // Thông tin trạng thái
   status: PlaymateStatus;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
   applications?: PlaymateApplication[];
+  
+  // Thông tin booking slot
+  bookingSlotId?: number;
+  bookingSlot?: BookingSlot;
+  
+  // Các trường mới từ API
+  participants?: Participant[];
 }
 
 // Thông tin đơn đăng ký tham gia - cho PlaymateManage và PlaymateDetail
 export interface PlaymateApplication {
   // Thông tin cơ bản
-  id: number;
-  playmateSearchId: number; // ID của bài đăng playmate
-  userId: string;
-  userInfo: UserInfo;
+  id: number | string;
+  playmateId: string;
+  playmateSearchId?: number;
+  playerId: string;
+  userId?: string;
+  userInfo?: UserInfo;
     
   // Thông tin bổ sung về người đăng ký
-  message?: string; // Lời nhắn khi đăng ký
-  skillLevel?: SkillLevel; // Trình độ kỹ năng  
+  note?: string;
+  message?: string;
+  skillLevel?: SkillLevel;
       
   // Thông tin trạng thái
   status: ApplicationStatus;
-  createdAt: string;
+  createdAt?: string;
   reviewedAt?: string; // Thời gian được duyệt/từ chối
   rejectionReason?: string; // Lý do từ chối
+  
+  // Thông tin search nếu lấy từ api my-register
+  search?: {
+    id: string;
+    title: string;
+    sportId?: number;
+    sportName?: string;
+    date?: string;
+    timeStart?: string;
+    timeEnd?: string;
+    location?: string;
+    creator?: UserInfo;
+  };
 }
 
 // Interface cho form tạo tìm kiếm người chơi cùng (PlaymateCreate)
@@ -99,46 +170,92 @@ export interface PlaymateFormData {
   // Thông tin cơ bản
   title: string;
   description?: string;
-  image?: File[];
+  imagesUrl?: string[];
   
-  // Thông tin địa điểm và thời gian
-  facilityId: string;
-  sportId: number;
-  date: string;
-  startTime: string;
-  endTime: string;  
-  location?: string;
-  applicationDeadline?: string;
+  // Booking slot id mới
+  bookingSlotId: number;
   
   // Thông tin chi phí
-  price?: number;
-  costMale?: number;
-  costFemale?: number;
-  costType: CostType;
-  costDetails?: string;
+  costType: string;
+  totalCost?: number;
+  maleCost?: number;
+  femaleCost?: number;
+  detailOfCost?: string;
 
   // Thông tin người tham gia
-  searchType: PlaymateSearchType;
-  requiredParticipants: number;
-  maximumParticipants?: number;
-  genderPreference: GenderPreference;
+  isTeam: boolean;
+  minParticipant: number;
+  maxParticipant?: number;
+  genderPreference: string;
     
   // Thông tin trình độ kỹ năng
-  requiredSkillLevel: SkillLevel[];
+  skillLevel: string;
   
   // Thông tin liên hệ và quy tắc
-  communicationDescription?: string;
-  
+  additionalInfor?: string;
 }
 
 // Interface cho form đăng ký tham gia playmate (Modal popup khi đăng ký)
 export interface PlaymateApplicationFormData {
-  playmateSearchId: number;
-  userId: string;
-  skillLevel?: SkillLevel;
-  message?: string;
-  experienceDetails?: string;  
+  playmateId: string;
+  skillLevel: string;
+  note?: string;
 } 
+
+// Interface cho action chấp nhận/từ chối đơn đăng ký
+export interface PlaymateActionRequest {
+  playerId: string;
+  playmateId: string;
+}
+
+// Các hàm chuyển đổi giữa API response và UI model
+export const mapApiToPlaymateSearch = (api: ApiPlaymateSearch): PlaymateSearch => {
+  return {
+    id: api.id,
+    userId: api.bookingSlot.booking.player?.id || '',
+    userInfo: {
+      id: api.bookingSlot.booking.player?.id,
+      name: api.bookingSlot.booking.player?.name || 'Unknown',
+      avatar: api.bookingSlot.booking.player?.avatarUrl,
+      phoneNumber: api.bookingSlot.booking.player?.phoneNumber,
+      email: api.bookingSlot.booking.player?.email
+    },
+    title: api.title,
+    description: api.desciption || undefined,
+    image: api.imagesUrl,
+    requiredSkillLevel: (api.skillLevel.toUpperCase() as SkillLevel) || 'ANY',
+    location: api.additionalInfo || undefined,
+    date: api.bookingSlot.date.split('T')[0],
+    startTime: api.bookingSlot.booking.startTime,
+    endTime: api.bookingSlot.booking.endTime,
+    communicationDescription: api.additionalInfo,
+    playmateSearchType: api.isTeam ? 'GROUP' : 'INDIVIDUAL',
+    requiredParticipants: api.minParticipant,
+    maximumParticipants: api.maxParticipant,
+    currentParticipants: api.participants.filter(p => p.status === 'accepted').length + 1, // +1 for creator
+    genderPreference: (api.genderPreference.toUpperCase() as GenderPreference),
+    price: api.costType === 'total' ? api.totalCost : undefined,
+    costType: mapCostType(api.costType),
+    costMale: api.maleCost,
+    costFemale: api.femaleCost,
+    costDetails: api.detailOfCost,
+    status: 'ACTIVE', // Default to active
+    createdAt: api.createdAt,
+    bookingSlotId: api.bookingSlot.id,
+    bookingSlot: api.bookingSlot,
+    participants: api.participants
+  };
+};
+
+// Map cost type from API to UI
+const mapCostType = (apiCostType: string): CostType => {
+  switch(apiCostType.toLowerCase()) {    
+    case 'total': return 'total';
+    case 'free': return 'free';
+    case 'genderbased': return 'genderBased';
+    default: return apiCostType as CostType;
+  }
+};
 
 
 

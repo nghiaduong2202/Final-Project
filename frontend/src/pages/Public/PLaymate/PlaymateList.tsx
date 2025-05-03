@@ -6,8 +6,7 @@ import {
   SkillLevel, 
   CostType 
 } from '@/types/playmate.type';
-import { getAllPlaymateSearches } from '@/services/playmate.service';
-import { sportService } from '@/services/sport.service';
+import playmateService from '@/services/playmate.service';
 
 import {
   Card,
@@ -44,24 +43,17 @@ import {
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
 
-interface Sport {
-  id: number;
-  name: string;
-}
-
 const PlaymateList: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState<boolean>(true);
   const [playmateSearches, setPlaymateSearches] = useState<PlaymateSearch[]>([]);
   const [filteredSearches, setFilteredSearches] = useState<PlaymateSearch[]>([]);
-  const [sports, setSports] = useState<Sport[]>([]);
   
   // Filter states
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [selectedSportId, setSelectedSportId] = useState<number | null>(null);
   const [selectedSkillLevel, setSelectedSkillLevel] = useState<SkillLevel | null>(null);
   const [selectedSearchType, setSelectedSearchType] = useState<PlaymateSearchType | null>(null);
-  const [activeTab, setActiveTab] = useState<'all' | 'ACTIVE' | 'COMPLETED' | 'CANCELED'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED'>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(8);
 
@@ -69,12 +61,8 @@ const PlaymateList: React.FC = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        // Fetch sport list
-        const sportData = await sportService.getSport();
-        setSports(sportData || []);
-        
         // Fetch playmate searches
-        const searches = await getAllPlaymateSearches();
+        const searches = await playmateService.getAllPlaymateSearches();
         setPlaymateSearches(searches);
         setFilteredSearches(searches);
       } catch (error) {
@@ -104,14 +92,8 @@ const PlaymateList: React.FC = () => {
         search => 
           search.title.toLowerCase().includes(term) || 
           (search.description && search.description.toLowerCase().includes(term)) ||
-          (search.location && search.location.toLowerCase().includes(term)) ||
-          (search.sportName && search.sportName.toLowerCase().includes(term))
+          (search.location && search.location.toLowerCase().includes(term))
       );
-    }
-
-    // Apply filters
-    if (selectedSportId) {
-      result = result.filter(search => search.sportId === selectedSportId);
     }
 
     if (selectedSkillLevel) {
@@ -130,7 +112,7 @@ const PlaymateList: React.FC = () => {
 
     setFilteredSearches(result);
     setCurrentPage(1);
-  }, [playmateSearches, searchTerm, selectedSportId, selectedSkillLevel, selectedSearchType, activeTab]);
+  }, [playmateSearches, searchTerm, selectedSkillLevel, selectedSearchType, activeTab]);
 
   const handleCreatePlaymate = () => {
     navigate('/user/playmate/create');
@@ -138,10 +120,6 @@ const PlaymateList: React.FC = () => {
 
   const handleSearch = (value: string) => {
     setSearchTerm(value);
-  };
-
-  const handleSportFilter = (value: number | null) => {
-    setSelectedSportId(value);
   };
 
   const handleSkillLevelFilter = (value: SkillLevel | null) => {
@@ -152,22 +130,19 @@ const PlaymateList: React.FC = () => {
     setSelectedSearchType(value);
   };
 
-  const handleViewPlaymate = (id: number) => {
+  const handleViewPlaymate = (id: string) => {
     navigate(`/user/playmate/${id}`);
   };
   
   const getCostTypeDisplay = (costType?: CostType, price?: number, costMale?: number, costFemale?: number) => {
-    if (!costType || costType === 'FREE') return <Tag color="success">Miễn phí</Tag>;
+    if (!costType || costType === 'FREE' || costType === 'free') return <Tag color="success">Miễn phí</Tag>;
     
-    if (costType === 'PER_PERSON' && price) {
-      return <Text>{price.toLocaleString('vi-VN')}đ/người</Text>;
-    }
-    
-    if (costType === 'TOTAL' && price) {
+       
+    if ((costType === 'TOTAL' || costType === 'total') && price) {
       return <Text>{price.toLocaleString('vi-VN')}đ tổng</Text>;
     }
     
-    if (costType === 'GENDER_BASED') {
+    if (costType === 'GENDER_BASED' || costType === 'genderBased') {
       return (
         <Space direction="vertical" size={0}>
           {costMale && <Text>Nam: {costMale.toLocaleString('vi-VN')}đ</Text>}
@@ -187,14 +162,17 @@ const PlaymateList: React.FC = () => {
   const getStatusTag = (status?: string) => {
     if (!status) return null;
     
-    switch (status) {
-      case 'ACTIVE':
+    const statusLower = status.toLowerCase();
+    
+    switch (statusLower) {
+      case 'active':
         return <Tag color="green">Đang diễn ra</Tag>;
-      case 'COMPLETED':
+      case 'completed':
         return <Tag color="blue">Đã kết thúc</Tag>;
-      case 'CANCELED':
+      case 'cancelled':
+      case 'canceled':
         return <Tag color="red">Đã hủy</Tag>;
-      case 'EXPIRED':
+      case 'expired':
         return <Tag color="red">Đã hết hạn</Tag>;
       default:
         return <Tag color="default">Không xác định</Tag>;
@@ -217,7 +195,9 @@ const PlaymateList: React.FC = () => {
   const getSkillTag = (level?: SkillLevel) => {
     if (!level) return null;
     
-    switch (level) {
+    const levelUpper = level.toUpperCase() as SkillLevel;
+    
+    switch (levelUpper) {
       case 'BEGINNER':
         return <Tag color="green">Mới bắt đầu</Tag>;
       case 'INTERMEDIATE':
@@ -240,10 +220,14 @@ const PlaymateList: React.FC = () => {
   );
 
   const renderPlaymateCard = (search: PlaymateSearch) => {
-    const sportName = sports.find(s => s.id === search.sportId)?.name || search.sportName || '';
-    
     const defaultImage = `https://via.placeholder.com/600x300?text=${encodeURIComponent(search.title)}`;
     const coverImage = search.image && search.image.length > 0 ? search.image[0] : defaultImage;
+    
+    // Calculate current participants (creator + accepted participants)
+    const acceptedParticipants = search.participants ? 
+      search.participants.filter(p => p.status === 'accepted' || p.status === 'ACCEPTED').length : 0;
+    
+    const currentCount = 1 + acceptedParticipants; // +1 for the creator
     
     return (
       <Card
@@ -281,20 +265,18 @@ const PlaymateList: React.FC = () => {
             }}
             disabled={search.status !== 'ACTIVE' || Boolean(
               search.maximumParticipants && 
-              search.currentParticipants && 
-              search.currentParticipants >= search.maximumParticipants
+              currentCount >= search.maximumParticipants
             )}
           >
             {search.status !== 'ACTIVE' ? 'Đã kết thúc' : 
              (search.maximumParticipants && 
-              search.currentParticipants && 
-              search.currentParticipants >= search.maximumParticipants) ? 'Đã đủ người' : 'Đăng ký'}
+              currentCount >= search.maximumParticipants) ? 'Đã đủ người' : 'Đăng ký'}
           </Button>
         ]}
       >
         <div className="playmate-card-content">
           <div className="playmate-card-org">
-            <Avatar src={search.userInfo.avatar} icon={<UserOutlined />} size="small" />
+            <Avatar src={search.userInfo.avatar || search.userInfo.avatarUrl} icon={<UserOutlined />} size="small" />
             <Text type="secondary" className="text-sm truncate">
               {search.userInfo.name}
             </Text>
@@ -332,7 +314,7 @@ const PlaymateList: React.FC = () => {
             <div className="playmate-info-item">
               <TeamOutlined />
               <Text className="ml-2">
-                {`${search.currentParticipants || 1}/${search.requiredParticipants} người tham gia`}
+                {`${currentCount}/${search.requiredParticipants} người tham gia`}
                 {search.maximumParticipants && ` (tối đa ${search.maximumParticipants})`}
               </Text>
             </div>
@@ -347,15 +329,14 @@ const PlaymateList: React.FC = () => {
           
           <div className="playmate-card-footer">
             <div className="playmate-tags">
-              {sportName && <Tag className="playmate-tag">{sportName}</Tag>}
               {getSkillTag(search.requiredSkillLevel)}
               {search.genderPreference && (
                 <Tag color={
-                  search.genderPreference === 'MALE' ? 'blue' : 
-                  search.genderPreference === 'FEMALE' ? 'pink' : 'default'
+                  search.genderPreference.toUpperCase() === 'MALE' ? 'blue' : 
+                  search.genderPreference.toUpperCase() === 'FEMALE' ? 'pink' : 'default'
                 }>
-                  {search.genderPreference === 'MALE' ? 'Nam' : 
-                   search.genderPreference === 'FEMALE' ? 'Nữ' : 'Không giới hạn'}
+                  {search.genderPreference.toUpperCase() === 'MALE' ? 'Nam' : 
+                   search.genderPreference.toUpperCase() === 'FEMALE' ? 'Nữ' : 'Không giới hạn'}
                 </Tag>
               )}
             </div>
@@ -403,7 +384,7 @@ const PlaymateList: React.FC = () => {
           <div className="flex flex-col md:flex-row md:justify-between md:items-center">
             <Tabs 
               activeKey={activeTab} 
-              onChange={tab => setActiveTab(tab as 'all' | 'ACTIVE' | 'COMPLETED' | 'CANCELED')}
+              onChange={tab => setActiveTab(tab as 'all' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED')}
               className="playmate-tabs"
               items={[
                 {
@@ -426,7 +407,7 @@ const PlaymateList: React.FC = () => {
                   label: <span>Đã kết thúc</span>,
                 },
                 {
-                  key: 'CANCELED',
+                  key: 'CANCELLED',
                   label: <span>Đã hủy</span>,
                 },
                 {
@@ -451,20 +432,6 @@ const PlaymateList: React.FC = () => {
           <Divider style={{ margin: '16px 0' }} />
           
           <Row gutter={[16, 16]}>
-            <Col xs={24} md={8}>
-              <Select
-                placeholder="Môn thể thao"
-                style={{ width: '100%' }}
-                onChange={handleSportFilter}
-                allowClear
-                value={selectedSportId}
-              >
-                {sports.map(sport => (
-                  <Option key={sport.id} value={sport.id}>{sport.name}</Option>
-                ))}
-              </Select>
-            </Col>
-            
             <Col xs={24} md={8}>
               <Select
                 placeholder="Trình độ"

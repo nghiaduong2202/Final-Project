@@ -48,6 +48,7 @@ import { reviewService } from '@/services/review.service';
 import { useAppSelector, useAppDispatch } from '@/hooks/reduxHooks';
 import { showLoginModal } from '@/store/slices/userSlice';
 import { ChatService } from '@/services/chat.service';
+import { openChatWidget, setActiveConversation } from '@/store/slices/chatSlice';
 import dayjs from 'dayjs';
 
 // Import CSS ghi đè Ant Design
@@ -105,7 +106,7 @@ interface FacilityEvent extends Omit<Event, 'eventType'> {
   maxParticipants?: number;
   prizes?: EventPrize[];
   eventType?: EventType;
-  image?: string;
+  image?: string[];
 }
 
 const DetailFacility: React.FC = () => {
@@ -309,22 +310,47 @@ const DetailFacility: React.FC = () => {
     }
 
     try {
-      // Tạo hoặc mở cuộc trò chuyện với owner
-      message.loading({ content: 'Đang kết nối...', key: 'createChat' });
-      const conversation = await ChatService.createConversation(facility.owner.id);
-      message.success({ content: 'Đã kết nối với chủ sở hữu', key: 'createChat' });
       
-      // Mở chat widget sau khi tạo cuộc trò chuyện
-      // Việc này sẽ được xử lý bởi ChatWidget component
+      // Lấy danh sách conversation từ API
+      message.loading({ content: 'Đang kiểm tra...', key: 'chatCheck' });
+      const conversationsData = await ChatService.getConversations();
       
-      // Lưu conversationId vào localStorage để ChatWidget hiển thị cuộc trò chuyện này
-      localStorage.setItem('active_conversation', conversation.id);
+      // Kiểm tra xem đã có conversation với owner chưa
+      const existingConversation = conversationsData.find(conv => 
+        !conv.isGroup && 
+        conv.participants.some(p => p.person.id === facility.owner?.id)
+      );
+
+      if (existingConversation) {
+        // Nếu đã có conversation, chọn conversation đó
+        message.success({ content: 'Đã mở cuộc trò chuyện', key: 'chatCheck' });
+        // Dispatch action với id của conversation
+        setTimeout(() => {
+          // Đầu tiên mở chat widget
+      dispatch(openChatWidget());
       
-      // Dispatch event để ChatWidget biết cần mở và hiển thị cuộc trò chuyện
-      window.dispatchEvent(new CustomEvent('open_chat', { detail: { conversationId: conversation.id } }));
+          dispatch(setActiveConversation(existingConversation.id));
+        }, 200);
+      } else {
+        // Nếu chưa có, tạo conversation mới
+        message.loading({ content: 'Đang kết nối...', key: 'chatCheck' });
+        const conversation = await ChatService.createConversation(facility.owner.id);
+        message.success({ content: 'Đã kết nối với chủ sở hữu', key: 'chatCheck' });
+        
+        // Cập nhật lại danh sách conversations
+        await ChatService.getConversations();
+        dispatch(openChatWidget());
+        // Đặt conversation mới làm active sau một khoảng thời gian ngắn
+        setTimeout(() => {      
+          dispatch(setActiveConversation(conversation.id));
+        }, 200);
+      }
     } catch (error) {
-      console.error('Error creating conversation:', error);
-      message.error({ content: 'Không thể kết nối với chủ sở hữu. Vui lòng thử lại sau.', key: 'createChat' });
+      console.error('Error handling chat:', error);
+      message.error({ 
+        content: 'Không thể kết nối với chủ sở hữu. Vui lòng thử lại sau.', 
+        key: 'chatCheck' 
+      });
     }
   };
 
@@ -400,11 +426,18 @@ const DetailFacility: React.FC = () => {
             <Card 
               className="mb-4 overflow-hidden" 
               cover={
-                <img 
-                  alt={event.name} 
-                  src={event.image} 
-                  className="h-48 object-cover"
-                />
+                <div className="relative h-48">
+                  <img 
+                    alt={event.name} 
+                    src={event.image?.[0] || 'https://via.placeholder.com/800x400'} 
+                    className="w-full h-full object-cover"
+                  />
+                  {event.image && event.image.length > 1 && (
+                    <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm">
+                      +{event.image.length - 1} ảnh
+                    </div>
+                  )}
+                </div>
               }
             >
               <div className="flex justify-between items-start mb-2">
