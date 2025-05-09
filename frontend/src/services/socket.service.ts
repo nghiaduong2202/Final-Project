@@ -16,7 +16,7 @@ export class SocketService {
   private maxReconnectAttempts = 5;
 
   constructor() {
-    console.log('SocketService initialized');
+    // console.log('SocketService initialized');
     
     // Try to connect immediately if token is available
     const token = this.getToken();
@@ -42,7 +42,7 @@ export class SocketService {
 
   private connect(): void {
     if (this.isConnecting) {
-      console.log('Already attempting to connect. Skipping redundant connect call.');
+      // console.log('Already attempting to connect. Skipping redundant connect call.');
       return;
     }
     
@@ -58,7 +58,7 @@ export class SocketService {
     }
 
     this.isConnecting = true;
-    console.log('Attempting to connect to socket server...');
+    // console.log('Attempting to connect to socket server...');
     
     try {
       // Ngắt kết nối cũ nếu có
@@ -83,7 +83,7 @@ export class SocketService {
 
       // Thiết lập các event listeners
       this.socket.on('connect', () => {
-        console.log('Connected to chat server successfully!');
+        // console.log('Connected to chat server successfully!');
         this.reconnectAttempts = 0;
         this.isConnecting = false;
       });
@@ -98,12 +98,12 @@ export class SocketService {
       });
 
       this.socket.on('connected-users', (users: string[]) => {
-        console.log('Connected users updated:', users);
+        // console.log('Connected users updated:', users);
         this.connectedUsers.next(users);
       });
 
       this.socket.on('receive-message', (message: SocketMessage) => {
-        console.log('Received message:', message);
+        // console.log('Received message:', message);
         // Cập nhật messages trong conversation tương ứng
         const conversationId = message.conversation.id;
         const currentMessages = this.messages.value;
@@ -166,7 +166,7 @@ export class SocketService {
       });
 
       this.socket.on('seen-message', (participant: Participant) => {
-        console.log('Received seen-message event:', participant);
+        // console.log('Received seen-message event:', participant);
         const currentUserId = this.getCurrentUserId();
         
         // Cập nhật seen status trong conversations
@@ -334,7 +334,7 @@ export class SocketService {
 
   // Các phương thức để emit events
   sendMessage(conversationId: string, content: string): void {
-    console.log('Attempting to send message:', { conversationId, content });
+    // console.log('Attempting to send message:', { conversationId, content });
     
     // Always ensure we have a connection
     if (!this.socket || !this.socket.connected) {
@@ -351,7 +351,7 @@ export class SocketService {
       
       // Queue the message to be sent after connection
       setTimeout(() => {
-        console.log('Checking if socket is connected now...');
+        // console.log('Checking if socket is connected now...');
         if (this.socket && this.socket.connected) {
           console.log('Connected now. Sending queued message.');
           this.socket.emit('send-message', {
@@ -363,7 +363,7 @@ export class SocketService {
           // Try one more time with longer timeout
           setTimeout(() => {
             if (this.socket && this.socket.connected) {
-              console.log('Connected on second attempt. Sending message.');
+              // console.log('Connected on second attempt. Sending message.');
               this.socket.emit('send-message', {
                 conversationId,
                 content
@@ -375,7 +375,7 @@ export class SocketService {
         }
       }, 500);
     } else {
-      console.log('Socket already connected. Sending message immediately.');
+      // console.log('Socket already connected. Sending message immediately.');
       this.socket.emit('send-message', {
         conversationId,
         content
@@ -451,7 +451,7 @@ export class SocketService {
           // Try once more
           setTimeout(() => {
             if (this.socket && this.socket.connected) {
-              console.log('Connected on second attempt. Marking message as seen.');
+              // console.log('Connected on second attempt. Marking message as seen.');
               this.socket.emit('seen-message', {
                 conversationId,
                 messageId

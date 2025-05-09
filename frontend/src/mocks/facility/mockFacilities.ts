@@ -3,8 +3,6 @@ import { mockFieldGroups } from '@/mocks/field/Groupfield_Field';
 import { mockServices } from '@/mocks/service/serviceData';
 import { mockEvents } from '@/mocks/event/eventData';
 import { mockVouchers } from '@/mocks/voucher/voucherData';
-import { VerificationHistoryItem } from '@/types/facility.type';
-
 
 // Mock data cho facility dropdown (cho các select box)
 export const mockFacilitiesDropdown = [
@@ -36,7 +34,7 @@ export const mockFacilities: Facility[] = [
     ],
     status: 'active',
     avgRating: 4.7,
-    numberOfRatings: 128,
+    numberOfRating: 128,
     imagesUrl: [
       'https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa',
       'https://images.unsplash.com/photo-1574629810360-7efbbe195018',
@@ -49,7 +47,7 @@ export const mockFacilities: Facility[] = [
       temporary: '',
       facilityId: '1'
     },
-    license: [{
+    licenses: [{
       verified: 'https://example.com/licenses/verified-1.pdf',
       temporary: '',
       facilityId: '1',
@@ -76,7 +74,7 @@ export const mockFacilities: Facility[] = [
     ],
     status: 'active',
     avgRating: 4.5,
-    numberOfRatings: 87,
+    numberOfRating: 87,
     imagesUrl: [
       'https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa',
       'https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0',
@@ -89,7 +87,7 @@ export const mockFacilities: Facility[] = [
       temporary: '',
       facilityId: '2'
     },
-    license: [{
+    licenses: [{
       verified: 'https://example.com/licenses/verified-2.pdf',
       temporary: '',
       facilityId: '2',
@@ -118,7 +116,7 @@ export const mockFacilities: Facility[] = [
     ],
     status: 'pending',
     avgRating: 0,
-    numberOfRatings: 0,
+    numberOfRating: 0,
     imagesUrl: [
       'https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa',
       'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea',
@@ -131,7 +129,7 @@ export const mockFacilities: Facility[] = [
       temporary: 'https://example.com/certificates/temp-3.pdf',
       facilityId: '3'
     },
-    license: [{
+    licenses: [{
       verified: '',
       temporary: 'https://example.com/licenses/temp-3.pdf',
       facilityId: '3',
@@ -158,7 +156,7 @@ export const mockFacilities: Facility[] = [
     ],
     status: 'unactive',
     avgRating: 4.9,
-    numberOfRatings: 42,
+    numberOfRating: 42,
     imagesUrl: [
       'https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa',
       'https://images.unsplash.com/photo-1592919505780-303950717480',
@@ -171,7 +169,7 @@ export const mockFacilities: Facility[] = [
       temporary: '',
       facilityId: '4'
     },
-    license: [{
+    licenses: [{
       verified: 'https://example.com/licenses/verified-4.pdf',
       temporary: '',
       facilityId: '4',
@@ -198,7 +196,7 @@ export const mockFacilities: Facility[] = [
     ],
     status: 'unactive',
     avgRating: 4.2,
-    numberOfRatings: 65,
+    numberOfRating: 65,
     imagesUrl: [
       'https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa',
       'https://images.unsplash.com/photo-1542652694-40abf526446e',
@@ -211,7 +209,7 @@ export const mockFacilities: Facility[] = [
       temporary: 'https://example.com/certificates/temp-5.pdf',
       facilityId: '5'
     },
-    license: [{
+    licenses: [{
       verified: '',
       temporary: 'https://example.com/licenses/temp-5.pdf',
       facilityId: '5',
@@ -238,7 +236,7 @@ export const mockFacilities: Facility[] = [
     ],
     status: 'active',
     avgRating: 4.6,
-    numberOfRatings: 93,
+    numberOfRating: 93,
     imagesUrl: [
       'https://images.unsplash.com/photo-1576610616656-d3aa5d1f4534',
       'https://images.unsplash.com/photo-1519315901367-f34ff9154487',
@@ -251,7 +249,7 @@ export const mockFacilities: Facility[] = [
       temporary: '',
       facilityId: '6'
     },
-    license: [{
+    licenses: [{
       verified: 'https://example.com/licenses/verified-6.pdf',
       temporary: '',
       facilityId: '6',

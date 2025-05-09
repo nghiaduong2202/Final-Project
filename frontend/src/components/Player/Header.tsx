@@ -434,7 +434,7 @@ const Header = () => {
             </div>
 
             {/* Language selector */}
-            <div className="hidden md:block">
+            <div className="hidden lg:block">
               <Dropdown menu={{ items: languageItems }} placement="bottomRight">
                 <Button 
                   type="text" 

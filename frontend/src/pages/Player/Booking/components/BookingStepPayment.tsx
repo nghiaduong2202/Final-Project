@@ -3,6 +3,7 @@ import { Form, Card, Radio, Space, Divider, Typography, Row, Col, FormInstance, 
 import { 
   BankOutlined, WalletOutlined, CreditCardOutlined, TagOutlined, InfoCircleOutlined
 } from '@ant-design/icons';
+import { useParams } from 'react-router-dom';
 import { BookingFormData } from '@/types/booking.type';
 import { AvailableFieldGroup } from '@/types/field.type';
 import { Service } from '@/types/service.type';
@@ -48,6 +49,7 @@ const BookingStepPayment: React.FC<BookingStepPaymentProps> = ({
   formatCurrency,
   calculateTotalPrice
 }) => {
+  const { facilityId } = useParams<{ facilityId: string }>();
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
   const [loadingVouchers, setLoadingVouchers] = useState(false);
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
@@ -57,23 +59,8 @@ const BookingStepPayment: React.FC<BookingStepPaymentProps> = ({
   // Lấy danh sách voucher từ API khi component được tạo
   useEffect(() => {
     const fetchVouchers = async () => {
-      // Lấy facilityId từ URL hoặc từ fieldGroups nếu có
-      let facilityId: string | null = null;
-      
-      // Cách 1: Lấy từ URL
-      const urlParams = new URLSearchParams(window.location.search);
-      facilityId = urlParams.get('facilityId');
-      
-      // Cách 2: Lấy từ fieldGroups nếu có
-      if (!facilityId && fieldGroups.length > 0 && fieldGroups[0].id) {
-        // Lấy facilityId của field group đầu tiên (field group thuộc về facility)
-        // Trong thực tế có thể cần lấy từ một nguồn khác tùy vào cấu trúc dữ liệu
-        facilityId = fieldGroups[0].id.split('_')[0]; // Giả sử id có format: "facilityId_groupId"
-      }
-      
       if (!facilityId) {
-        console.error('Could not determine facilityId for vouchers');
-        setLoadingVouchers(false);
+        console.error('Missing facilityId for vouchers');
         return;
       }
       
@@ -99,7 +86,7 @@ const BookingStepPayment: React.FC<BookingStepPaymentProps> = ({
     };
     
     fetchVouchers();
-  }, [fieldGroups, totalPrice]);
+  }, [facilityId, totalPrice]);
 
   // Xử lý khi chọn voucher
   const handleVoucherSelect = (voucherId: number) => {

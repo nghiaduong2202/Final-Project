@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Button, Result } from 'antd';
+import { Button, Result, Spin } from 'antd';
 import { CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import bookingService from '@/services/booking.service';
 
@@ -11,10 +11,12 @@ const ResultBookingVNPay: React.FC = () => {
 
   const [paymentSuccess, setPaymentSuccess] = useState<boolean | null>(null);
   const [paymentMessage, setPaymentMessage] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
   
   useEffect(() => {
     const fetchPaymentStatus = async () => {
       try {
+        setLoading(true);
         // Lấy tất cả các tham số từ URL
         const queryParams = Object.fromEntries(new URLSearchParams(location.search));
         
@@ -43,6 +45,8 @@ const ResultBookingVNPay: React.FC = () => {
         console.error('Error checking payment status:', error);
         setPaymentMessage(null);
         setPaymentSuccess(false);
+      } finally {
+        setLoading(false);
       }
     };
     
@@ -51,7 +55,12 @@ const ResultBookingVNPay: React.FC = () => {
   
   return (
     <div style={{ padding: '24px', maxWidth: '800px', margin: '0 auto' }}>
-      {paymentSuccess ? (
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '50px' }}>
+          <Spin size="large" />
+          <p style={{ marginTop: '20px' }}>Đang xử lý kết quả thanh toán...</p>
+        </div>
+      ) : paymentSuccess ? (
         <Result
           status="success"
           icon={<CheckCircleOutlined style={{ color: '#52c41a' }} />}

@@ -5,7 +5,7 @@ import {
   notification, Upload, Divider, Modal, Breadcrumb, Image, Avatar
 } from 'antd';
 import {
-  StarOutlined, PictureOutlined, CheckCircleOutlined, HomeOutlined, HistoryOutlined, CommentOutlined,
+  StarOutlined, PictureOutlined, CheckCircleOutlined,
   FieldTimeOutlined, CalendarOutlined, UserOutlined
 } from '@ant-design/icons';
 import type { UploadFile, UploadProps } from 'antd/es/upload/interface';
@@ -445,9 +445,9 @@ const BookingReview: React.FC = () => {
         <Breadcrumb
           className="mb-4"
           items={[
-            { title: <Link to="/"><HomeOutlined /> Trang chủ</Link> },
-            { title: <Link to="/user/history-booking"><HistoryOutlined /> Lịch sử đặt sân</Link> },
-            { title: <><CommentOutlined /> Đánh giá</> }
+            { title: <Link to="/">Trang chủ</Link> },
+            { title: <Link to="/user/history-booking">Lịch sử đặt sân</Link> },
+            { title: <> Đánh giá</> }
           ]}
         />
 

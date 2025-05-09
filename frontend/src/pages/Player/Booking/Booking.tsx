@@ -1134,11 +1134,22 @@ const BookingPage: React.FC = () => {
     let servicePrice = 0;
     const discount = 0;
     
+    // Calculate duration in hours from timeRange
+    let durationHours = 0;
+    if (formData.timeRange) {
+      const timeRange = ensureDayjsTimeRange(formData.timeRange);
+      if (timeRange) {
+        const [startTime, endTime] = timeRange;
+        durationHours = endTime.diff(startTime, 'hour', true); // Get duration in hours with decimals
+      }
+    }
+    
     // If we have payment data, use those values
     if (formData.fieldGroupId) {
       const fieldGroup = availableFieldGroups.find(g => String(g.id) === String(formData.fieldGroupId));
       if (fieldGroup) {
-        fieldPrice = fieldGroup.basePrice * selectedDates.length;
+        // Calculate field price = base price * number of hours * number of dates
+        fieldPrice = fieldGroup.basePrice * durationHours * selectedDates.length;
       }
     }
     
@@ -1330,17 +1341,59 @@ const BookingPage: React.FC = () => {
         }
       }
 
-      // Kiểm tra thời gian có nằm trong giờ hoạt động của cơ sở không
-      if (operatingTimes && operatingTimes.openTime1 && operatingTimes.closeTime1) {
-        const openTime = dayjs(operatingTimes.openTime1, 'HH:mm:ss');
-        const closeTime = dayjs(operatingTimes.closeTime1, 'HH:mm:ss');
+      // Tạo đối tượng thời gian để so sánh (chỉ giờ:phút)
+      const startTimeOfDay = dayjs().hour(startTime.hour()).minute(startTime.minute()).second(0);
+      const endTimeOfDay = dayjs().hour(endTime.hour()).minute(endTime.minute()).second(0);
+      
+      // Kiểm tra thời gian có nằm trong bất kỳ khung giờ hoạt động nào của cơ sở không
+      if (operatingTimes) {
+        // Tạo mảng các cặp khung giờ hoạt động
+        const timeRanges = [];
         
-        const startTimeOfDay = dayjs().hour(startTime.hour()).minute(startTime.minute()).second(0);
-        const endTimeOfDay = dayjs().hour(endTime.hour()).minute(endTime.minute()).second(0);
+        if (operatingTimes.openTime1 && operatingTimes.closeTime1) {
+          timeRanges.push({
+            open: dayjs(operatingTimes.openTime1, 'HH:mm:ss'),
+            close: dayjs(operatingTimes.closeTime1, 'HH:mm:ss')
+          });
+        }
         
-        // Điều kiện đã được sửa để cho phép thời gian kết thúc bằng với thời gian đóng cửa
-        if (startTimeOfDay.isBefore(openTime) || (endTimeOfDay.isAfter(closeTime) && !endTimeOfDay.isSame(closeTime, 'minute'))) {
-          reject(`Thời gian phải nằm trong khung giờ hoạt động từ ${openTime.format('HH:mm')} đến ${closeTime.format('HH:mm')}`);
+        if (operatingTimes.openTime2 && operatingTimes.closeTime2) {
+          timeRanges.push({
+            open: dayjs(operatingTimes.openTime2, 'HH:mm:ss'),
+            close: dayjs(operatingTimes.closeTime2, 'HH:mm:ss')
+          });
+        }
+        
+        if (operatingTimes.openTime3 && operatingTimes.closeTime3) {
+          timeRanges.push({
+            open: dayjs(operatingTimes.openTime3, 'HH:mm:ss'),
+            close: dayjs(operatingTimes.closeTime3, 'HH:mm:ss')
+          });
+        }
+        
+        // Nếu không có khung giờ nào được định nghĩa, cho phép đặt
+        if (timeRanges.length === 0) {
+          resolve();
+          return;
+        }
+        
+        // Kiểm tra xem thời gian có nằm trong bất kỳ khung giờ nào không
+        const isWithinAnyTimeRange = timeRanges.some(range => {
+          // Thời gian bắt đầu phải >= giờ mở cửa và thời gian kết thúc phải <= giờ đóng cửa
+          // Cho phép thời gian kết thúc bằng với thời gian đóng cửa
+          return (
+            (startTimeOfDay.isAfter(range.open) || startTimeOfDay.isSame(range.open, 'minute')) &&
+            (endTimeOfDay.isBefore(range.close) || endTimeOfDay.isSame(range.close, 'minute'))
+          );
+        });
+        
+        if (!isWithinAnyTimeRange) {
+          // Tạo thông báo lỗi hiển thị tất cả các khung giờ hoạt động
+          const timeRangesText = timeRanges
+            .map(range => `${range.open.format('HH:mm')} - ${range.close.format('HH:mm')}`)
+            .join(' hoặc ');
+          
+          reject(`Thời gian phải nằm trong khung giờ hoạt động: ${timeRangesText}`);
           return;
         }
       }

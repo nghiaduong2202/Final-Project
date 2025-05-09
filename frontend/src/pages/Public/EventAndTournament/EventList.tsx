@@ -695,16 +695,14 @@ const EventList: React.FC = () => {
         </div>
         
         {/* Event Highlight Carousel Section - Di chuyển lên trên activeTab */}
-        {loading ? (
+        {/* {loading ? (
           <div className="text-center py-8 mb-6 spin-container">
             <Spin />
             <div className="mt-3">Đang tải danh sách sự kiện...</div>
           </div>
         ) : upcomingEvents.length > 0 ? (
           <div className="mb-6 highlight-event-carousel">
-            {/* <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-4">
-              Sự kiện sắp diễn ra gần nhất
-            </h2> */}
+               
             <Carousel
               ref={carouselRef}
               autoplay
@@ -718,7 +716,7 @@ const EventList: React.FC = () => {
               {upcomingEvents.map(event => renderCarouselSlide(event))}
             </Carousel>
           </div>
-        ) : null}
+        ) : null} */}
         
         <Card className="mb-4 md:mb-6">
           <div className="flex flex-col md:flex-row md:justify-between md:items-center">

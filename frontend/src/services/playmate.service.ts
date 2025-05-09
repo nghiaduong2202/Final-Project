@@ -6,7 +6,8 @@ import {
   PlaymateApplicationFormData,
   PlaymateActionRequest,
   mapApiToPlaymateSearch,
-  BookingSlot
+  BookingSlot,
+  UpdatePlaymateFormData
 } from "@/types/playmate.type";
 import api from "./api";
 
@@ -81,12 +82,26 @@ const playmateService = {
   },
 
   /**
+   * Cập nhật bài đăng tìm bạn chơi
+   */
+  async updatePlaymateSearch(formData: UpdatePlaymateFormData): Promise<PlaymateSearch> {
+    try {
+      const response = await api.put(`/playmate/update`, formData);
+      return mapApiToPlaymateSearch(response.data);
+    } catch (error) {
+      console.error('Error updating playmate search:', error);
+      throw error;
+    }
+  },
+  
+
+  /**
    * Upload ảnh lên cloud
    */
   async uploadImage(file: File): Promise<string> {
     try {
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('image', file);
       
       const response = await api.post('/cloud-uploader', formData, {
         headers: {
@@ -154,19 +169,19 @@ const playmateService = {
     }
   },
 
-  /**
-   * Hủy đơn đăng ký (người đăng ký tự hủy)
-   */
-  async cancelApplication(applicationId: string): Promise<boolean> {
-    try {
-      // Note: This endpoint might need to be updated based on the actual API
-      await api.put(`/playmate/cancel-application/${applicationId}`);
-      return true;
-    } catch (error) {
-      console.error(`Error cancelling application with id ${applicationId}:`, error);
-      throw error;
-    }
-  }
+  // /**
+  //  * Hủy đơn đăng ký (người đăng ký tự hủy)
+  //  */
+  // async cancelApplication(applicationId: string): Promise<boolean> {
+  //   try {
+  //     // Note: This endpoint might need to be updated based on the actual API
+  //     await api.put(`/playmate/cancel-application/${applicationId}`);
+  //     return true;
+  //   } catch (error) {
+  //     console.error(`Error cancelling application with id ${applicationId}:`, error);
+  //     throw error;
+  //   }
+  // }
 };
 
 export default playmateService;

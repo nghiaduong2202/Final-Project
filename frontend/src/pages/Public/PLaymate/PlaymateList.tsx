@@ -6,7 +6,12 @@ import {
   SkillLevel, 
   CostType 
 } from '@/types/playmate.type';
+import { Sport } from '@/types/sport.type';
 import playmateService from '@/services/playmate.service';
+import { sportService } from '@/services/sport.service';
+import { getSportNameInVietnamese } from '@/utils/translateSport';
+import { useSelector } from 'react-redux';
+import { RootState } from '@/store';
 
 import {
   Card,
@@ -25,22 +30,20 @@ import {
   Avatar,
   message,
   Pagination,
-  Tabs,
-  Badge
+  Tabs
 } from 'antd';
 import {
   PlusOutlined,
   CalendarOutlined,
-  ClockCircleOutlined,
   EnvironmentOutlined,
   UserOutlined,
   TeamOutlined,
   MoneyCollectOutlined,
   SearchOutlined,
-  ArrowRightOutlined
+  ProfileOutlined
 } from '@ant-design/icons';
 
-const { Title, Text, Paragraph } = Typography;
+const { Title, Text } = Typography;
 const { Option } = Select;
 
 const PlaymateList: React.FC = () => {
@@ -48,14 +51,17 @@ const PlaymateList: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [playmateSearches, setPlaymateSearches] = useState<PlaymateSearch[]>([]);
   const [filteredSearches, setFilteredSearches] = useState<PlaymateSearch[]>([]);
+  const [sportsList, setSportsList] = useState<Sport[]>([]);
+  const user = useSelector((state: RootState) => state.user.user);
   
   // Filter states
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [selectedSkillLevel, setSelectedSkillLevel] = useState<SkillLevel | null>(null);
-  const [selectedSearchType, setSelectedSearchType] = useState<PlaymateSearchType | null>(null);
-  const [activeTab, setActiveTab] = useState<'all' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED'>('all');
+  const [selectedSkillLevel, setSelectedSkillLevel] = useState<SkillLevel | ''>('');
+  const [selectedSearchType, setSelectedSearchType] = useState<PlaymateSearchType | ''>('');
+  const [selectedSport, setSelectedSport] = useState<number | ''>('');
+  const [activeTab, setActiveTab] = useState<'all' | 'active' | 'inactive'>('all');
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(8);
+  const [pageSize, setPageSize] = useState(6);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -63,8 +69,16 @@ const PlaymateList: React.FC = () => {
         setLoading(true);
         // Fetch playmate searches
         const searches = await playmateService.getAllPlaymateSearches();
+        
+        // Không lọc bỏ bài đăng của người dùng hiện tại nữa
+        // const filteredSearches = searches.filter(search => search.userId !== user?.id);
+
         setPlaymateSearches(searches);
         setFilteredSearches(searches);
+        
+        // Fetch sports list
+        const sports = await sportService.getSport();
+        setSportsList(sports);
       } catch (error) {
         console.error('Error fetching data:', error);
         message.error('Không thể tải dữ liệu. Vui lòng thử lại sau.');
@@ -74,7 +88,7 @@ const PlaymateList: React.FC = () => {
     };
 
     fetchData();
-  }, []);
+  }, [user]);
 
   // Apply filters whenever any filter changes
   useEffect(() => {
@@ -82,7 +96,27 @@ const PlaymateList: React.FC = () => {
 
     // Filter by status tab
     if (activeTab !== 'all') {
-      result = result.filter(search => search.status === activeTab);
+      const isActive = activeTab === 'active';
+      
+      // Xác định trạng thái mở/đóng dựa trên các điều kiện như trong renderPlaymateCard
+      result = result.filter(search => {
+        // Tính toán các điều kiện cho từng bài đăng - không bao gồm người tạo
+        const currentCount = search.participants ? 
+          search.participants.filter(p => p.status === 'accepted' || p.status === 'pending').length : 0;
+        
+        // Xác định bài đăng đã đủ người hay chưa
+        const isFullyBooked = search.maximumParticipants && 
+          currentCount >= search.maximumParticipants;
+        
+        // Xác định bài đăng đã quá hạn hay chưa
+        const isPastDate = new Date(search.date) < new Date();
+        
+        // Xác định bài đăng còn mở hay đã đóng
+        const isOpen = search.status && !isPastDate && !isFullyBooked;
+        
+        // Lọc theo tab đã chọn
+        return isOpen === isActive;
+      });
     }
 
     // Filter by search term (title, description, location)
@@ -98,7 +132,7 @@ const PlaymateList: React.FC = () => {
 
     if (selectedSkillLevel) {
       result = result.filter(search => {
-        if (selectedSkillLevel === 'ANY') return true;
+        if (selectedSkillLevel === 'any') return true;
         return search.requiredSkillLevel === selectedSkillLevel;
       });
     }
@@ -106,28 +140,43 @@ const PlaymateList: React.FC = () => {
     if (selectedSearchType) {
       result = result.filter(search => search.playmateSearchType === selectedSearchType);
     }
+    
+    // Filter by sport
+    if (selectedSport) {
+      result = result.filter(search => {
+        return search.bookingSlot?.booking?.sport?.id === selectedSport;
+      });
+    }
 
     // Sort by date (newest first)
     result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     setFilteredSearches(result);
     setCurrentPage(1);
-  }, [playmateSearches, searchTerm, selectedSkillLevel, selectedSearchType, activeTab]);
+  }, [playmateSearches, searchTerm, selectedSkillLevel, selectedSearchType, selectedSport, activeTab]);
 
   const handleCreatePlaymate = () => {
     navigate('/user/playmate/create');
+  };
+  
+  const handleManagePlaymates = () => {
+    navigate('/user/playmate/manage');
   };
 
   const handleSearch = (value: string) => {
     setSearchTerm(value);
   };
 
-  const handleSkillLevelFilter = (value: SkillLevel | null) => {
+  const handleSkillLevelFilter = (value: SkillLevel | '') => {
     setSelectedSkillLevel(value);
   };
 
-  const handleSearchTypeFilter = (value: PlaymateSearchType | null) => {
+  const handleSearchTypeFilter = (value: PlaymateSearchType | '') => {
     setSelectedSearchType(value);
+  };
+  
+  const handleSportFilter = (value: number | '') => {
+    setSelectedSport(value);
   };
 
   const handleViewPlaymate = (id: string) => {
@@ -135,16 +184,16 @@ const PlaymateList: React.FC = () => {
   };
   
   const getCostTypeDisplay = (costType?: CostType, price?: number, costMale?: number, costFemale?: number) => {
-    if (!costType || costType === 'FREE' || costType === 'free') return <Tag color="success">Miễn phí</Tag>;
+    if (!costType || costType === 'free') return <Tag color="success">Miễn phí</Tag>;
     
        
-    if ((costType === 'TOTAL' || costType === 'total') && price) {
-      return <Text>{price.toLocaleString('vi-VN')}đ tổng</Text>;
+    if ((costType === 'total') && price) {
+      return <Text>Tổng chi phí: {price.toLocaleString('vi-VN')}đ</Text>;
     }
     
-    if (costType === 'GENDER_BASED' || costType === 'genderBased') {
+    if (costType === 'gender') {
       return (
-        <Space direction="vertical" size={0}>
+        <Space direction="horizontal" size={12}>
           {costMale && <Text>Nam: {costMale.toLocaleString('vi-VN')}đ</Text>}
           {costFemale && <Text>Nữ: {costFemale.toLocaleString('vi-VN')}đ</Text>}
         </Space>
@@ -159,55 +208,20 @@ const PlaymateList: React.FC = () => {
     return formattedDate;
   };
 
-  const getStatusTag = (status?: string) => {
-    if (!status) return null;
-    
-    const statusLower = status.toLowerCase();
-    
-    switch (statusLower) {
-      case 'active':
-        return <Tag color="green">Đang diễn ra</Tag>;
-      case 'completed':
-        return <Tag color="blue">Đã kết thúc</Tag>;
-      case 'cancelled':
-      case 'canceled':
-        return <Tag color="red">Đã hủy</Tag>;
-      case 'expired':
-        return <Tag color="red">Đã hết hạn</Tag>;
-      default:
-        return <Tag color="default">Không xác định</Tag>;
-    }
+  const getStatusTag = (isActive: boolean) => {
+    return isActive ? 
+      <Tag color="green">Đang mở</Tag> : 
+      <Tag color="red">Đã đóng</Tag>;
   };
 
   const getTypeTag = (type?: PlaymateSearchType) => {
     if (!type) return null;
     
     switch (type) {
-      case 'INDIVIDUAL':
+      case 'individual':
         return <Tag color="blue">Cá nhân</Tag>;
-      case 'GROUP':
+      case 'group':
         return <Tag color="purple">Nhóm</Tag>;
-      default:
-        return <Tag color="default">Khác</Tag>;
-    }
-  };
-
-  const getSkillTag = (level?: SkillLevel) => {
-    if (!level) return null;
-    
-    const levelUpper = level.toUpperCase() as SkillLevel;
-    
-    switch (levelUpper) {
-      case 'BEGINNER':
-        return <Tag color="green">Mới bắt đầu</Tag>;
-      case 'INTERMEDIATE':
-        return <Tag color="orange">Trung cấp</Tag>;
-      case 'ADVANCED':
-        return <Tag color="volcano">Nâng cao</Tag>;
-      case 'PROFESSIONAL':
-        return <Tag color="red">Chuyên nghiệp</Tag>;
-      case 'ANY':
-        return <Tag color="cyan">Mọi trình độ</Tag>;
       default:
         return <Tag color="default">Khác</Tag>;
     }
@@ -220,19 +234,56 @@ const PlaymateList: React.FC = () => {
   );
 
   const renderPlaymateCard = (search: PlaymateSearch) => {
-    const defaultImage = `https://via.placeholder.com/600x300?text=${encodeURIComponent(search.title)}`;
+    const defaultImage = `https://res.cloudinary.com/db3dx1dos/image/upload/v1746769804/hyfcz9nb8j3d5q4lfpqp.jpg`;
     const coverImage = search.image && search.image.length > 0 ? search.image[0] : defaultImage;
     
-    // Calculate current participants (creator + accepted participants)
-    const acceptedParticipants = search.participants ? 
-      search.participants.filter(p => p.status === 'accepted' || p.status === 'ACCEPTED').length : 0;
+    // Kiểm tra xem đây có phải là bài đăng của người dùng hiện tại không
+    const isUserPost = user?.id === search.userId;
     
-    const currentCount = 1 + acceptedParticipants; // +1 for the creator
+    // Sử dụng currentParticipants đã được tính toán trong mapApiToPlaymateSearch
+    // Nếu không có, tính toán từ mảng participants (không bao gồm người tạo)
+    let currentCount = search.currentParticipants;
     
+    if (currentCount === undefined) {
+      // Tính số người tham gia có trạng thái 'accepted' HOẶC 'pending'
+      currentCount = search.participants ? 
+        search.participants.filter(p => p.status === 'accepted' || p.status === 'pending').length : 0;
+    }
+    
+    console.log('Playmate ID:', search.id, 'currentParticipants:', search.currentParticipants, 
+      'participants length:', search.participants?.length || 0,
+      'accepted+pending:', search.participants?.filter(p => p.status === 'accepted' || p.status === 'pending').length || 0);
+    
+    // Determine if the playmate has reached maximum participants
+    const isFullyBooked = search.maximumParticipants && 
+      currentCount >= search.maximumParticipants;
+    
+    // Check if the playmate date has passed
+    const isPastDate = new Date(search.date) < new Date();
+    
+    // Overall status determination (open or closed)
+    const isOpen = search.status && !isPastDate && !isFullyBooked;
+
+    // Get facility information from bookingSlot
+    const facilityName = search.bookingSlot?.field?.fieldGroup?.facility?.name || 'Chưa có thông tin';
+    const facilityLocation = search.bookingSlot?.field?.fieldGroup?.facility?.location || 'Chưa có địa chỉ';
+    const sportName = search.bookingSlot?.booking?.sport?.name 
+      ? getSportNameInVietnamese(search.bookingSlot.booking.sport.name) 
+      : 'Chưa có thông tin';
+
+    // Format date and time together
+    const formattedDate = formatDate(search.date);
+    const formattedTime = `${search.startTime.substring(0, 5)}-${search.endTime.substring(0, 5)}`;
+    const dateTimeDisplay = `${formattedDate} (${formattedTime})`;
+
+    // Determine participant text based on playmate type
+    const participantText = search.playmateSearchType === 'group' ? 'nhóm tham gia' : 'người tham gia';
+
     return (
       <Card
         hoverable
-        className="playmate-card h-full shadow-sm hover:shadow-md transition-all"
+        className={`playmate-card h-full shadow-sm hover:shadow-md transition-all ${isUserPost ? 'my-playmate-card' : ''}`}
+        onClick={() => handleViewPlaymate(search.id)}
         cover={
           <div className="playmate-card-cover">
             <img 
@@ -241,105 +292,113 @@ const PlaymateList: React.FC = () => {
               className="object-cover w-full h-full"
             />
             <div className="playmate-card-badge">
-              {getStatusTag(search.status)}
+              {isUserPost && <Tag color="gold">Bài đăng của bạn</Tag>}
+              {getStatusTag(isOpen)}
               {getTypeTag(search.playmateSearchType)}
             </div>
           </div>
         }
-        actions={[
-          <Button 
-            type="link" 
-            onClick={(e) => {
-              e.stopPropagation();
-              handleViewPlaymate(search.id);
-            }}
-            icon={<ArrowRightOutlined />}
-          >
-            Chi tiết
-          </Button>,
-          <Button 
-            type="primary"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleViewPlaymate(search.id);
-            }}
-            disabled={search.status !== 'ACTIVE' || Boolean(
-              search.maximumParticipants && 
-              currentCount >= search.maximumParticipants
-            )}
-          >
-            {search.status !== 'ACTIVE' ? 'Đã kết thúc' : 
-             (search.maximumParticipants && 
-              currentCount >= search.maximumParticipants) ? 'Đã đủ người' : 'Đăng ký'}
-          </Button>
-        ]}
       >
         <div className="playmate-card-content">
           <div className="playmate-card-org">
             <Avatar src={search.userInfo.avatar || search.userInfo.avatarUrl} icon={<UserOutlined />} size="small" />
             <Text type="secondary" className="text-sm truncate">
-              {search.userInfo.name}
+              {search.userInfo.name} {isUserPost && <span className="text-gold">(Bạn)</span>}
             </Text>
           </div>
           
           <div className="playmate-card-title-container">
             <Card.Meta
-              title={<span className="playmate-card-title">{search.title}</span>}
-              description={
-                <Paragraph ellipsis={{ rows: 2 }} className="playmate-card-desc">
-                  {search.description}
-                </Paragraph>
-              }
+              title={<span className="playmate-card-title">{search.title}</span>}              
             />
           </div>
           
-          <div className="playmate-card-info">
+          <div className="playmate-card-info">           
+                                
+            {/* Date and time combined */}
             <div className="playmate-info-item">
               <CalendarOutlined />
-              <Text className="ml-2">{formatDate(search.date)}</Text>
-            </div>
-            
-            <div className="playmate-info-item">
-              <ClockCircleOutlined />
-              <Text className="ml-2">{`${search.startTime} - ${search.endTime}`}</Text>
-            </div>
-            
-            {search.location && (
-              <div className="playmate-info-item">
-                <EnvironmentOutlined />
-                <Text className="ml-2" ellipsis>{search.location}</Text>
+              <div className="ml-2">
+                <Text type="secondary" className="block text-xs">Thời gian chơi:</Text>
+                <Text className="block font-medium" style={{ color: '#1890ff' }}>{dateTimeDisplay}</Text>
               </div>
-            )}
+            </div>
             
+            {/* Facility name with title */}
+            <div className="playmate-info-item">
+              <CalendarOutlined />
+              <div className="ml-2">
+                <Text type="secondary" className="block text-xs">Cơ sở:</Text>
+                <Text strong className="block" style={{ color: '#722ed1' }}>{facilityName}</Text>
+              </div>
+            </div>
+            
+            {/* Facility location */}
+            <div className="playmate-info-item">
+              <EnvironmentOutlined />
+              <div className="ml-2">
+                <Text type="secondary" className="block text-xs">Địa chỉ:</Text>
+                <Text className="block">{facilityLocation}</Text>
+              </div>
+            </div>
+            
+            {/* Participants with dynamic text */}
             <div className="playmate-info-item">
               <TeamOutlined />
-              <Text className="ml-2">
-                {`${currentCount}/${search.requiredParticipants} người tham gia`}
-                {search.maximumParticipants && ` (tối đa ${search.maximumParticipants})`}
-              </Text>
+              <div className="ml-2">
+                <Text type="secondary" className="block text-xs">{search.playmateSearchType === 'group' ? 'Nhóm đăng ký tham gia:' : 'Người đăng ký tham gia:'}</Text>
+                <Text className="block" style={{ color: '#fa8c16' }}>
+                  {`${currentCount}/${search.maximumParticipants} ${participantText}`}
+                </Text>
+              </div>
             </div>
             
+            {/* Cost information */}
             <div className="playmate-info-item">
               <MoneyCollectOutlined />
-              <span className="ml-2">
-                {getCostTypeDisplay(search.costType, search.price, search.costMale, search.costFemale)}
-              </span>
+              <div className="ml-2">
+                <Text type="secondary" className="block text-xs">Chi phí:</Text>
+                <span className="block" style={{ color: '#52c41a' }}>
+                  {getCostTypeDisplay(search.costType, search.price, search.costMale, search.costFemale)}
+                </span>
+              </div>
             </div>
           </div>
+
+           {/* Sport information with highlight */}
+           <div className="playmate-info-item">              
+              <div className="ml-2 my-1">                
+                <div className="flex items-center">
+                  <Tag color="blue" className="m-0">{sportName}</Tag>
+                </div>
+              </div>
+            </div>
           
           <div className="playmate-card-footer">
-            <div className="playmate-tags">
-              {getSkillTag(search.requiredSkillLevel)}
-              {search.genderPreference && (
-                <Tag color={
-                  search.genderPreference.toUpperCase() === 'MALE' ? 'blue' : 
-                  search.genderPreference.toUpperCase() === 'FEMALE' ? 'pink' : 'default'
-                }>
-                  {search.genderPreference.toUpperCase() === 'MALE' ? 'Nam' : 
-                   search.genderPreference.toUpperCase() === 'FEMALE' ? 'Nữ' : 'Không giới hạn'}
-                </Tag>
-              )}
-            </div>
+            {isUserPost ? (
+              <Button 
+                type="primary"
+                size="small"
+                className="playmate-join-button ml-auto"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/user/playmate/${search.id}`);
+                }}
+              >
+                Quản lý
+              </Button>
+            ) : (
+              <Button 
+                type="primary"
+                size="small"
+                className="playmate-join-button ml-auto"
+                disabled={!isOpen}
+              >
+                {!search.status ? 'Đã đóng' : 
+                 isPastDate ? 'Đã hết hạn' :
+                 isFullyBooked ? 'Đã đủ người' : 'Đăng ký'}
+              </Button>
+            )}
           </div>
         </div>
       </Card>
@@ -347,7 +406,7 @@ const PlaymateList: React.FC = () => {
   };
 
   return (
-    <div className="w-full px-4 py-6">
+    <div className="w-full px-4 py-6 public-playmate-list bg-gray-50">
       <div className="max-w-7xl mx-auto">
         {/* Breadcrumb & Title */}
         <Breadcrumb className="mb-4"
@@ -367,7 +426,14 @@ const PlaymateList: React.FC = () => {
             </Text>
           </div>
           
-          <div className="mt-4 md:mt-0">
+          <div className="mt-4 md:mt-0 flex gap-3">
+            <Button 
+              icon={<ProfileOutlined />} 
+              onClick={handleManagePlaymates}
+              size="large"
+            >
+              Quản lý bài đăng
+            </Button>
             <Button 
               type="primary" 
               icon={<PlusOutlined />} 
@@ -380,11 +446,11 @@ const PlaymateList: React.FC = () => {
         </div>
         
         {/* Filters */}
-        <Card className="mb-4 md:mb-6">
+        <Card className="mb-4 md:mb-6 filter-card shadow-sm">
           <div className="flex flex-col md:flex-row md:justify-between md:items-center">
             <Tabs 
               activeKey={activeTab} 
-              onChange={tab => setActiveTab(tab as 'all' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED')}
+              onChange={tab => setActiveTab(tab as 'all' | 'active' | 'inactive')}
               className="playmate-tabs"
               items={[
                 {
@@ -392,28 +458,13 @@ const PlaymateList: React.FC = () => {
                   label: <span>Tất cả bài đăng</span>,
                 },
                 {
-                  key: 'ACTIVE',
-                  label: (
-                    <Badge 
-                      count={playmateSearches.filter(s => s.status === 'ACTIVE').length} 
-                      offset={[15, 0]}
-                    >
-                      <span>Đang diễn ra</span>
-                    </Badge>
-                  ),
+                  key: 'active',
+                  label: <span>Đang mở</span>,
                 },
                 {
-                  key: 'COMPLETED',
-                  label: <span>Đã kết thúc</span>,
-                },
-                {
-                  key: 'CANCELLED',
-                  label: <span>Đã hủy</span>,
-                },
-                {
-                  key: 'EXPIRED',
-                  label: <span>Đã hết hạn</span>,
-                },
+                  key: 'inactive',
+                  label: <span>Đã đóng</span>,
+                }
               ]}
             />
             
@@ -432,7 +483,24 @@ const PlaymateList: React.FC = () => {
           <Divider style={{ margin: '16px 0' }} />
           
           <Row gutter={[16, 16]}>
-            <Col xs={24} md={8}>
+            <Col xs={24} md={8} lg={6}>
+              <Select
+                placeholder="Môn thể thao"
+                style={{ width: '100%' }}
+                onChange={handleSportFilter}
+                allowClear
+                value={selectedSport}
+              >
+                <Option value="">Tất cả môn thể thao</Option>
+                {sportsList.map(sport => (
+                  <Option key={sport.id} value={sport.id}>
+                    {getSportNameInVietnamese(sport.name)}
+                  </Option>
+                ))}
+              </Select>
+            </Col>
+            
+            <Col xs={24} md={8} lg={6}>
               <Select
                 placeholder="Trình độ"
                 style={{ width: '100%' }}
@@ -440,15 +508,16 @@ const PlaymateList: React.FC = () => {
                 allowClear
                 value={selectedSkillLevel}
               >
-                <Option value="BEGINNER">Mới bắt đầu</Option>
-                <Option value="INTERMEDIATE">Trung cấp</Option>
-                <Option value="ADVANCED">Nâng cao</Option>
-                <Option value="PROFESSIONAL">Chuyên nghiệp</Option>
-                <Option value="ANY">Mọi trình độ</Option>
+                <Option value="">Tất cả trình độ</Option>
+                <Option value="newbie">Mới bắt đầu</Option>
+                <Option value="intermediate">Trung cấp</Option>
+                <Option value="advance">Nâng cao</Option>
+                <Option value="professional">Chuyên nghiệp</Option>
+                <Option value="any">Mọi trình độ</Option>
               </Select>
             </Col>
             
-            <Col xs={24} md={8}>
+            <Col xs={24} md={8} lg={6}>
               <Select
                 placeholder="Loại tìm kiếm"
                 style={{ width: '100%' }}
@@ -456,8 +525,9 @@ const PlaymateList: React.FC = () => {
                 allowClear
                 value={selectedSearchType}
               >
-                <Option value="INDIVIDUAL">Cá nhân</Option>
-                <Option value="GROUP">Nhóm</Option>
+                <Option value="">Tất cả loại tìm kiếm</Option>
+                <Option value="individual">Cá nhân</Option>
+                <Option value="group">Nhóm</Option>
               </Select>
             </Col>
           </Row>
@@ -465,36 +535,39 @@ const PlaymateList: React.FC = () => {
         
         {/* Search results */}
         {loading ? (
-          <div className="text-center py-8 spin-container">
+          <div className="text-center py-12 spin-container">
             <Spin size="large" />
             <div className="mt-3">Đang tải danh sách bài đăng...</div>
           </div>
         ) : filteredSearches.length > 0 ? (
-          <>
-            <Row gutter={[16, 16]}>
+          <div className="playmate-list-container">
+            <Row gutter={[16, 24]}>
               {paginatedSearches.map(search => (
-                <Col key={search.id} xs={24} sm={12} md={8} lg={6} className="mb-4">
+                <Col key={search.id} xs={24} sm={12} md={8}>
                   {renderPlaymateCard(search)}
                 </Col>
               ))}
             </Row>
             
-            {filteredSearches.length > pageSize && (
-              <div className="pagination-container">
+            {filteredSearches.length > 0 && (
+              <div className="flex justify-center my-4">
                 <Pagination
                   current={currentPage}
-                  pageSize={pageSize}
                   total={filteredSearches.length}
-                  onChange={setCurrentPage}
+                  pageSize={pageSize}
                   showSizeChanger
+                  pageSizeOptions={['6', '12', '18', '24']}
+                  showTotal={(total) => `Tổng cộng ${total} bài đăng`}
+                  onChange={(page) => setCurrentPage(page)}
                   onShowSizeChange={(current, size) => {
                     setCurrentPage(1);
                     setPageSize(size);
                   }}
+                  className="rounded-md shadow-sm px-4 py-2"
                 />
               </div>
             )}
-          </>
+          </div>
         ) : (
           <Empty
             description="Không tìm thấy bài đăng nào phù hợp"
@@ -506,6 +579,14 @@ const PlaymateList: React.FC = () => {
       
       <style>
         {`
+          .public-playmate-list {
+            min-height: calc(100vh - 64px);
+          }
+          
+          .filter-card {
+            border-radius: 8px;
+          }
+          
           .spin-container {
             display: flex;
             flex-direction: column;
@@ -522,11 +603,20 @@ const PlaymateList: React.FC = () => {
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
             display: flex;
             flex-direction: column;
+            cursor: pointer;
           }
           
           .playmate-card:hover {
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
             transform: translateY(-5px);
+          }
+          
+          .my-playmate-card {
+            border: 2px solid #faad14;
+          }
+          
+          .text-gold {
+            color: #faad14;
           }
           
           .playmate-card-cover {
@@ -567,8 +657,7 @@ const PlaymateList: React.FC = () => {
           }
           
           .playmate-card-title-container {
-            min-height: 88px;
-            margin-bottom: 12px;
+            min-height: 20px;            
           }
           
           .playmate-card-title {
@@ -578,6 +667,7 @@ const PlaymateList: React.FC = () => {
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            font-size: 20px;
           }
           
           .playmate-card-desc {
@@ -589,25 +679,34 @@ const PlaymateList: React.FC = () => {
           .playmate-card-info {
             display: flex;
             flex-direction: column;
-            gap: 8px;
-            margin: 12px 0;
+            gap: 12px;
+            margin: 8px 0;
             flex-grow: 1;
           }
           
           .playmate-info-item {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             color: rgba(0, 0, 0, 0.65);
             font-size: 13px;
+            line-height: 1.5;
+          }
+          
+          .playmate-info-item .anticon,
+          .playmate-info-item i {
+            margin-top: 3px;
+            min-width: 14px;
           }
           
           .playmate-card-footer {
             display: flex;
-            justify-content: space-between;
+            justify-content: flex-end;
             align-items: center;
             margin-top: auto;
             flex-wrap: wrap;
             min-height: 36px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(0, 0, 0, 0.06);
           }
           
           .playmate-tags {
@@ -618,6 +717,18 @@ const PlaymateList: React.FC = () => {
           
           .playmate-tag {
             margin: 0;
+          }
+          
+          .playmate-join-button {
+            margin-top: 8px;
+          }
+          
+          .playmate-tabs {
+            margin-bottom: 0 !important;
+          }
+          
+          .playmate-list-container {
+            min-height: 400px;
           }
           
           .pagination-container {
@@ -638,13 +749,14 @@ const PlaymateList: React.FC = () => {
             margin-left: 8px;
           }
           
-          .playmate-tabs {
-            margin-bottom: 0 !important;
+          .my-8 {
+            margin-top: 32px;
+            margin-bottom: 32px;
           }
           
           @media (max-width: 768px) {
             .playmate-card-cover {
-              height: 180px;
+              height: 200px;
             }
           }
         `}
@@ -653,4 +765,4 @@ const PlaymateList: React.FC = () => {
   );
 };
 
-export default PlaymateList; 
+export default PlaymateList;

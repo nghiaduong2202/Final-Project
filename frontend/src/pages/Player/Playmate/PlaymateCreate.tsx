@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { PlaymateFormData, BookingSlot } from '@/types/playmate.type';
 import playmateService from '@/services/playmate.service';
+import {getSportNameInVietnamese}  from '@/utils/translateSport';
 import {
   Form,
   Input,
@@ -30,7 +31,11 @@ import {
   UserOutlined,
   InfoCircleOutlined,
   ExclamationCircleOutlined,
-  CheckCircleOutlined
+  CheckCircleOutlined,
+  EnvironmentOutlined,
+  CalendarOutlined,
+  ClockCircleOutlined,
+  TagOutlined
 } from '@ant-design/icons';
 import { RadioChangeEvent } from 'antd/lib/radio';
 import type { ValidateErrorEntity } from 'rc-field-form/lib/interface';
@@ -56,6 +61,8 @@ const PlaymateCreate: React.FC = () => {
   const [formValues, setFormValues] = useState<PlaymateFormValues | null>(null);
   const [uploading, setUploading] = useState<boolean>(false);
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
+  const [fileList, setFileList] = useState<UploadFile[]>([]);
+  const [selectedBookingSlot, setSelectedBookingSlot] = useState<BookingSlot | null>(null);
 
   useEffect(() => {
     // Fetch booking slots
@@ -86,6 +93,19 @@ const PlaymateCreate: React.FC = () => {
       setUploading(true);
       const imageUrl = await playmateService.uploadImage(file);
       setUploadedImages(prev => [...prev, imageUrl]);
+      
+      // Add file to fileList with status 'done'
+      const newFile: UploadFile = {
+        uid: file.uid,
+        name: file.name,
+        status: 'done',
+        url: imageUrl,
+        thumbUrl: imageUrl,
+        size: file.size,
+        type: file.type
+      };
+      
+      setFileList(prev => [...prev, newFile]);
       message.success('Tải ảnh lên thành công');
       return false; // prevent default upload behavior
     } catch (error) {
@@ -131,15 +151,48 @@ const PlaymateCreate: React.FC = () => {
       };
       
       // Create playmate search
-      const response = await playmateService.createPlaymateSearch(playmateFormData);
+      await playmateService.createPlaymateSearch(playmateFormData);
+      
+      // Hiển thị thông báo thành công và chuyển hướng
       message.success('Đã tạo bài đăng tìm bạn chơi thành công!');
-      navigate(`/user/playmate/${response.id}`);
-    } catch (error) {
+      
+      // Chuyển hướng sau một khoảng thời gian để đảm bảo người dùng thấy thông báo
+      setTimeout(() => {
+        navigate(`/user/playmate/manage`);
+      }, 500);
+    } catch (error: unknown) {
       console.error('Error creating playmate search:', error);
-      message.error('Có lỗi xảy ra khi tạo bài đăng. Vui lòng thử lại sau.');
+      
+      // Thêm thông tin chi tiết của lỗi
+      let errorMessage = 'Có lỗi xảy ra khi tạo bài đăng. Vui lòng thử lại sau.';
+      
+      if (error && typeof error === 'object') {
+        const err = error as { response?: { data?: { message?: string } }, message?: string };
+        if (err.response?.data?.message) {
+          errorMessage = `Lỗi: ${err.response.data.message}`;
+        } else if (err.message) {
+          errorMessage = `Lỗi: ${err.message}`;
+        }
+      }
+      
+      message.error(errorMessage);
     } finally {
       setSubmitting(false);
     }
+  };
+
+  // Handle file removal
+  const handleRemove = (file: UploadFile) => {
+    const index = fileList.indexOf(file);
+    const newFileList = fileList.slice();
+    newFileList.splice(index, 1);
+    setFileList(newFileList);
+    
+    // Also remove from uploadedImages
+    if (file.url) {
+      setUploadedImages(prev => prev.filter(url => url !== file.url));
+    }
+    return true;
   };
 
   const handleCancelSubmit = () => {
@@ -161,10 +214,10 @@ const PlaymateCreate: React.FC = () => {
     return date.toLocaleDateString('vi-VN');
   };
 
-  // Number parser for formatting currency fields
-  const numberParser = (value: string | undefined): number => {
-    if (!value) return 0;
-    return Number(value.replace(/\s?|(,*)/g, ''));
+  // Handle booking slot selection change
+  const handleBookingSlotChange = (value: number) => {
+    const selected = bookingSlots.find(slot => slot.id === value);
+    setSelectedBookingSlot(selected || null);
   };
 
   // Render the booking slot select options
@@ -172,10 +225,12 @@ const PlaymateCreate: React.FC = () => {
     return bookingSlots.map(slot => {
       const date = formatDate(slot.date);
       const time = `${slot.booking.startTime.substring(0, 5)} - ${slot.booking.endTime.substring(0, 5)}`;
+      const facilityName = slot.field?.fieldGroup?.facility?.name || '';
+      const sportName = slot.booking.sport?.name || '';
       
       return (
         <Option key={slot.id} value={slot.id}>
-          {`${date} (${time})`}
+          {`${date} (${time}) - ${facilityName} - ${getSportNameInVietnamese(sportName)}`}
         </Option>
       );
     });
@@ -212,7 +267,7 @@ const PlaymateCreate: React.FC = () => {
                 layout="vertical"
                 onFinish={handleSubmit}
                 onFinishFailed={onFinishFailed}
-                requiredMark="optional"
+                requiredMark={false}
                 scrollToFirstError
                 disabled={loading}
                 className="playmate-form"
@@ -238,7 +293,7 @@ const PlaymateCreate: React.FC = () => {
                   <Row gutter={[16, 16]}>
                     <Col xs={24}>
                       <Form.Item
-                        label="Tiêu đề"
+                        label={<span className="required-field">Tiêu đề</span>}
                         name="title"
                         rules={[{ required: true, message: 'Vui lòng nhập tiêu đề!' }]}
                       >
@@ -250,11 +305,12 @@ const PlaymateCreate: React.FC = () => {
                   <Form.Item
                     label="Hình ảnh minh họa"
                     name="imagesFileList"
-                    valuePropName="fileList"
                   >
                     <Upload 
                       listType="picture-card" 
                       beforeUpload={handleUpload}
+                      fileList={fileList}
+                      onRemove={handleRemove}
                       showUploadList={{
                         showPreviewIcon: true,
                         showRemoveIcon: true
@@ -268,7 +324,7 @@ const PlaymateCreate: React.FC = () => {
                   </Form.Item>
 
                   <Form.Item
-                    label="Chọn lịch đặt sân"
+                    label={<span className="required-field">Chọn lịch đặt sân</span>}
                     name="bookingSlotId"
                     rules={[{ required: true, message: 'Vui lòng chọn lịch đặt sân!' }]}
                   >
@@ -277,15 +333,58 @@ const PlaymateCreate: React.FC = () => {
                       loading={loading}
                       showSearch
                       optionFilterProp="children"
+                      onChange={handleBookingSlotChange}
                     >
                       {renderBookingSlotOptions()}
                     </Select>
                   </Form.Item>
 
+                  {selectedBookingSlot && (
+                    <Card className="mb-4 bg-gray-50">
+                      <div className="flex flex-col space-y-2">
+                        <div className="flex items-center">
+                          <CalendarOutlined className="mr-2 text-blue-500" />
+                          <Text strong>Ngày: </Text>
+                          <Text className="ml-2">{formatDate(selectedBookingSlot.date)}</Text>
+                        </div>
+                        <div className="flex items-center">
+                          <ClockCircleOutlined className="mr-2 text-blue-500" />
+                          <Text strong>Thời gian: </Text>
+                          <Text className="ml-2">{`${selectedBookingSlot.booking.startTime.substring(0, 5)} - ${selectedBookingSlot.booking.endTime.substring(0, 5)}`}</Text>
+                        </div>
+                        <div className="flex items-center">
+                          <TagOutlined className="mr-2 text-blue-500" />
+                          <Text strong>Môn thể thao: </Text>
+                          <Text className="ml-2 capitalize">{getSportNameInVietnamese(selectedBookingSlot.booking.sport?.name || '')}</Text>
+                        </div>
+                        {selectedBookingSlot.field?.name && (
+                          <div className="flex items-center">
+                            <InfoCircleOutlined className="mr-2 text-blue-500" />
+                            <Text strong>Sân: </Text>
+                            <Text className="ml-2">{selectedBookingSlot.field.name}</Text>
+                          </div>
+                        )}
+                        {selectedBookingSlot.field?.fieldGroup?.facility?.name && (
+                          <div className="flex items-center">
+                            <InfoCircleOutlined className="mr-2 text-blue-500" />
+                            <Text strong>Cơ sở: </Text>
+                            <Text className="ml-2">{selectedBookingSlot.field.fieldGroup.facility.name}</Text>
+                          </div>
+                        )}
+                        {selectedBookingSlot.field?.fieldGroup?.facility?.location && (
+                          <div className="flex items-start">
+                            <EnvironmentOutlined className="mr-2 text-blue-500 mt-1" />
+                            <Text strong className="mr-2">Địa chỉ:</Text>
+                            <Text>{selectedBookingSlot.field.fieldGroup.facility.location}</Text>
+                          </div>
+                        )}
+                      </div>
+                    </Card>
+                  )}
+
                   <Form.Item
                     label="Mô tả"
-                    name="description"
-                    rules={[{ required: true, message: 'Vui lòng nhập mô tả!' }]}
+                    name="description"                    
                   >
                     <TextArea 
                       rows={4} 
@@ -314,7 +413,7 @@ const PlaymateCreate: React.FC = () => {
                   className="mb-6 border border-gray-200 rounded-lg playmate-inner-card"
                 >
                   <Form.Item
-                    label="Loại chi phí"
+                    label={<span className="required-field">Loại chi phí</span>}
                     name="costType"
                     rules={[{ required: true, message: 'Vui lòng chọn loại chi phí!' }]}
                   >
@@ -322,33 +421,14 @@ const PlaymateCreate: React.FC = () => {
                       <Space direction="vertical">                        
                         <Radio value="total">Tổng chi phí</Radio>
                         <Radio value="free">Miễn phí</Radio>
-                        <Radio value="genderBased">Theo giới tính</Radio>
+                        <Radio value="gender">Theo giới tính</Radio>
                       </Space>
                     </Radio.Group>
-                  </Form.Item>
-                
-                  {(costType === 'perPerson') && (
-                    <Form.Item
-                      label="Chi phí dự kiến/người"
-                      name="totalCost"
-                      rules={[{ required: costType === 'perPerson', message: 'Vui lòng nhập chi phí!' }]}
-                    >
-                      <InputNumber 
-                        min={0} 
-                        step={1000} 
-                        className="w-full" 
-                        formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                        parser={numberParser}
-                        placeholder="Nhập chi phí" 
-                        prefix={<DollarOutlined />}
-                        addonAfter="VND"
-                      />
-                    </Form.Item>
-                  )}
+                  </Form.Item>                
                   
                   {(costType === 'total') && (
                     <Form.Item
-                      label="Tổng chi phí"
+                      label={<span className="required-field">Tổng chi phí</span>}
                       name="totalCost"
                       rules={[{ required: costType === 'total', message: 'Vui lòng nhập chi phí!' }]}
                     >
@@ -356,8 +436,11 @@ const PlaymateCreate: React.FC = () => {
                         min={0} 
                         step={1000} 
                         className="w-full" 
-                        formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                        parser={numberParser}
+                        formatter={(value) => value ? `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.') : ''}
+                        parser={(value: string | undefined) => {
+                          if (!value) return 0;
+                          return Number(value.replace(/\./g, ''));
+                        }}
                         placeholder="Nhập chi phí" 
                         prefix={<DollarOutlined />}
                         addonAfter="VND"
@@ -365,20 +448,23 @@ const PlaymateCreate: React.FC = () => {
                     </Form.Item>
                   )}
                   
-                  {costType === 'genderBased' && (
+                  {costType === 'gender' && (
                     <Row gutter={16}>
                       <Col xs={24} md={12}>
                         <Form.Item
-                          label="Chi phí cho Nam"
+                          label={<span className="required-field">Chi phí cho Nam</span>}
                           name="maleCost"
-                          rules={[{ required: costType === 'genderBased', message: 'Vui lòng nhập chi phí!' }]}
+                          rules={[{ required: costType === 'gender', message: 'Vui lòng nhập chi phí!' }]}
                         >
                           <InputNumber 
                             min={0} 
                             step={1000} 
                             className="w-full" 
-                            formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                            parser={numberParser}
+                            formatter={(value) => value ? `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.') : ''}
+                            parser={(value: string | undefined) => {
+                              if (!value) return 0;
+                              return Number(value.replace(/\./g, ''));
+                            }}
                             placeholder="Nhập chi phí cho nam" 
                             prefix={<DollarOutlined />}
                             addonAfter="VND"
@@ -387,16 +473,19 @@ const PlaymateCreate: React.FC = () => {
                       </Col>
                       <Col xs={24} md={12}>
                         <Form.Item
-                          label="Chi phí cho Nữ"
+                          label={<span className="required-field">Chi phí cho Nữ</span>}
                           name="femaleCost"
-                          rules={[{ required: costType === 'genderBased', message: 'Vui lòng nhập chi phí!' }]}
+                          rules={[{ required: costType === 'gender', message: 'Vui lòng nhập chi phí!' }]}
                         >
                           <InputNumber 
                             min={0} 
                             step={1000} 
                             className="w-full" 
-                            formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                            parser={numberParser}
+                            formatter={(value) => value ? `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.') : ''}
+                            parser={(value: string | undefined) => {
+                              if (!value) return 0;
+                              return Number(value.replace(/\./g, ''));
+                            }}
                             placeholder="Nhập chi phí cho nữ" 
                             prefix={<DollarOutlined />}
                             addonAfter="VND"
@@ -437,7 +526,7 @@ const PlaymateCreate: React.FC = () => {
                   <Row gutter={16}>
                     <Col xs={24} md={12}>
                       <Form.Item
-                        label="Số người/đội cần thiết"
+                        label={<span className="required-field">Số người/đội cần thiết</span>}
                         name="minParticipant"
                         rules={[{ required: true, message: 'Vui lòng nhập số người/đội cần thiết!' }]}
                       >
@@ -476,7 +565,7 @@ const PlaymateCreate: React.FC = () => {
                   className="mb-6 border border-gray-200 rounded-lg playmate-inner-card"
                 >
                   <Form.Item
-                    label="Giới tính"
+                    label={<span className="required-field">Giới tính</span>}
                     name="genderPreference"
                     rules={[{ required: true, message: 'Vui lòng chọn giới tính!' }]}
                   >
@@ -488,15 +577,15 @@ const PlaymateCreate: React.FC = () => {
                   </Form.Item>
                   
                   <Form.Item
-                    label="Trình độ yêu cầu"
+                    label={<span className="required-field">Trình độ yêu cầu tối thiểu</span>}
                     name="skillLevel"
                     rules={[{ required: true, message: 'Vui lòng chọn trình độ yêu cầu!' }]}
                   >
                     <Select placeholder="Chọn trình độ">
                       <Option value="any">Không giới hạn</Option>
-                      <Option value="beginner">Mới bắt đầu</Option>
+                      <Option value="newbie">Mới bắt đầu</Option>
                       <Option value="intermediate">Trung cấp</Option>
-                      <Option value="advanced">Nâng cao</Option>
+                      <Option value="advance">Nâng cao</Option>
                       <Option value="professional">Chuyên nghiệp</Option>
                     </Select>
                   </Form.Item>
@@ -592,6 +681,11 @@ const PlaymateCreate: React.FC = () => {
           .max-w-7xl {
             max-width: 1400px;
           }
+        }
+        /* Required field indicator */
+        .required-field::before {
+          content: '* ';
+          color: #ff4d4f;
         }
       `}</style>
     </div>

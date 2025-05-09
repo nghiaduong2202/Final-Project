@@ -145,11 +145,11 @@ export const useChat = () => {
 
   // Listen for new messages
   useEffect(() => {
-    console.log('Setting up message subscription for conversation:', activeConversationId);
+    // console.log('Setting up message subscription for conversation:', activeConversationId);
     
     const subscription = socketService.getMessages(activeConversationId || '').subscribe(
       (newMessages: Message[]) => {
-        console.log('New messages received:', newMessages.length, activeConversationId);
+        // console.log('New messages received:', newMessages.length, activeConversationId);
         
         if (activeConversationId && newMessages.length > 0) {
           // Add each message individually
@@ -181,7 +181,7 @@ export const useChat = () => {
     // Subscribe to online status changes for the current chat participant
     const subscription = socketService.getUserOnlineStatus(currentChatParticipantId).subscribe(
       (online: boolean) => {
-        console.log(`User ${currentChatParticipantId} online status:`, online);
+        // console.log(`User ${currentChatParticipantId} online status:`, online);
         setIsOnline(online);
       }
     );
@@ -191,11 +191,11 @@ export const useChat = () => {
 
   // Listen for conversation updates
   useEffect(() => {
-    console.log('Setting up conversation update subscription');
+    // console.log('Setting up conversation update subscription');
     
     const subscription = socketService.getConversations().subscribe(
       (updatedConversations: Conversation[]) => {
-        console.log('Received updated conversations:', updatedConversations.length);
+        // console.log('Received updated conversations:', updatedConversations.length);
         
         // Process the updated conversations, maintaining unread count for active conversation
         let processedConversations = updatedConversations;
@@ -224,7 +224,7 @@ export const useChat = () => {
   // Listen for conversation updates - fetch conversations when widget is opened
   useEffect(() => {
     if (isChatWidgetOpen) {
-      console.log('Chat widget opened, fetching conversations');
+      // console.log('Chat widget opened, fetching conversations');
       fetchConversations();
     }
   }, [isChatWidgetOpen, fetchConversations]);
