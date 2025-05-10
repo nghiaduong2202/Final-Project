@@ -6,10 +6,12 @@ import { BookingFormData } from '@/types/booking.type';
 import { 
   InfoCircleOutlined, 
   EnvironmentOutlined, TeamOutlined, FieldTimeOutlined,
-  CalendarOutlined, CheckCircleOutlined, CloseCircleOutlined
+  CalendarOutlined, CheckCircleOutlined, CloseCircleOutlined,
+  DollarOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { getSportNameInVietnamese } from '@/utils/translateSport';
+import BookingPaymentSummary from './BookingPaymentSummary';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -38,13 +40,17 @@ interface BookingStepFieldProps {
   formData: Partial<BookingFormData>;
   fieldGroups: AvailableFieldGroup[];
   formatCurrency: (amount: number) => string;
+  calculateTotalPrice: () => number;
+  selectedDates?: dayjs.Dayjs[];
 }
 
 const BookingStepField: React.FC<BookingStepFieldProps> = ({
   form,
   formData,
   fieldGroups,
-  formatCurrency
+  formatCurrency,
+  calculateTotalPrice,
+  selectedDates = []
 }) => {
   const [selectedFieldGroup, setSelectedFieldGroup] = useState<AvailableFieldGroup | null>(
     formData.fieldGroupId ? fieldGroups.find(g => String(g.id) === String(formData.fieldGroupId)) || null : null
@@ -160,133 +166,56 @@ const BookingStepField: React.FC<BookingStepFieldProps> = ({
     }
   }, [selectedFieldGroup, form]);
 
-  // Render thông tin giá
-  const renderPriceInfo = (fieldGroup: AvailableFieldGroup) => {
-    const prices = [];
+  // Hàm helper để định dạng giờ từ "HH:MM:SS" sang "HH:MM"
+  const formatTimeString = (timeStr: string | null | undefined): string => {
+    if (!timeStr) return '';
+    return timeStr.substring(0, 5);
+  };
 
-    // Giá cơ bản
-    prices.push(
-      <div key="base" className="flex justify-between">
-        <span>Giá cơ bản:</span>
-        <span className="font-medium">{formatCurrency(fieldGroup.basePrice)}/giờ</span>
-      </div>
-    );
-
-    // Các mức giá cao điểm
+  // Render thông tin giờ cao điểm trong card field group
+  const renderPeakHourInfo = (fieldGroup: AvailableFieldGroup): JSX.Element[] => {
+    const peakHourElements: JSX.Element[] = [];
+    
     if (fieldGroup.peakStartTime1 && fieldGroup.peakEndTime1 && fieldGroup.priceIncrease1) {
-      prices.push(
-        <div key="peak1" className="flex justify-between text-orange-500">
-          <span>
-            <FieldTimeOutlined className="mr-1" />
-            Cao điểm ({fieldGroup.peakStartTime1.substring(0, 5)}-{fieldGroup.peakEndTime1.substring(0, 5)}):
-          </span>
-          <span className="font-medium">{formatCurrency(fieldGroup.basePrice + fieldGroup.priceIncrease1)}/giờ</span>
+      peakHourElements.push(
+        <div key="peak1" className="flex items-center mt-1 text-orange-500">
+          <FieldTimeOutlined className="mr-1" />
+          <span> Giá cao điểm 1: {formatTimeString(fieldGroup.peakStartTime1)}-{formatTimeString(fieldGroup.peakEndTime1)}: </span>
+          <span className="font-medium pl-2">{formatCurrency(fieldGroup.basePrice + fieldGroup.priceIncrease1)}/giờ</span>
         </div>
       );
     }
-
+    
     if (fieldGroup.peakStartTime2 && fieldGroup.peakEndTime2 && fieldGroup.priceIncrease2) {
-      prices.push(
-        <div key="peak2" className="flex justify-between text-orange-500">
-          <span>
-            <FieldTimeOutlined className="mr-1" />
-            Cao điểm ({fieldGroup.peakStartTime2.substring(0, 5)}-{fieldGroup.peakEndTime2.substring(0, 5)}):
-          </span>
-          <span className="font-medium">{formatCurrency(fieldGroup.basePrice + fieldGroup.priceIncrease2)}/giờ</span>
+      peakHourElements.push(
+        <div key="peak2" className="flex items-center mt-1 text-orange-500">
+          <FieldTimeOutlined className="mr-1" />
+          <span> Giá cao điểm 2: {formatTimeString(fieldGroup.peakStartTime2)}-{formatTimeString(fieldGroup.peakEndTime2)}: </span>
+          <span className="font-medium pl-2">{formatCurrency(fieldGroup.basePrice + fieldGroup.priceIncrease2)}/giờ</span>
         </div>
       );
     }
-
+    
     if (fieldGroup.peakStartTime3 && fieldGroup.peakEndTime3 && fieldGroup.priceIncrease3) {
-      prices.push(
-        <div key="peak3" className="flex justify-between text-orange-500">
-          <span>
-            <FieldTimeOutlined className="mr-1" />
-            Cao điểm ({fieldGroup.peakStartTime3.substring(0, 5)}-{fieldGroup.peakEndTime3.substring(0, 5)}):
-          </span>
-          <span className="font-medium">{formatCurrency(fieldGroup.basePrice + fieldGroup.priceIncrease3)}/giờ</span>
+      peakHourElements.push(
+        <div key="peak3" className="flex items-center mt-1 text-orange-500">
+          <FieldTimeOutlined className="mr-1" />
+          <span> Giá cao điểm 3: {formatTimeString(fieldGroup.peakStartTime3)}-{formatTimeString(fieldGroup.peakEndTime3)}: </span>
+          <span className="font-medium pl-2">{formatCurrency(fieldGroup.basePrice + fieldGroup.priceIncrease3)}/giờ</span>
         </div>
       );
     }
-
-    return (
-      <div className="space-y-1 bg-gray-50 p-3 rounded-md mt-2">
-        {prices}
-      </div>
-    );
-  };
-
-  // Xử lý khi thay đổi field group
-  const handleFieldGroupChange = (fieldGroupId: string) => {
-    const selected = fieldGroups.find(g => g.id === fieldGroupId) || null;
-    setSelectedFieldGroup(selected);
     
-    // Reset và khởi tạo lại lựa chọn sân
-    if (selected) {
-      const initialSelections: FieldSelection = {};
-      let firstSelectedFieldId: number | null = null;
-      
-      if (selected.bookingSlot) {
-        selected.bookingSlot.forEach(slot => {
-          const dateStr = dayjs(slot.date).format('YYYY-MM-DD');
-          
-          // Chọn sân đầu tiên có status là 'active'
-          const firstActiveField = slot.fields.find(field => field.status === 'active');
-          if (firstActiveField) {
-            initialSelections[dateStr] = firstActiveField.id;
-            if (!firstSelectedFieldId) firstSelectedFieldId = firstActiveField.id;
-          } else {
-            initialSelections[dateStr] = null;
-          }
-        });
-      }
-      
-      setFieldSelections(initialSelections);
-      
-      // Always update with a valid fieldId to prevent API errors
-      if (firstSelectedFieldId) {
-        console.log('Setting default fieldId after group change:', firstSelectedFieldId);
-        form.setFieldsValue({
-          fieldGroupId,
-          fieldId: firstSelectedFieldId,
-          fieldSelections: initialSelections
-        });
-      } else {
-        form.setFieldsValue({
-          fieldGroupId,
-          fieldId: "",
-          fieldSelections: {}
-        });
-      }
-    } else {
-      // Reset nếu không có field group nào được chọn
-      setFieldSelections({});
-      form.setFieldsValue({
-        fieldGroupId: null,
-        fieldId: "",
-        fieldSelections: {}
-      });
+    if (peakHourElements.length === 0) {
+      return [
+        <div key="no-peak" className="flex items-center mt-1 text-gray-500">
+          <FieldTimeOutlined className="mr-1" />
+          <span>Không có giờ cao điểm</span>
+        </div>
+      ];
     }
-  };
-
-  // Xử lý khi chọn sân cho một ngày cụ thể
-  const handleFieldSelect = (date: string, fieldId: number) => {
-    // Cập nhật field selection cho ngày đã chọn
-    const updatedSelections = {
-      ...fieldSelections,
-      [date]: fieldId
-    };
     
-    setFieldSelections(updatedSelections);
-    
-    // Cập nhật form với fieldSelections mới
-    form.setFieldValue('fieldSelections', updatedSelections);
-    
-    // Cập nhật form với fieldId mới nhất được chọn (cho tương thích ngược)
-    form.setFieldValue('fieldId', fieldId);
-    
-    console.log(`Selected field ID ${fieldId} for date ${date}`);
-    console.log('Updated field selections:', updatedSelections);
+    return peakHourElements;
   };
 
   // Format ngày hiển thị
@@ -455,6 +384,79 @@ const BookingStepField: React.FC<BookingStepFieldProps> = ({
     );
   };
 
+  // Xử lý khi thay đổi field group
+  const handleFieldGroupChange = (fieldGroupId: string) => {
+    const selected = fieldGroups.find(g => g.id === fieldGroupId) || null;
+    setSelectedFieldGroup(selected);
+    
+    // Reset và khởi tạo lại lựa chọn sân
+    if (selected) {
+      const initialSelections: FieldSelection = {};
+      let firstSelectedFieldId: number | null = null;
+      
+      if (selected.bookingSlot) {
+        selected.bookingSlot.forEach(slot => {
+          const dateStr = dayjs(slot.date).format('YYYY-MM-DD');
+          
+          // Chọn sân đầu tiên có status là 'active'
+          const firstActiveField = slot.fields.find(field => field.status === 'active');
+          if (firstActiveField) {
+            initialSelections[dateStr] = firstActiveField.id;
+            if (!firstSelectedFieldId) firstSelectedFieldId = firstActiveField.id;
+          } else {
+            initialSelections[dateStr] = null;
+          }
+        });
+      }
+      
+      setFieldSelections(initialSelections);
+      
+      // Always update with a valid fieldId to prevent API errors
+      if (firstSelectedFieldId) {
+        console.log('Setting default fieldId after group change:', firstSelectedFieldId);
+        form.setFieldsValue({
+          fieldGroupId,
+          fieldId: firstSelectedFieldId,
+          fieldSelections: initialSelections
+        });
+      } else {
+        form.setFieldsValue({
+          fieldGroupId,
+          fieldId: "",
+          fieldSelections: {}
+        });
+      }
+    } else {
+      // Reset nếu không có field group nào được chọn
+      setFieldSelections({});
+      form.setFieldsValue({
+        fieldGroupId: null,
+        fieldId: "",
+        fieldSelections: {}
+      });
+    }
+  };
+
+  // Xử lý khi chọn sân cho một ngày cụ thể
+  const handleFieldSelect = (date: string, fieldId: number) => {
+    // Cập nhật field selection cho ngày đã chọn
+    const updatedSelections = {
+      ...fieldSelections,
+      [date]: fieldId
+    };
+    
+    setFieldSelections(updatedSelections);
+    
+    // Cập nhật form với fieldSelections mới
+    form.setFieldValue('fieldSelections', updatedSelections);
+    
+    // Cập nhật form với fieldId mới nhất được chọn (cho tương thích ngược)
+    form.setFieldValue('fieldId', fieldId);
+    
+    console.log(`Selected field ID ${fieldId} for date ${date}`);
+    console.log('Updated field selections:', updatedSelections);
+  };
+
   return (
     <Card className="shadow-md">
       {fieldGroups.length === 0 ? (
@@ -486,31 +488,34 @@ const BookingStepField: React.FC<BookingStepFieldProps> = ({
           </Form.Item>
           
           <Row gutter={[10, 30]}>
-            <Col xs={24} md={12}>
+            <Col xs={24} md={10}>
+              <div className="p-3 rounded-lg h-full">
               <Title level={5} className="mb-4">Chọn loại sân</Title>
               <Form.Item
                 name="fieldGroupId"
                 rules={[{ required: true, message: 'Vui lòng chọn loại sân' }]}
+                style={{ width: '100%' }}
               >
                 <Radio.Group 
                   className="w-full"
+                  style={{ width: '100%' }}
                   onChange={(e) => handleFieldGroupChange(e.target.value)}
                 >
-                  <Space direction="vertical" className="w-full">
+                  <Space direction="vertical" className="w-full" style={{ width: '100%' }}>
                     {fieldGroups.map(group => (
-                      <Radio key={group.id} value={group.id} className="w-full">
+                      <Radio key={group.id} value={group.id} className="w-full" style={{ width: '100%' }}>
                         <Card 
                           className={`w-full mb-2 cursor-pointer hover:bg-gray-50 transition-all ${
                             selectedFieldGroup && selectedFieldGroup.id === group.id 
                               ? 'border-blue-500 shadow-sm' 
                               : 'border-gray-200'
                           }`}
-                          style={{ padding: '12px' }}
+                          style={{ padding: '12px', width: '100%' }}
                         >
-                          <div className="flex justify-between items-start">
-                            <div>
+                          <div className="flex justify-between items-start w-full pr-10">
+                            <div className="w-full flex flex-col gap-1">
                               <Text strong className="text-lg">{group.name}</Text>
-                              <div className="text-sm text-gray-600 mt-1">
+                              <div className="text-sm text-gray-600 mt-1 flex flex-col gap-1">
                                 <div className="flex items-center">
                                   <EnvironmentOutlined className="mr-1" />
                                   <span>Kích thước: {group.dimension}</span>
@@ -523,6 +528,13 @@ const BookingStepField: React.FC<BookingStepFieldProps> = ({
                                   <FieldTimeOutlined className="mr-1" />
                                   <span>Số sân: {group.bookingSlot && group.bookingSlot[0] ? 
                                     group.bookingSlot[0].fields.length : 0}</span>
+                                </div>                                
+                                <div className="flex items-center mt-1">
+                                  <DollarOutlined className="mr-1" />
+                                  <span>Giá cơ bản: {formatCurrency(group.basePrice)}/giờ</span>
+                                </div>
+                                <div className="mt-1">
+                                  {renderPeakHourInfo(group)}
                                 </div>
                               </div>
                               <div className="mt-2">
@@ -530,18 +542,7 @@ const BookingStepField: React.FC<BookingStepFieldProps> = ({
                                   <Tag color="blue" key={sport.id}>{getSportNameInVietnamese(sport.name)}</Tag>
                                 ))}
                               </div>
-                            </div>
-                            <div className="text-right min-w-[100px]">
-                              <div className="text-lg text-blue-600 font-semibold">
-                                {formatCurrency(group.basePrice)}/giờ
-                              </div>
-                              <Tooltip 
-                                title="Xem chi tiết giá" 
-                                className="cursor-help text-blue-500 mt-1 inline-block"
-                              >
-                                <InfoCircleOutlined /> Chi tiết giá
-                              </Tooltip>
-                            </div>
+                            </div>                            
                           </div>
                         </Card>
                       </Radio>
@@ -549,27 +550,42 @@ const BookingStepField: React.FC<BookingStepFieldProps> = ({
                   </Space>
                 </Radio.Group>
               </Form.Item>
+              </div>
             </Col>
             
-            <Col xs={24} md={12}>
-            {selectedFieldGroup && (
-              <div className="bg-gray-50 p-3 rounded-lg h-full">
-                  <Title level={5}>Thông tin chi tiết</Title>
-                  <div className="mb-4">
-                    <strong>{selectedFieldGroup.name}</strong> - Chọn sân cho từng ngày đặt
-                  </div>                  
-                  {renderPriceInfo(selectedFieldGroup)}                  
-                  <Divider />
-              
-              <Title level={5} className="mb-4">
-                Danh sách sân khả dụng
-                <Tooltip title="Bạn có thể lựa chọn sân độc lập cho mỗi ngày">
-                  <InfoCircleOutlined className="ml-2 text-blue-500" />
-                </Tooltip>
-              </Title>
-              {selectedFieldGroup ? renderFieldsTable() : <Empty description="Vui lòng chọn loại sân trước" />}
-              {selectedFieldGroup && renderSelectedFieldsSummary()}
-              </div>
+            <Col xs={24} md={14}>
+              {selectedFieldGroup ? (
+                <div className="p-3 rounded-lg h-full">
+                  <div>                                                    
+                    
+                    {/* Add Payment Summary */}
+                    <div className="mt-4">
+                      <BookingPaymentSummary 
+                        step={2}
+                        fieldGroup={selectedFieldGroup}
+                        startTime={formData.timeRange?.[0]?.format('HH:mm:ss')}
+                        endTime={formData.timeRange?.[1]?.format('HH:mm:ss')}
+                        selectedDates={selectedDates.length > 0 ? selectedDates : (formData.date ? [formData.date] : [])}
+                        formatCurrency={formatCurrency}
+                        calculateTotalPrice={calculateTotalPrice}
+                      />
+                    </div>
+                    <Divider />
+                
+                    <Title level={5} className="mb-4">
+                      Danh sách sân khả dụng
+                      <Tooltip title="Bạn có thể lựa chọn sân độc lập cho mỗi ngày">
+                        <InfoCircleOutlined className="ml-2 text-blue-500" />
+                      </Tooltip>
+                    </Title>
+                    {selectedFieldGroup ? renderFieldsTable() : <Empty description="Vui lòng chọn loại sân trước" />}
+                    {selectedFieldGroup && renderSelectedFieldsSummary()}
+                  </div>
+                </div>
+              ) : (
+                <div className="p-6 rounded-lg h-full flex items-center justify-center">
+                  <Empty description="Vui lòng chọn loại sân để xem chi tiết" />
+                </div>
               )}
             </Col>
           </Row>

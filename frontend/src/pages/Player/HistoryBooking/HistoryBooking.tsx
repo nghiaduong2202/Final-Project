@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Table, Card, Tag, Button, Modal, Typography, Space, Tabs, Select, 
-  DatePicker, Input, Badge, Row, Col, Statistic, Avatar, Empty, notification, Tooltip, Alert, Breadcrumb, Popover,
+  DatePicker, Input, Badge, Row, Col, Statistic, Avatar, Empty, notification, Tooltip, Breadcrumb, Popover,
   Dropdown
 } from 'antd';
 import type { TabsProps } from 'antd';
@@ -10,16 +10,15 @@ import {
   EyeOutlined, CloseCircleOutlined, StarOutlined, SearchOutlined, 
   InfoCircleOutlined, CalendarOutlined, FilterOutlined, ReloadOutlined,
   CheckCircleOutlined, HistoryOutlined, ClockCircleOutlined, SyncOutlined, 
-  ExclamationCircleOutlined, ArrowRightOutlined, DownOutlined,
+  ExclamationCircleOutlined, DownOutlined,
   EnvironmentOutlined, BookOutlined
 } from '@ant-design/icons';
 import { useNavigate, Link } from 'react-router-dom';
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
 dayjs.extend(isBetween);
-import api from '@/services/api';
-import { getSportNameInVietnamese } from '@/utils/translateSport';
 import bookingService from '@/services/booking.service';
+import { getSportNameInVietnamese } from '@/utils/translateSport';
 import { sportService } from '@/services/sport.service';
 
 const { Title } = Typography;
@@ -61,6 +60,7 @@ interface Field {
 interface BookingSlot {
   id: number;
   date: string;
+  status: string;
   field: Field;
 }
 
@@ -69,7 +69,8 @@ interface Payment {
   fieldPrice: number;
   servicePrice: number | null;
   discount: number | null;
-  status: string;
+  refund: number;
+  refundedPoint: number;
   updatedAt: string;
 }
 
@@ -106,7 +107,8 @@ interface BookingSummaryData {
   total: number;
   upcoming: number;
   completed: number;
-  cancelled: number;
+  canceled: number;
+  inProgress: number;
 }
 
 // Tách thành component riêng để dễ quản lý
@@ -147,7 +149,7 @@ const BookingSummaryCard = ({ data }: { data: BookingSummaryData }) => {
         <Card className="summary-card hover:shadow-md transition-all" hoverable>
           <Statistic
             title={<span className="font-medium">Đã hủy/Hoàn tiền</span>}
-            value={data.cancelled}
+            value={data.canceled}
             prefix={<CloseCircleOutlined className="text-red-500" />}
             valueStyle={{ color: '#ff4d4f', fontWeight: 600 }}
           />
@@ -157,8 +159,64 @@ const BookingSummaryCard = ({ data }: { data: BookingSummaryData }) => {
   );
 };
 
+// Lấy ngày hiển thị dựa vào trạng thái và danh sách ngày
+const getDisplayDate = (dates: string[], status: string, bookingSlots: BookingSlot[]): string => {
+  // Sắp xếp các ngày theo thứ tự tăng dần
+  const sortedDates = [...dates].sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+  
+  // Nếu chỉ có một ngày, trả về ngày đó
+  if (sortedDates.length === 1) {
+    return sortedDates[0];
+  }
+  
+  // Xác định ngày hiển thị dựa vào trạng thái
+  const today = dayjs();
+  
+  if (status === 'upcoming') {
+    // Tìm slot sắp tới gần nhất
+    const upcomingSlots = bookingSlots.filter(slot => slot.status === 'upcoming');
+    if (upcomingSlots.length > 0) {
+      // Sắp xếp theo ngày gần nhất
+      const sortedUpcomingSlots = [...upcomingSlots].sort(
+        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+      );
+      return sortedUpcomingSlots[0].date;
+    }
+  } else if (status === 'in_progress') {
+    // Tìm ngày đang diễn ra (ngày hiện tại)
+    const currentDate = sortedDates.find(date => dayjs(date).isSame(today, 'day'));
+    if (currentDate) {
+      return currentDate;
+    }
+    
+    // Nếu không có ngày nào trùng với ngày hiện tại, tìm slot sắp tới gần nhất
+    const upcomingSlots = bookingSlots.filter(slot => slot.status === 'upcoming');
+    if (upcomingSlots.length > 0) {
+      const sortedUpcomingSlots = [...upcomingSlots].sort(
+        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+      );
+      return sortedUpcomingSlots[0].date;
+    }
+  } else if (status === 'completed') {
+    // Tìm ngày đã hoàn thành cuối cùng
+    const completedSlots = bookingSlots.filter(slot => slot.status === 'done');
+    if (completedSlots.length > 0) {
+      const sortedCompletedSlots = [...completedSlots].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() // Sắp xếp giảm dần
+      );
+      return sortedCompletedSlots[0].date;
+    }
+  } else if (status === 'canceled') {
+    // Với trạng thái đã hủy, hiển thị ngày cuối cùng
+    return sortedDates[sortedDates.length - 1];
+  }
+  
+  // Mặc định trả về ngày đầu tiên
+  return sortedDates[0];
+};
+
 // Add a BookingDate component to display multiple dates
-const BookingDates = ({ dates, status }: { dates: string[], status: string }) => {
+const BookingDates = ({ dates, status, bookingSlots }: { dates: string[], status: string, bookingSlots: BookingSlot[] }) => {
   // Nếu chỉ có một ngày, hiển thị ngày đó
   if (dates.length === 1) {
     return <span>{dayjs(dates[0]).format('DD/MM/YYYY')}</span>;
@@ -168,37 +226,36 @@ const BookingDates = ({ dates, status }: { dates: string[], status: string }) =>
   const sortedDates = [...dates].sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
   
   // Xác định ngày hiển thị dựa vào trạng thái
-  let displayDate = sortedDates[0]; // Mặc định hiển thị ngày đầu tiên
-  const today = dayjs();
+  const displayDate = getDisplayDate(sortedDates, status, bookingSlots);
   
-  if (status === 'upcoming') {
-    // Tìm ngày gần nhất trong tương lai
-    const futureDate = sortedDates.find(date => dayjs(date).isAfter(today) || dayjs(date).isSame(today, 'day'));
-    if (futureDate) {
-      displayDate = futureDate;
-    }
-  } else if (status === 'in_progress') {
-    // Tìm ngày đang diễn ra (ngày hiện tại)
-    const currentDate = sortedDates.find(date => dayjs(date).isSame(today, 'day'));
-    if (currentDate) {
-      displayDate = currentDate;
-    }
-  } else if (status === 'completed' || status === 'cancelled') {
-    // Với trạng thái hoàn thành hoặc đã hủy, hiển thị ngày cuối cùng
-    displayDate = sortedDates[sortedDates.length - 1];
-  }
-
   // Hiển thị popover cho tất cả các ngày
   const content = (
     <div className="p-1">
-      {sortedDates.map((date, index) => (
-        <div key={index} className="mb-1 last:mb-0">
-          <Tag color={date === displayDate ? "blue" : "default"}>
-            {`${index + 1}: ${dayjs(date).format('DD/MM/YYYY')}`}
-            {date === displayDate && <span className="ml-1">(Hiển thị)</span>}
-          </Tag>
-        </div>
-      ))}
+      {sortedDates.map((date, index) => {
+        // Tìm slot tương ứng với ngày này
+        const slot = bookingSlots.find(s => s.date === date);
+        const slotStatus = slot ? slot.status : 'unknown';
+        
+        // Xác định màu sắc dựa trên trạng thái của slot
+        let statusColor = 'default';
+        if (slotStatus === 'done') statusColor = 'green';
+        else if (slotStatus === 'upcoming') statusColor = 'blue';
+        else if (slotStatus === 'canceled') statusColor = 'red';
+        
+        return (
+          <div key={index} className="mb-1 last:mb-0">
+            <Tag color={date === displayDate ? statusColor : "default"}>
+              {`${index + 1}: ${dayjs(date).format('DD/MM/YYYY')}`}
+              {date === displayDate && <span className="ml-1">(Hiển thị)</span>}
+              {slotStatus !== 'unknown' && (
+                <span className={`ml-1 ${slotStatus === 'done' ? 'text-green-500' : slotStatus === 'upcoming' ? 'text-blue-500' : 'text-red-500'}`}>
+                  [{slotStatus === 'done' ? 'Hoàn thành' : slotStatus === 'upcoming' ? 'Sắp diễn ra' : 'Đã hủy'}]
+                </span>
+              )}
+            </Tag>
+          </div>
+        );
+      })}
     </div>
   );
 
@@ -220,7 +277,7 @@ const HistoryBookingPage: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [filterLoading, setFilterLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('all');
+  const [activeTab, setActiveTab] = useState('upcoming');
   const [filterTimeRange, setFilterTimeRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null);
   const [searchText, setSearchText] = useState('');
   const [sportFilter, setSportFilter] = useState<number | null>(null);
@@ -230,14 +287,15 @@ const HistoryBookingPage: React.FC = () => {
   const [bookings, setBookings] = useState<BookingHistoryItem[]>([]);
   
   // Thêm state cho việc hiển thị booking sắp tới
-  const [upcomingBookings, setUpcomingBookings] = useState<BookingHistoryItem[]>([]);
+  // const [upcomingBookings, setUpcomingBookings] = useState<BookingHistoryItem[]>([]);
   
   // State cho booking statistics
   const [bookingStats, setBookingStats] = useState<BookingSummaryData>({
     total: 0,
     upcoming: 0,
     completed: 0,
-    cancelled: 0
+    canceled: 0,
+    inProgress: 0
   });
 
   // State để lưu danh sách các cơ sở đã từng đặt (unique)
@@ -249,7 +307,7 @@ const HistoryBookingPage: React.FC = () => {
     upcoming: 0,
     in_progress: 0,
     completed: 0,
-    cancelled: 0
+    canceled: 0
   });
 
   // State để lưu lịch sử booking đã load
@@ -292,7 +350,7 @@ const HistoryBookingPage: React.FC = () => {
       updateBookingStats(bookingsData);
       
       // Xử lý dữ liệu booking sắp tới
-      processUpcomingBookings(bookingsData);
+      // processUpcomingBookings(bookingsData);
       
       // Lấy danh sách các cơ sở unique đã từng đặt
       processBookableFacilities(bookingsData);
@@ -316,54 +374,54 @@ const HistoryBookingPage: React.FC = () => {
     }
   };
 
-  // Tách xử lý booking sắp tới để cải thiện hiệu suất
-  const processUpcomingBookings = (bookingsData: BookingHistoryItem[]) => {
-    const today = dayjs();
-    const next7Days = today.add(7, 'day');
+  
+  // const processUpcomingBookings = (bookingsData: BookingHistoryItem[]) => {
+  //   const today = dayjs();
+  //   const next7Days = today.add(7, 'day');
     
-    // Tạo Map để cache kết quả getBookingDisplayStatus
-    const statusCache = new Map<string, string>();
+  //   // Tạo Map để cache kết quả getBookingDisplayStatus
+  //   const statusCache = new Map<string, string>();
     
-    const upcoming = bookingsData.filter((item: BookingHistoryItem) => {
-      // Cache kết quả để tránh tính toán lại
-      let displayStatus = statusCache.get(item.booking.id);
-      if (!displayStatus) {
-        displayStatus = getBookingDisplayStatus(item);
-        statusCache.set(item.booking.id, displayStatus);
-      }
+  //   const upcoming = bookingsData.filter((item: BookingHistoryItem) => {
+  //     // Cache kết quả để tránh tính toán lại
+  //     let displayStatus = statusCache.get(item.booking.id);
+  //     if (!displayStatus) {
+  //       displayStatus = getBookingDisplayStatus(item);
+  //       statusCache.set(item.booking.id, displayStatus);
+  //     }
       
-      if (displayStatus !== 'upcoming') return false;
+  //     if (displayStatus !== 'upcoming') return false;
       
-      // Kiểm tra xem booking có ngày nào diễn ra trong 7 ngày tới không
-      const bookingDates = item.booking.bookingSlots.map(slot => slot.date);
-      const hasDateInNext7Days = bookingDates.some(date => {
-        const bookingDate = dayjs(date);
-        return bookingDate.isAfter(today) && bookingDate.isBefore(next7Days) || bookingDate.isSame(today, 'day');
-      });
+  //     // Kiểm tra xem booking có ngày nào diễn ra trong 7 ngày tới không
+  //     const bookingDates = item.booking.bookingSlots.map(slot => slot.date);
+  //     const hasDateInNext7Days = bookingDates.some(date => {
+  //       const bookingDate = dayjs(date);
+  //       return bookingDate.isAfter(today) && bookingDate.isBefore(next7Days) || bookingDate.isSame(today, 'day');
+  //     });
       
-      return hasDateInNext7Days;
-    });
+  //     return hasDateInNext7Days;
+  //   });
     
-    // Sắp xếp booking theo ngày gần nhất
-    const sortedUpcoming = [...upcoming].sort((a, b) => {
-      // Lấy ngày gần nhất của mỗi booking
-      const datesA = a.booking.bookingSlots.map(slot => slot.date)
-        .sort((d1, d2) => new Date(d1).getTime() - new Date(d2).getTime());
-      const datesB = b.booking.bookingSlots.map(slot => slot.date)
-        .sort((d1, d2) => new Date(d1).getTime() - new Date(d2).getTime());
+  //   // Sắp xếp booking theo ngày gần nhất
+  //   // const sortedUpcoming = [...upcoming].sort((a, b) => {
+  //   //   // Lấy ngày gần nhất của mỗi booking
+  //   //   const datesA = a.booking.bookingSlots.map(slot => slot.date)
+  //   //     .sort((d1, d2) => new Date(d1).getTime() - new Date(d2).getTime());
+  //   //   const datesB = b.booking.bookingSlots.map(slot => slot.date)
+  //   //     .sort((d1, d2) => new Date(d1).getTime() - new Date(d2).getTime());
       
-      // Tìm ngày gần nhất trong tương lai cho booking A
-      const nextDateA = datesA.find(date => dayjs(date).isAfter(today) || dayjs(date).isSame(today, 'day')) || datesA[0];
+  //   //   // Tìm ngày gần nhất trong tương lai cho booking A
+  //   //   const nextDateA = datesA.find(date => dayjs(date).isAfter(today) || dayjs(date).isSame(today, 'day')) || datesA[0];
       
-      // Tìm ngày gần nhất trong tương lai cho booking B
-      const nextDateB = datesB.find(date => dayjs(date).isAfter(today) || dayjs(date).isSame(today, 'day')) || datesB[0];
+  //   //   // Tìm ngày gần nhất trong tương lai cho booking B
+  //   //   const nextDateB = datesB.find(date => dayjs(date).isAfter(today) || dayjs(date).isSame(today, 'day')) || datesB[0];
       
-      // So sánh hai ngày
-      return new Date(nextDateA).getTime() - new Date(nextDateB).getTime();
-    });
+  //   //   // So sánh hai ngày
+  //   //   return new Date(nextDateA).getTime() - new Date(nextDateB).getTime();
+  //   // });
     
-    setUpcomingBookings(sortedUpcoming);
-  };
+  //   // setUpcomingBookings(sortedUpcoming);
+  // };
 
   // Tách xử lý cơ sở có thể đặt để cải thiện hiệu suất
   const processBookableFacilities = (bookingsData: BookingHistoryItem[]) => {
@@ -408,7 +466,7 @@ const HistoryBookingPage: React.FC = () => {
         if (status === 'upcoming') newUnreadCounts.upcoming += 1;
         else if (status === 'in_progress') newUnreadCounts.in_progress += 1;
         else if (status === 'completed') newUnreadCounts.completed += 1;
-        else if (status === 'cancelled') newUnreadCounts.cancelled += 1;
+        else if (status === 'canceled') newUnreadCounts.canceled += 1;
       });
       
       setUnreadCounts(newUnreadCounts);
@@ -433,7 +491,7 @@ const HistoryBookingPage: React.FC = () => {
         upcoming: 0,
         in_progress: 0,
         completed: 0,
-        cancelled: 0
+        canceled: 0
       });
     }
   };
@@ -478,9 +536,9 @@ const HistoryBookingPage: React.FC = () => {
       ),
     },
     {
-      key: 'cancelled',
+      key: 'canceled',
       label: (
-        <Badge count={getUnreadCount('cancelled')} offset={[10, 0]}>
+        <Badge count={getUnreadCount('canceled')} offset={[10, 0]}>
           Đã hủy
         </Badge>
       ),
@@ -491,23 +549,26 @@ const HistoryBookingPage: React.FC = () => {
   const updateBookingStats = (bookingsData: BookingHistoryItem[]) => {
     const total = bookingsData.length;
     
-    const upcoming = bookingsData.filter(item => 
-      getBookingDisplayStatus(item) === 'upcoming'
-    ).length;
+    // Đếm số lượng booking theo từng trạng thái hiển thị
+    let upcoming = 0;
+    let completed = 0;
+    let canceled = 0;
+    let inProgress = 0;
     
-    const completed = bookingsData.filter(item => 
-      getBookingDisplayStatus(item) === 'completed'
-    ).length;
-    
-    const cancelled = bookingsData.filter(item => 
-      getBookingDisplayStatus(item) === 'cancelled'
-    ).length;
+    bookingsData.forEach(item => {
+      const status = getBookingDisplayStatus(item);
+      if (status === 'upcoming') upcoming++;
+      else if (status === 'completed') completed++;
+      else if (status === 'canceled') canceled++;
+      else if (status === 'in_progress') inProgress++;
+    });
     
     setBookingStats({
       total,
       upcoming,
       completed,
-      cancelled
+      canceled,
+      inProgress
     });
   };
 
@@ -515,15 +576,32 @@ const HistoryBookingPage: React.FC = () => {
     confirm({
       title: 'Xác nhận hủy đặt sân',
       icon: <ExclamationCircleOutlined />,
-      content: 'Bạn có chắc chắn muốn hủy đặt sân này? Hành động này không thể hoàn tác.',
+      content: (
+        <div>
+          <p>Bạn có chắc chắn muốn hủy đặt sân này? Hành động này không thể hoàn tác.</p>
+          
+          <div className="mt-4 bg-gray-50 p-3 rounded-md">
+            <p className="font-medium mb-2">Chính sách hoàn điểm tích lũy:</p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>Hủy trước 7 ngày: Hoàn 100% thành điểm tích lũy</li>
+              <li>Hủy trước 3 ngày: Hoàn 50% thành điểm tích lũy</li>
+              <li>Sau 3 ngày: Không được hoàn tiền</li>
+            </ul>
+            <div className="mt-2 text-sm text-gray-500">
+              <p>Điểm tích lũy có thể được sử dụng cho các lần đặt sân tiếp theo.</p>
+              <p>1 điểm = 1.000 VNĐ</p>
+            </div>
+          </div>
+        </div>
+      ),
       okText: 'Hủy đặt sân',
       okType: 'danger',
       cancelText: 'Không',
       onOk: async () => {
         setLoading(true);
         try {
-          // Thực hiện cancel booking khi API có sẵn
-          await api.put(`/booking/${id}/cancel`);
+          // Sử dụng phương thức cancelBooking từ bookingService
+          await bookingService.cancelBooking(id);
           
           notification.success({
             message: 'Hủy đặt sân thành công',
@@ -585,11 +663,43 @@ const HistoryBookingPage: React.FC = () => {
         text = 'Hoàn thành';
         icon = <CheckCircleOutlined />;
         break;
-      case 'cancelled':
+      case 'canceled':
         color = 'red';
         text = 'Đã hủy';
         icon = <CloseCircleOutlined />;
         break;
+    }
+
+    // Display for refunded points and refund information
+    const hasRefund = record.booking.payment.refund > 0;
+    const hasRefundedPoints = record.booking.payment.refundedPoint > 0;
+
+    // If it's canceled and has refund points OR used refunded points, show both
+    if (displayStatus === 'canceled' && hasRefund) {
+      return (
+        <>
+          <Tag icon={icon} color={color}>
+            {text}
+          </Tag>
+          <Tooltip title={`Đã hoàn ${record.booking.payment.refund} điểm tích lũy`}>
+            <Tag color="green" className="ml-1">+{record.booking.payment.refund} điểm</Tag>
+          </Tooltip>
+        </>
+      );
+    }
+
+    // If it has used refunded points, display that info too
+    if (hasRefundedPoints) {
+      return (
+        <>
+          <Tag icon={icon} color={color}>
+            {text}
+          </Tag>
+          <Tooltip title={`Đã sử dụng ${record.booking.payment.refundedPoint} điểm tích lũy`}>
+            <Tag color="orange" className="ml-1">-{record.booking.payment.refundedPoint} điểm</Tag>
+          </Tooltip>
+        </>
+      );
     }
 
     return (
@@ -598,33 +708,7 @@ const HistoryBookingPage: React.FC = () => {
       </Tag>
     );
   };
-
-  // Hàm render trạng thái payment
-  const renderPaymentStatus = (status: string) => {
-    let color = 'default';
-    let text = 'Không xác định';
-
-    switch (status) {
-      case 'unpaid':
-        color = 'volcano';
-        text = 'Chưa thanh toán';
-        break;
-      case 'paid':
-        color = 'green';
-        text = 'Đã thanh toán';
-        break;
-      case 'refunded':
-        color = 'orange';
-        text = 'Đã hoàn tiền';
-        break;
-    }
-
-    return (
-      <Tag color={color} style={{ marginLeft: 8 }}>
-        {text}
-      </Tag>
-    );
-  };
+ 
 
   // Lọc dữ liệu theo tab đang chọn và các filter
   const applyFilters = () => {
@@ -669,103 +753,54 @@ const HistoryBookingPage: React.FC = () => {
       return displayStatusCache.get(cacheKey)!;
     }
     
-    // Nếu booking đã bị hủy hoặc hoàn tiền, luôn hiển thị là cancelled
-    if (item.booking.status === 'cancelled' || item.booking.status === 'refunded') {
-      displayStatusCache.set(cacheKey, 'cancelled');
-      return 'cancelled';
+    // Nếu booking đã bị hủy, luôn hiển thị là canceled
+    if (item.booking.status === 'canceled') {
+      displayStatusCache.set(cacheKey, 'canceled');
+      return 'canceled';
     }
     
     const today = dayjs();
     
     // Lấy tất cả các ngày đặt sân
-    const bookingDates = item.booking.bookingSlots.map(slot => dayjs(slot.date));
+    const bookingSlots = item.booking.bookingSlots;
     const startTime = item.booking.startTime;
     const endTime = item.booking.endTime;
     
-    // Sắp xếp các ngày theo thứ tự tăng dần
-    bookingDates.sort((a, b) => a.valueOf() - b.valueOf());
-    
-    // Ngày cuối cùng trong lịch đặt sân
-    const lastBookingDate = bookingDates[bookingDates.length - 1];
-    const lastBookingEnd = lastBookingDate
-      .hour(parseInt(endTime.split(':')[0]))
-      .minute(parseInt(endTime.split(':')[1]));
-      
-    // Nếu đã qua thời điểm kết thúc của ngày cuối cùng, xem như hoàn thành
-    if (today.isAfter(lastBookingEnd)) {
+    // Kiểm tra xem tất cả các slot đã hoàn thành chưa
+    const allSlotsDone = bookingSlots.every(slot => slot.status === 'done');
+    if (allSlotsDone) {
       displayStatusCache.set(cacheKey, 'completed');
       return 'completed';
     }
     
-    // Ngày đầu tiên trong lịch đặt sân
-    const firstBookingDate = bookingDates[0];
-    const firstBookingStart = firstBookingDate
-      .hour(parseInt(startTime.split(':')[0]))
-      .minute(parseInt(startTime.split(':')[1]));
+    // Kiểm tra nếu có bất kỳ slot nào đang diễn ra (thời gian hiện tại nằm trong khoảng thời gian đặt sân)
+    const hasInProgressSlot = bookingSlots.some(slot => {
+      const slotDate = dayjs(slot.date);
+      const slotStartTime = slotDate
+        .hour(parseInt(startTime.split(':')[0]))
+        .minute(parseInt(startTime.split(':')[1]));
+      const slotEndTime = slotDate
+        .hour(parseInt(endTime.split(':')[0]))
+        .minute(parseInt(endTime.split(':')[1]));
       
-    // Nếu chưa đến thời điểm bắt đầu của ngày đầu tiên, xem như sắp diễn ra
-    if (today.isBefore(firstBookingStart)) {
+      return today.isAfter(slotStartTime) && today.isBefore(slotEndTime) && slot.status === 'upcoming';
+    });
+    
+    if (hasInProgressSlot) {
+      displayStatusCache.set(cacheKey, 'in_progress');
+      return 'in_progress';
+    }
+    
+    // Kiểm tra xem có slot nào sắp diễn ra không
+    const hasUpcomingSlot = bookingSlots.some(slot => slot.status === 'upcoming');
+    if (hasUpcomingSlot) {
       displayStatusCache.set(cacheKey, 'upcoming');
       return 'upcoming';
     }
     
-    // Kiểm tra xem có đang trong một phiên đặt sân nào không
-    for (const bookingDate of bookingDates) {
-      const bookingStart = bookingDate
-        .hour(parseInt(startTime.split(':')[0]))
-        .minute(parseInt(startTime.split(':')[1]));
-      const bookingEnd = bookingDate
-        .hour(parseInt(endTime.split(':')[0]))
-        .minute(parseInt(endTime.split(':')[1]));
-        
-      if (today.isAfter(bookingStart) && today.isBefore(bookingEnd)) {
-        displayStatusCache.set(cacheKey, 'in_progress');
-        return 'in_progress';
-      }
-    }
-    
-    // Kiểm tra xem có phải là đang ở giữa các phiên đặt sân không
-    if (today.isAfter(firstBookingStart) && today.isBefore(lastBookingEnd)) {
-      displayStatusCache.set(cacheKey, 'upcoming');
-      return 'upcoming'; // Đang ở giữa các phiên định kỳ, xem như sắp diễn ra
-    }
-    
-    displayStatusCache.set(cacheKey, 'upcoming');
-    return 'upcoming'; // Mặc định là sắp diễn ra nếu không rơi vào các trường hợp trên
-  };
-
-  // Lấy ngày hiển thị dựa vào trạng thái và danh sách ngày
-  const getDisplayDate = (dates: string[], status: string): string => {
-    // Sắp xếp các ngày theo thứ tự tăng dần
-    const sortedDates = [...dates].sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
-    
-    // Nếu chỉ có một ngày, trả về ngày đó
-    if (sortedDates.length === 1) {
-      return sortedDates[0];
-    }
-    
-    // Xác định ngày hiển thị dựa vào trạng thái
-    let displayDate = sortedDates[0]; // Mặc định hiển thị ngày đầu tiên
-    const today = dayjs();
-    
-    if (status === 'upcoming') {
-      // Tìm ngày gần nhất trong tương lai
-      const futureDate = sortedDates.find(date => dayjs(date).isAfter(today) || dayjs(date).isSame(today, 'day'));
-      if (futureDate) {
-        displayDate = futureDate;
-      }
-    } else if (status === 'in_progress') {
-      // Tìm ngày đang diễn ra (ngày hiện tại)
-      const currentDate = sortedDates.find(date => dayjs(date).isSame(today, 'day'));
-      if (currentDate) {
-        displayDate = currentDate;
-      }
-    } else if (status === 'completed' || status === 'cancelled') {
-      // Với trạng thái hoàn thành hoặc đã hủy, hiển thị ngày cuối cùng
-      displayDate = sortedDates[sortedDates.length - 1];
-    }
-    
-    return displayDate;
+    // Mặc định là đã hoàn thành nếu không rơi vào các trường hợp trên
+    displayStatusCache.set(cacheKey, 'completed');
+    return 'completed';
   };
 
   // Memoize filteredBookings để tránh tính toán lại khi component re-render
@@ -779,7 +814,7 @@ const HistoryBookingPage: React.FC = () => {
         if (activeTab === 'upcoming' && displayStatus !== 'upcoming') return false;
         if (activeTab === 'in_progress' && displayStatus !== 'in_progress') return false;
         if (activeTab === 'completed' && displayStatus !== 'completed') return false;
-        if (activeTab === 'cancelled' && !['cancelled', 'refunded'].includes(item.booking.status)) return false;
+        if (activeTab === 'canceled' && !['canceled', 'refunded'].includes(item.booking.status)) return false;
       }
 
       // Lọc theo khoảng thời gian
@@ -858,17 +893,15 @@ const HistoryBookingPage: React.FC = () => {
       key: 'time',
       defaultSortOrder: 'ascend',
       sorter: (a: BookingHistoryItem, b: BookingHistoryItem) => {
-        // Sắp xếp theo ngày hiển thị thay vì ngày đầu tiên
-        const statusA = getBookingDisplayStatus(a);
-        const statusB = getBookingDisplayStatus(b);
-        
+        // Sắp xếp theo ngày đầu tiên của mỗi booking
         const datesA = a.booking.bookingSlots.map(slot => slot.date);
         const datesB = b.booking.bookingSlots.map(slot => slot.date);
         
-        const displayDateA = getDisplayDate(datesA, statusA);
-        const displayDateB = getDisplayDate(datesB, statusB);
+        // Lấy ngày sớm nhất cho mỗi booking để so sánh
+        const earliestA = new Date(Math.min(...datesA.map(d => new Date(d).getTime())));
+        const earliestB = new Date(Math.min(...datesB.map(d => new Date(d).getTime())));
         
-        return new Date(displayDateA).getTime() - new Date(displayDateB).getTime();
+        return earliestA.getTime() - earliestB.getTime();
       },
       sortDirections: ['ascend', 'descend'] as const,
       render: (_: unknown, record: BookingHistoryItem) => {
@@ -879,12 +912,11 @@ const HistoryBookingPage: React.FC = () => {
           <div>
             <div>
               <CalendarOutlined style={{ marginRight: 8 }} />
-              <BookingDates dates={bookingDates} status={getBookingDisplayStatus(record)} />
+              <BookingDates dates={bookingDates} status={getBookingDisplayStatus(record)} bookingSlots={record.booking.bookingSlots} />
               <span style={{ marginLeft: 8 }}>{record.booking.startTime.substring(0, 5)} - {record.booking.endTime.substring(0, 5)}</span>
             </div>
             <div style={{ marginLeft: 16, marginTop: 4 }}>
-              {renderBookingStatusByTime(record)}
-              {renderPaymentStatus(record.booking.payment.status)}
+              {renderBookingStatusByTime(record)}             
             </div>
           </div>
         );
@@ -914,8 +946,8 @@ const HistoryBookingPage: React.FC = () => {
         // Kiểm tra xem có thể hủy booking không (chỉ cho phép hủy những đơn sắp diễn ra)
         const displayStatus = getBookingDisplayStatus(record);
         const canCancel = displayStatus === 'upcoming' && 
-                         (record.booking.status === 'completed' || 
-                          record.booking.status === 'payment_confirmed');
+                         record.booking.status !== 'canceled' &&
+                         record.booking.bookingSlots.some(slot => slot.status === 'upcoming');
         
         return (
           <Space size="small" onClick={(e) => e.stopPropagation()}>
@@ -957,7 +989,7 @@ const HistoryBookingPage: React.FC = () => {
                 />
               </Tooltip>
             ) : (
-              <Tooltip title={displayStatus === 'upcoming' ? "Không thể hủy đặt sân này" : "Đã quá hạn hủy đặt sân"}>
+              <Tooltip title={record.booking.status === 'canceled' ? "Đơn đã bị hủy" : displayStatus === 'upcoming' ? "Không thể hủy đặt sân này" : "Đã quá hạn hủy đặt sân"}>
                 <Button
                   danger
                   size="small"
@@ -977,8 +1009,10 @@ const HistoryBookingPage: React.FC = () => {
     const fieldPrice = item.booking.payment?.fieldPrice || 0;
     const servicePrice = item.booking.payment?.servicePrice || 0;
     const discount = item.booking.payment?.discount || 0;
+    // Tính toán giá trị từ điểm tích lũy đã sử dụng (chuyển đổi điểm sang tiền)
+    const refundedPointValue = item.booking.payment?.refundedPoint || 0;
     
-    return fieldPrice + servicePrice - discount;
+    return fieldPrice + servicePrice - discount - refundedPointValue;
   };
 
   // Hàm chuyển đến trang đặt sân
@@ -1048,66 +1082,7 @@ const HistoryBookingPage: React.FC = () => {
           </Card>
         )}
 
-        {/* Hiển thị booking sắp tới */}
-        {upcomingBookings.length > 0 && (
-          <Card className="mb-6 shadow-sm rounded-lg" title={<span className="font-semibold">Đặt sân trong 7 ngày sắp tới</span>}>
-            <div className="space-y-4">
-              {upcomingBookings.slice(0, 3).map(booking => {
-                // Lấy ngày gần nhất sắp diễn ra
-                const today = dayjs();
-                const bookingDates = booking.booking.bookingSlots.map(slot => slot.date);
-                const sortedDates = [...bookingDates].sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
-                
-                // Tìm ngày gần nhất trong tương lai
-                const nextDate = sortedDates.find(date => dayjs(date).isAfter(today) || dayjs(date).isSame(today, 'day')) || sortedDates[0];
-                
-                // Tìm slot tương ứng với ngày đó
-                const nextSlot = booking.booking.bookingSlots.find(slot => slot.date === nextDate);
-                
-                return (
-                  <Alert
-                    key={booking.booking.id}
-                    type="info"
-                    message={
-                      <div className="flex justify-between items-center">
-                        <Space wrap>
-                          <CalendarOutlined className="text-blue-500" />
-                          <span className="font-medium">
-                            {dayjs(nextDate).format('DD/MM/YYYY')} ({booking.booking.startTime.substring(0, 5)} - {booking.booking.endTime.substring(0, 5)})
-                          </span>
-                          <span className="text-gray-400">•</span>
-                          <span>{booking.facility.name}</span>
-                          <span className="text-gray-400">•</span>
-                          <span>{nextSlot?.field.name || booking.booking.bookingSlots[0]?.field.name}</span>
-                          {bookingDates.length > 1 && (
-                            <Tag color="purple" className="ml-1">Định kỳ</Tag>
-                          )}
-                        </Space>
-                        <Button 
-                          type="primary" 
-                          size="small"
-                          onClick={() => viewBookingDetail(booking.booking.id)}
-                          className="flex items-center"
-                        >
-                          Chi tiết <ArrowRightOutlined />
-                        </Button>
-                      </div>
-                    }
-                    className="drop-shadow-sm"
-                  />
-                );
-              })}
-              {upcomingBookings.length > 3 && (
-                <div className="text-right">
-                  <Button type="link" onClick={() => handleTabChange('upcoming')}>
-                    Xem tất cả ({upcomingBookings.length})
-                  </Button>
-                </div>
-              )}
-            </div>
-          </Card>
-        )}
-
+        
         {/* Bộ lọc nâng cao */}
         {filterVisible && (
           <Card className="mb-6 shadow-sm rounded-lg" title={<span className="font-semibold">Bộ lọc nâng cao</span>}>

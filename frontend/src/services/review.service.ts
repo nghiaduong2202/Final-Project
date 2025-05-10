@@ -1,5 +1,5 @@
 import api from './api';
-import { ReviewFormData } from '../types/review.type';
+import { ReviewFormData, ReviewFormDataUpdate } from '../types/review.type';
 
 // API Endpoints
 export const reviewService = {
@@ -26,39 +26,81 @@ export const reviewService = {
 
   async createReview(review: ReviewFormData | FormData) {
     try {
-      // Handle both FormData and regular JSON formats
+      // Handle FormData directly
       let formDataToSend: FormData;
       
       if (!(review instanceof FormData)) {
         // Convert ReviewFormData to FormData
         formDataToSend = new FormData();
         
-        // Add review data as JSON string
+        // Add review data as JSON string with key 'data'
         formDataToSend.append('data', JSON.stringify(review.data));
         
-        // Add image files if any
-        if (review.imageUrl && review.imageUrl.length > 0) {
-          review.imageUrl.forEach((file) => {
-            formDataToSend.append('imageUrl', file);
+        // Add image files if any with key 'images' for each file
+        if (review.images && review.images.length > 0) {
+          review.images.forEach((file: File) => {
+            formDataToSend.append('images', file);
           });
         }
       } else {
         formDataToSend = review;
       }
       
-      const response = await api.post('/review', formDataToSend, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      // Tạo timeout để ngắt kết nối nếu quá lâu
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 phút timeout
       
-      return response.data;
+      try {
+        const response = await api.post('/review', formDataToSend, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        return response.data;
+      } catch (error) {
+        clearTimeout(timeoutId);
+        throw error;
+      }
     } catch (error) {
       console.error('Error creating review:', error);
       throw error;
     }
   },
 
+  async updateReview(review: ReviewFormDataUpdate ) {
+    try{
+      const response = await api.put(`/review/update-review`, review);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating review:', error);
+      throw error;
+    }
+  },
+
+   /**
+   * Upload ảnh lên cloud
+   */
+   async uploadImage(file: File): Promise<string> {
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      
+      const response = await api.post('/cloud-uploader', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      return response.data.url;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      throw error;
+    }
+  },
+  
   async updateFeedback(reviewId: string, feedback: string) {
     try{
       const response = await api.put(`/review/${reviewId}/feedback`, { feedback });

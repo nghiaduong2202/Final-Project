@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Select, Card, Carousel, Tag, Empty, Input } from 'antd';
 import { EnvironmentOutlined, StarOutlined, DollarOutlined } from '@ant-design/icons';
 import { IMAGE } from '@/constants/user/Home/Image';
@@ -14,6 +14,7 @@ import { Sport } from '@/types/sport.type';
 import './Home.css'; // Import custom CSS file for carousel
 import { facilityService } from '@/services/facility.service';
 import OperatingHoursDisplay from '@/components/shared/OperatingHoursDisplay';
+import { debounce } from 'lodash';
 
 const { Option } = Select;
 
@@ -71,6 +72,22 @@ const HomePage = () => {
   const [recommendedFacilities, setRecommendedFacilities] = useState<Facility[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Debounced function for updating facility name input
+  const debouncedSetFacilityName = useCallback(
+    debounce((value: string) => {
+      setSearchParams(prev => ({ ...prev, facilityName: value }));
+    }, 300),
+    []
+  );
+  
+  // Handle facility name input change
+  const handleFacilityNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Update the input value directly in the DOM for immediate feedback
+    e.persist();
+    // Use the debounced function for the state update
+    debouncedSetFacilityName(e.target.value);
+  };
+
   // Fetch dữ liệu thể thao và tỉnh/thành phố khi component được mount
   useEffect(() => {
     fetchSports();
@@ -89,12 +106,16 @@ const HomePage = () => {
   // Fetch districts khi province thay đổi
   useEffect(() => {
     if (searchParams.province !== 'all') {
-      fetchDistricts(searchParams.province);
+      // Tìm code của province
+      const selectedProvince = provinces.find(p => p.name === searchParams.province);
+      if (selectedProvince) {
+        fetchDistricts(selectedProvince.code);
+      }
     } else {
       setDistricts([]);
       setSearchParams(prev => ({ ...prev, district: 'all' }));
     }
-  }, [searchParams.province]);
+  }, [searchParams.province, provinces]);
 
   // Fetch danh sách các môn thể thao
   const fetchSports = async () => {
@@ -268,8 +289,8 @@ const HomePage = () => {
         <div className="mb-1 text-sm font-medium">Tên cơ sở/Địa chỉ</div>
         <Input
           placeholder="Nhập tên cơ sở hoặc địa chỉ"
-          value={searchParams.facilityName}
-          onChange={(e) => setSearchParams(prev => ({ ...prev, facilityName: e.target.value }))}
+          defaultValue={searchParams.facilityName}
+          onChange={handleFacilityNameChange}
           allowClear
           className="w-full"
           size="large"
@@ -315,7 +336,7 @@ const HomePage = () => {
             >
               <Option value="all">Tất cả tỉnh/thành phố</Option>
               {provinces.map(province => (
-                <Option key={province.code} value={province.code}>
+                <Option key={province.code} value={province.name}>
                   {province.name}
                 </Option>
               ))}
@@ -335,7 +356,7 @@ const HomePage = () => {
             >
               <Option value="all">Tất cả quận/huyện</Option>
               {districts.map(district => (
-                <Option key={district.code} value={district.code}>
+                <Option key={district.code} value={district.name}>
                   {district.name}
                 </Option>
               ))}

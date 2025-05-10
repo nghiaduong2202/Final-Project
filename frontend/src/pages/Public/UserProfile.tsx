@@ -7,7 +7,7 @@ import {
 import {
   UserOutlined, EditOutlined, ManOutlined, WomanOutlined,
   CalendarOutlined, MailOutlined, PhoneOutlined, BankOutlined,
-  UploadOutlined, HeartOutlined, CloseOutlined
+  UploadOutlined, HeartOutlined, CloseOutlined, WalletOutlined
 } from '@ant-design/icons';
 import moment from 'moment';
 import type { Moment } from 'moment';
@@ -224,6 +224,15 @@ const UserProfile: React.FC = () => {
     }
   };
 
+  // Format currency
+  const formatCurrency = (amount: number | undefined) => {
+    if (amount === undefined) return '0 ₫';
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND'
+    }).format(amount);
+  };
+
   // Update the tabItems to include a new tab for favorite facilities
   const tabItems: TabsProps['items'] = [
     {
@@ -332,7 +341,7 @@ const UserProfile: React.FC = () => {
       children: (
         <div className="py-5">
           <Row gutter={[32, 24]}>
-            <Col xs={24}>
+            <Col xs={24} md={12}>
               <div className="mb-6">
                 <Text type="secondary">Tài Khoản Ngân Hàng</Text>
                 <div className="mt-1">
@@ -341,6 +350,21 @@ const UserProfile: React.FC = () => {
                 </div>
               </div>
             </Col>
+            {user.role === 'player' && (
+              <Col xs={24} md={12}>
+                <div className="mb-6">
+                  <Text type="secondary">Điểm Tích Lũy</Text>
+                  <div className="mt-1">
+                    <WalletOutlined className="mr-2 text-green-500" />
+                    <Text strong className="text-green-600">{user.refundedPoint || 0} điểm</Text>
+                    <div className="mt-1 text-xs text-gray-500">
+                      Tương đương: {formatCurrency(user.refundedPoint * 1000)}
+                      <span className="ml-1">(1 điểm = 1.000 VNĐ)</span>
+                    </div>
+                  </div>
+                </div>
+              </Col>
+            )}
           </Row>
         </div>
       ),

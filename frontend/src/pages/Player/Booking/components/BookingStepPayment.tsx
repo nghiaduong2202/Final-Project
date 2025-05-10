@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Form, Card, Radio, Space, Divider, Typography, Row, Col, FormInstance, Select, Spin, Empty, message } from 'antd';
+import { Form, Card, Radio, Space, Divider, Typography, FormInstance, Select, Spin, Empty, message, InputNumber, Button } from 'antd';
 import { 
-  BankOutlined, WalletOutlined, CreditCardOutlined, TagOutlined, InfoCircleOutlined
+  BankOutlined, WalletOutlined, CreditCardOutlined, TagOutlined, InfoCircleOutlined, 
+  WalletFilled
 } from '@ant-design/icons';
 import { useParams } from 'react-router-dom';
 import { BookingFormData } from '@/types/booking.type';
@@ -9,9 +10,24 @@ import { AvailableFieldGroup } from '@/types/field.type';
 import { Service } from '@/types/service.type';
 import { voucherService } from '@/services/voucher.service';
 import dayjs from 'dayjs';
+import { useAppSelector } from '@/hooks/reduxHooks';
+import BookingPaymentSummary from './BookingPaymentSummary';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 const { Option } = Select;
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  phoneNumber: string;
+  gender: 'male' | 'female' | 'other';
+  dob: string;
+  bankAccount: string;
+  role: 'player' | 'owner';
+  avatarUrl?: string;
+  refundedPoint: number;
+}
 
 interface Voucher {
   id: number;
@@ -33,10 +49,11 @@ interface BookingStepPaymentProps {
   formData: Partial<BookingFormData>;
   fieldGroups: AvailableFieldGroup[];
   services: Service[];
-  sports: { id: number; name: string }[];
+  sports?: { id: number; name: string }[];
   selectedDates: dayjs.Dayjs[];
   formatCurrency: (amount: number) => string;
   calculateTotalPrice: () => number;
+  user?: User;
 }
 
 const BookingStepPayment: React.FC<BookingStepPaymentProps> = ({
@@ -44,7 +61,6 @@ const BookingStepPayment: React.FC<BookingStepPaymentProps> = ({
   formData,
   fieldGroups,
   services,
-  sports,
   selectedDates,
   formatCurrency,
   calculateTotalPrice
@@ -52,9 +68,37 @@ const BookingStepPayment: React.FC<BookingStepPaymentProps> = ({
   const { facilityId } = useParams<{ facilityId: string }>();
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
   const [loadingVouchers, setLoadingVouchers] = useState(false);
-  const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
+  const [, setSelectedVoucher] = useState<Voucher | null>(null);
   const [discountAmount, setDiscountAmount] = useState(0);
   const totalPrice = calculateTotalPrice();
+  
+  // Get user from redux store to access refundedPoint
+  const { user: reduxUser } = useAppSelector(state => state.user);
+  const [refundedPointsInput, setRefundedPointsInput] = useState<number | null>(0);
+  // We use this state in useEffect but ESLint doesn't detect it
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [refundedPointsDiscount, setRefundedPointsDiscount] = useState(0);
+  
+  // Calculate the maximum points that can be used (in points)
+  const availablePoints = reduxUser?.refundedPoint || 0;
+  // Limit points to 50% of total price
+  const maxPointsUsable = Math.min(
+    availablePoints, 
+    Math.floor((totalPrice * 0.5) / 1000) // 50% of total payment, converted to points
+  );
+
+  // Update form values when refundedPoints input changes
+  useEffect(() => {
+    if (refundedPointsInput && refundedPointsInput > 0) {
+      // Convert points to VND (1 point = 1,000 VND)
+      const discount = refundedPointsInput * 1000;
+      setRefundedPointsDiscount(discount);
+      form.setFieldsValue({ refundedPoint: refundedPointsInput });
+    } else {
+      setRefundedPointsDiscount(0);
+      form.setFieldsValue({ refundedPoint: 0 });
+    }
+  }, [refundedPointsInput, form]);
 
   // Lấy danh sách voucher từ API khi component được tạo
   useEffect(() => {
@@ -126,12 +170,41 @@ const BookingStepPayment: React.FC<BookingStepPaymentProps> = ({
     }
   };
 
+  // Xử lý sử dụng tối đa điểm tích lũy
+  const handleUseMaxPoints = () => {
+    setRefundedPointsInput(maxPointsUsable);
+    form.setFieldsValue({ refundedPoint: maxPointsUsable });
+  };
+
+  // Xử lý khi người dùng thay đổi số điểm tích lũy
+  const handleRefundedPointChange = (value: number | null) => {
+    if (value === null) {
+      setRefundedPointsInput(0);
+      return;
+    }
+
+    // Validate against maximum limits
+    if (value > availablePoints) {
+      message.error(`Bạn chỉ có ${availablePoints} điểm tích lũy`);
+      setRefundedPointsInput(availablePoints);
+      return;
+    }
+
+    if (value > maxPointsUsable) {
+      message.error(`Bạn chỉ có thể sử dụng tối đa ${maxPointsUsable} điểm (50% giá trị đơn hàng)`);
+      setRefundedPointsInput(maxPointsUsable);
+      return;
+    }
+
+    setRefundedPointsInput(value);
+  };
+
   return (
     <Card className="shadow-md">
       <Form
         form={form}
         layout="vertical"
-        initialValues={formData}
+        initialValues={{...formData, refundedPoint: 0}}
       >
         <Form.Item
           name="paymentMethod"
@@ -244,18 +317,91 @@ const BookingStepPayment: React.FC<BookingStepPaymentProps> = ({
             </div>
           )}
         </Form.Item>
+        
+        {reduxUser && reduxUser.refundedPoint > 0 && (
+          <Form.Item
+            name="refundedPoint"
+            label={
+              <div className="flex items-center">
+                <WalletFilled className="mr-2 text-green-500" />
+                <span>Sử dụng điểm tích lũy</span>
+              </div>
+            }
+          >
+            <div>
+              <div className="flex items-center gap-2">
+                <InputNumber
+                  min={0}
+                  max={Math.min(availablePoints, maxPointsUsable)}
+                  value={refundedPointsInput}
+                  onChange={handleRefundedPointChange}
+                  style={{ width: '50%' }}
+                  placeholder="Nhập số điểm muốn sử dụng"
+                  formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                  parser={(value) => {
+                    const parsed = parseInt(value!.replace(/\$\s?|(,*)/g, ''));
+                    return isNaN(parsed) ? 0 : parsed;
+                  }}
+                />
+                <Button 
+                  type="primary" 
+                  size="small" 
+                  onClick={handleUseMaxPoints}
+                >
+                  Dùng tối đa
+                </Button>
+              </div>
+              
+              <div className="flex items-center justify-between mt-2">
+                <div className="text-gray-600">
+                  <span>Bạn có: </span>
+                  <span className="text-green-600 font-medium">{reduxUser.refundedPoint} điểm</span>
+                </div>
+                <div className="text-gray-600">
+                  <span>Tối đa có thể dùng: </span>
+                  <span className="text-green-600 font-medium">{maxPointsUsable} điểm</span>
+                  <span className="text-xs text-gray-500 ml-1">(50% giá trị đơn hàng)</span>
+                </div>
+              </div>
+              
+              <div className="mt-1 text-xs text-gray-500">
+                <InfoCircleOutlined className="mr-1" />
+                1 điểm = 1.000 VNĐ. Điểm tích lũy từ việc hoàn tiền các đơn hàng đã hủy.
+              </div>
+            </div>
+          </Form.Item>
+        )}
       </Form>
       
       <Divider />
       
-      <div className="bg-gray-50 p-4 rounded-lg">
+      {/* Add BookingPaymentSummary component */}
+      <BookingPaymentSummary 
+        step={4}
+        fieldGroup={formData.fieldGroupId ? 
+          fieldGroups.find(g => String(g.id) === String(formData.fieldGroupId)) : 
+          undefined}
+        services={Array.isArray(formData.services) ? formData.services : []}
+        allServices={services}
+        startTime={formData.timeRange?.[0]?.format('HH:mm:ss')}
+        endTime={formData.timeRange?.[1]?.format('HH:mm:ss')}
+        selectedDates={selectedDates}
+        voucherDiscount={discountAmount}
+        refundedPoint={Number(refundedPointsInput) || 0}
+        formatCurrency={formatCurrency}
+        calculateTotalPrice={calculateTotalPrice}
+      />
+      
+      {/* <Divider /> */}
+      
+      {/* <div className="bg-gray-50 p-4 rounded-lg">
         <Title level={5} className="mb-4">Thông tin đặt sân</Title>
         
         <Row gutter={[16, 16]}>
           <Col xs={24} md={12}>
             <div className="mb-2">
               <Text type="secondary">Loại hình thể thao:</Text>
-              <div>{sports.find(s => s.id === formData.sportId)?.name || '-'}</div>
+              <div>{sports?.find(s => s.id === formData.sportId)?.name || '-'}</div>
             </div>
             
             <div className="mb-2">
@@ -306,63 +452,7 @@ const BookingStepPayment: React.FC<BookingStepPaymentProps> = ({
             </div>
           </Col>
         </Row>
-        
-        <Divider />
-        
-        <div>
-          <Title level={5} className="mb-2">Chi tiết thanh toán</Title>
-          
-          <div className="flex justify-between mb-2">
-            <Text>Giá sân:</Text>
-            <Text>
-              {formData.fieldGroupId ? 
-                formatCurrency(fieldGroups.find(g => String(g.id) === String(formData.fieldGroupId))?.basePrice || 0) 
-                : '-'
-              }
-            </Text>
-          </div>
-          
-          {Array.isArray(formData.services) && formData.services.length > 0 && (
-            <div className="flex justify-between mb-2">
-              <Text>Dịch vụ:</Text>
-              <Text>
-                {formatCurrency(
-                  formData.services.reduce((total, service) => {
-                    const serviceInfo = services.find(s => s.id === service.serviceId);
-                    return total + (serviceInfo?.price || 0) * service.quantity;
-                  }, 0)
-                )}
-              </Text>
-            </div>
-          )}
-          
-          {formData.isRecurring && (
-            <div className="flex justify-between mb-2">
-              <Text>Số ngày đặt:</Text>
-              <Text>{selectedDates.length}</Text>
-            </div>
-          )}
-          
-          {selectedVoucher && (
-            <div className="flex justify-between mb-2">
-              <Text className="flex items-center">
-                <TagOutlined className="mr-1 text-orange-500" />
-                Giảm giá:
-              </Text>
-              <Text className="text-orange-500">- {formatCurrency(discountAmount)}</Text>
-            </div>
-          )}
-          
-          <Divider />
-          
-          <div className="flex justify-between text-lg font-bold">
-            <Text>Tổng cộng:</Text>
-            <Text className="text-blue-600">
-              {formatCurrency(totalPrice - discountAmount)}
-            </Text>
-          </div>
-        </div>
-      </div>
+      </div> */}
     </Card>
   );
 };

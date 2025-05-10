@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
-  Form, Steps, Alert, Modal, Typography, Button, message
+  Form, Steps, Alert, Modal, Typography, Button, message, Divider
 } from 'antd';
 import { 
   ArrowLeftOutlined, ArrowRightOutlined, CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined
@@ -12,6 +12,8 @@ import { bookingService } from '@/services/booking.service';
 import { AvailableFieldGroup } from '@/types/field.type';
 import { Service } from '@/types/service.type';
 import { Sport } from '@/types/sport.type';
+import { useAppSelector } from '@/hooks/reduxHooks';
+import { getSportNameInVietnamese } from '@/utils/translateSport';
 
 // Component imports
 import BookingStepInfo from './components/BookingStepInfo';
@@ -97,6 +99,9 @@ const BookingPage: React.FC = () => {
     openTime3: null,
     closeTime3: null
   });
+
+  // Get user from redux store
+  const { user } = useAppSelector(state => state.user);
 
   // Fetch sports when component mounts
   useEffect(() => {
@@ -380,6 +385,7 @@ const BookingPage: React.FC = () => {
           // If recurring, update the recurring dates with the new date but same pattern
           const newDates = generateRecurringDates(date, recurringType);
           setSelectedDates(newDates);
+          console.log('Updated selectedDates (recurring):', newDates.map(d => d.format('DD/MM/YYYY')));
           
           // Update form data to keep the recurring configuration consistent
           const updatedFormData = {
@@ -396,6 +402,7 @@ const BookingPage: React.FC = () => {
         } else {
           // If not recurring, just set this single date
           setSelectedDates([date]);
+          console.log('Updated selectedDates (single):', [date.format('DD/MM/YYYY')]);
         }
       }
     } else {
@@ -767,13 +774,14 @@ const BookingPage: React.FC = () => {
         return;
       }
       
-      const values = await form.validateFields(['paymentMethod', 'voucherId']);
+      const values = await form.validateFields(['paymentMethod', 'voucherId', 'refundedPoint']);
       
       // Process payment
       const response = await bookingService.processPayment(
         paymentId,
         values.paymentMethod,
-        values.voucherId
+        values.voucherId,
+        values.refundedPoint || 0
       );      
       
       // For online payment, redirect to payment URL
@@ -856,7 +864,7 @@ const BookingPage: React.FC = () => {
         }
         
         // Cập nhật formData bằng cách kết hợp với dữ liệu hiện có
-        const updatedFormData = { ...formData, ...fieldValues };
+        const updatedFormData = { ...formData, ...fieldValues, refundedPoint: 0 };
         setFormData(updatedFormData);
         console.log("Updated formData after step 1:", updatedFormData);
         
@@ -906,7 +914,7 @@ const BookingPage: React.FC = () => {
         const serviceValues = form.getFieldValue('services') || [];
         
         // Cập nhật formData
-        const updatedFormData = { ...formData, services: serviceValues };
+        const updatedFormData = { ...formData, services: serviceValues, refundedPoint: 0 };
         setFormData(updatedFormData);
         console.log("Updated formData after step 2:", updatedFormData);
         
@@ -919,7 +927,7 @@ const BookingPage: React.FC = () => {
         const paymentValues = await form.validateFields(['paymentMethod']);
         
         // Cập nhật formData
-        const updatedFormData = { ...formData, ...paymentValues };
+        const updatedFormData = { ...formData, ...paymentValues, refundedPoint: form.getFieldValue('refundedPoint') || 0 };
         setFormData(updatedFormData);
         console.log("Updated formData after step 3:", updatedFormData);
       }
@@ -1129,39 +1137,81 @@ const BookingPage: React.FC = () => {
   };
 
   const calculateTotalPrice = () => {
-    // Get current field price from the booking's payment data
-    let fieldPrice = 0;
-    let servicePrice = 0;
-    const discount = 0;
+    console.log('calculateTotalPrice called with formData:', formData);
+    let total = 0;
     
-    // Calculate duration in hours from timeRange
-    let durationHours = 0;
-    if (formData.timeRange) {
-      const timeRange = ensureDayjsTimeRange(formData.timeRange);
-      if (timeRange) {
-        const [startTime, endTime] = timeRange;
-        durationHours = endTime.diff(startTime, 'hour', true); // Get duration in hours with decimals
-      }
-    }
-    
-    // If we have payment data, use those values
+    // Get selected field group price
     if (formData.fieldGroupId) {
-      const fieldGroup = availableFieldGroups.find(g => String(g.id) === String(formData.fieldGroupId));
+      const fieldGroup = availableFieldGroups.find(fg => String(fg.id) === String(formData.fieldGroupId));
       if (fieldGroup) {
-        // Calculate field price = base price * number of hours * number of dates
-        fieldPrice = fieldGroup.basePrice * durationHours * selectedDates.length;
+        // Calculate base price
+        const basePrice = fieldGroup.basePrice || 0;
+        
+        // Calculate duration in hours
+        let duration = 0;
+        if (formData.timeRange && formData.timeRange[0] && formData.timeRange[1]) {
+          duration = formData.timeRange[1].diff(formData.timeRange[0], 'hour', true);
+        }
+        
+        // Calculate peak hour price if applicable
+        let peakHourPrice = 0;
+        if (duration > 0 && formData.timeRange) {
+          const start = formData.timeRange[0].format('HH:mm:00');
+          const end = formData.timeRange[1].format('HH:mm:00');
+          
+          // Check peak hour 1
+          if (fieldGroup.peakStartTime1 && fieldGroup.peakEndTime1 && fieldGroup.priceIncrease1) {
+            const peakStart = fieldGroup.peakStartTime1;
+            const peakEnd = fieldGroup.peakEndTime1;
+            
+            // Calculate overlap
+            if (start < peakEnd && end > peakStart) {
+              const overlapStart = start > peakStart ? start : peakStart;
+              const overlapEnd = end < peakEnd ? end : peakEnd;
+              
+              // Convert to hours (assuming format is "HH:MM:SS")
+              const getHours = (timeStr: string) => {
+                const [hours, minutes] = timeStr.split(':').map(Number);
+                return hours + minutes / 60;
+              };
+              
+              const overlapHours = Math.max(0, getHours(overlapEnd) - getHours(overlapStart));
+              peakHourPrice += overlapHours * fieldGroup.priceIncrease1;
+            }
+          }
+          
+          // Similarly for peak hour 2 and 3 if needed
+          // (Add similar code blocks for peak 2 and 3)
+        }
+        
+        // Calculate field price including peak hours
+        const fieldPrice = basePrice * duration + peakHourPrice;
+        
+        // Multiply by number of days/dates if recurring
+        const numberOfDates = selectedDates.length || 1;
+        total += fieldPrice * numberOfDates;
+        console.log('Field price calculation:', { basePrice, duration, peakHourPrice, fieldPrice, numberOfDates, total });
       }
     }
     
-    // Calculate service price from selected services
+    // Add service prices
     if (Array.isArray(formData.services) && formData.services.length > 0) {
-      servicePrice = formData.services.reduce((total, service) => {
+      // Calculate the daily service cost first
+      const dailyServiceCost = formData.services.reduce((sum, service) => {
         const serviceInfo = availableServices.find(s => s.id === service.serviceId);
-        return total + (serviceInfo?.price || 0) * service.quantity;
+        return sum + (serviceInfo?.price || 0) * service.quantity;
       }, 0);
+      
+      // Multiply by the number of days for the total
+      const numberOfDates = selectedDates.length || 1;
+      const totalServiceCost = dailyServiceCost * numberOfDates;
+      
+      total += totalServiceCost;
+      console.log('Service price calculation:', { dailyServiceCost, numberOfDates, totalServiceCost, total });
     }
     
-    return fieldPrice + servicePrice - discount;
+    console.log('Total price calculated:', total);
+    return total;
   };
 
   // Function to save a custom recurring option
@@ -1402,9 +1452,14 @@ const BookingPage: React.FC = () => {
     });
   };
 
+  // Add useEffect to log selectedDates changes
+  useEffect(() => {
+    console.log('selectedDates updated:', selectedDates.map(d => d.format('DD/MM/YYYY')));
+  }, [selectedDates]);
+
   const steps = [
     {
-      title: 'Thông tin đặt sân',
+      title: 'Thông tin chung',
       content: (
         <BookingStepInfo
           form={form}
@@ -1434,6 +1489,8 @@ const BookingPage: React.FC = () => {
           formData={formData}
           fieldGroups={availableFieldGroups}
           formatCurrency={formatCurrency}
+          calculateTotalPrice={calculateTotalPrice}
+          selectedDates={selectedDates}
         />
       )
     },
@@ -1444,6 +1501,10 @@ const BookingPage: React.FC = () => {
           form={form}
           formData={formData}
           services={availableServices}
+          fieldGroups={availableFieldGroups}
+          formatCurrency={formatCurrency}
+          calculateTotalPrice={calculateTotalPrice}
+          selectedDates={selectedDates}
         />
       )
     },
@@ -1459,6 +1520,7 @@ const BookingPage: React.FC = () => {
           selectedDates={selectedDates}
           formatCurrency={formatCurrency}
           calculateTotalPrice={calculateTotalPrice}
+          user={user || undefined}
         />
       )
     }
@@ -1480,6 +1542,126 @@ const BookingPage: React.FC = () => {
       <p>Tất cả thông tin bạn đã nhập sẽ bị xóa và không thể khôi phục.</p>
     </Modal>
   );
+
+  const renderConfirmModal = () => {
+    const totalPrice = calculateTotalPrice();
+    const refundedPoint = form.getFieldValue('refundedPoint') || 0;
+    const voucherDiscount = form.getFieldValue('voucherDiscount') || 0;
+    const finalPrice = totalPrice - refundedPoint - voucherDiscount;
+    const selectedSport = uniqueSports.find((s: { id: number }) => s.id === formData.sportId);
+    const selectedFieldGroup = availableFieldGroups.find((g: AvailableFieldGroup) => String(g.id) === String(formData.fieldGroupId));
+
+    return (
+      <Modal
+        title="Xác nhận đặt sân"
+        open={showConfirmModal}
+        onOk={handleSubmitBooking}
+        onCancel={() => setShowConfirmModal(false)}
+        okText="Xác nhận"
+        cancelText="Hủy"
+        width={600}
+        confirmLoading={loading}
+      >
+        <div className="space-y-4">
+          <div className="bg-blue-50 p-4 rounded-lg">
+            <Title level={5} className="mb-3">Thông tin đặt sân</Title>
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <Text>Loại hình thể thao:</Text>
+                <Text strong>{getSportNameInVietnamese(selectedSport?.name || '') || '-'}</Text>
+              </div>
+              <div className="flex justify-between">
+                <Text>Nhóm sân:</Text>
+                <Text strong>{selectedFieldGroup?.name || '-'}</Text>
+              </div>
+              <div className="flex justify-between">
+                <Text>Ngày đặt sân:</Text>
+                <Text strong>
+                  {formData.isRecurring 
+                    ? `Đặt sân định kỳ (${selectedDates.length} ngày)`
+                    : formData.date ? dayjs(formData.date).format('DD/MM/YYYY') : '-'
+                  }
+                </Text>
+              </div>
+              <div className="flex justify-between">
+                <Text>Thời gian:</Text>
+                <Text strong>
+                  {formData.timeRange ? 
+                    `${dayjs(formData.timeRange[0]).format('HH:mm')} - ${dayjs(formData.timeRange[1]).format('HH:mm')}` 
+                    : '-'
+                  }
+                </Text>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <Title level={5} className="mb-3">Chi tiết thanh toán</Title>
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <Text>Tổng tiền sân:</Text>
+                <Text>{formatCurrency(totalPrice)}</Text>
+              </div>
+              {refundedPoint > 0 && (
+                <div className="flex justify-between text-green-600">
+                  <Text>Giảm giá từ điểm tích lũy:</Text>
+                  <Text>-{formatCurrency(refundedPoint)}</Text>
+                </div>
+              )}
+              {voucherDiscount > 0 && (
+                <div className="flex justify-between text-green-600">
+                  <Text>Giảm giá từ voucher:</Text>
+                  <Text>-{formatCurrency(voucherDiscount)}</Text>
+                </div>
+              )}
+              <Divider className="my-2" />
+              <div className="flex justify-between">
+                <Text strong>Thành tiền:</Text>
+                <Text strong className="text-lg text-blue-600">
+                  {formatCurrency(finalPrice)}
+                </Text>
+              </div>
+            </div>
+          </div>
+
+          {formData.services && formData.services.length > 0 && (
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <Title level={5} className="mb-3">Dịch vụ bổ sung</Title>
+              <div className="space-y-2">
+                {formData.services.map(service => {
+                  const serviceInfo = availableServices.find((s: Service) => s.id === service.serviceId);
+                  if (!serviceInfo) return null;
+                  return (
+                    <div key={service.serviceId} className="flex justify-between">
+                      <Text>
+                        {serviceInfo.name} x {service.quantity}
+                      </Text>
+                      <Text>
+                        {formatCurrency(serviceInfo.price * service.quantity)}
+                      </Text>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <div className="bg-yellow-50 p-4 rounded-lg">            
+            <div className="space-y-2">              
+              {formData.paymentMethod !== 'cash' && (
+                <Alert
+                  message="Lưu ý"
+                  description="Sau khi xác nhận, bạn sẽ được chuyển hướng đến trang thanh toán tương ứng."
+                  type="info"
+                  showIcon
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      </Modal>
+    );
+  };
 
   return (
     <div className="w-full px-4 py-6">
@@ -1571,27 +1753,7 @@ const BookingPage: React.FC = () => {
         </div>
         
         {/* Confirm Modal */}
-        <Modal
-          title="Xác nhận đặt sân"
-          open={showConfirmModal}
-          onOk={handleSubmitBooking}
-          onCancel={() => setShowConfirmModal(false)}
-          confirmLoading={loading}
-          okText="Xác nhận"
-          cancelText="Hủy"
-        >
-          <p>Bạn có chắc chắn muốn đặt sân với thông tin đã chọn?</p>
-          <p>Tổng số tiền: <span className="text-blue-600 font-bold">{formatCurrency(calculateTotalPrice())}</span></p>
-          {formData.paymentMethod !== 'cash' && (
-            <Alert
-              message="Lưu ý"
-              description="Bạn sẽ được chuyển đến trang thanh toán sau khi xác nhận."
-              type="info"
-              showIcon
-              className="mt-4"
-            />
-          )}
-        </Modal>
+        {renderConfirmModal()}
 
         {/* Recurring Modal */}
         <RecurringModal

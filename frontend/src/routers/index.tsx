@@ -29,6 +29,7 @@ import ResultBookingVNPay from '@/pages/Player/Booking/ResultBookingVNPay';
 import PlaymateCreate from '@/pages/Player/Playmate/PlaymateCreate';
 import PlaymateManage from '@/pages/Player/Playmate/PlaymateManage';
 import EventParticipate from '@/pages/Player/EventParticipate/EventParticipate';
+import ResultBookingbyPoint from '@/pages/Player/Booking/ResultBookingbyPoint';
 
 // Owner pages
 import PlaySchedule from '@/pages/Owner/PlaySchedule/PlaySchedule';
@@ -86,6 +87,7 @@ const AppRouter: React.FC = () => {
       }>
         <Route path='/user/booking/:facilityId' element={<BookingPage />} />
         <Route path='/user/booking/result-booking-vnpay' element={<ResultBookingVNPay />} />
+        <Route path='/user/booking/result-booking-by-point' element={<ResultBookingbyPoint />} />
         <Route path='/user/history-booking' element={<HistoryBooking />} />
         <Route path='/user/booking/detail/:bookingId' element={<BookingDetail />} />
         <Route path='/user/booking/review/:bookingId' element={<BookingReview />} />

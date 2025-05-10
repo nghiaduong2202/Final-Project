@@ -10,9 +10,7 @@ import {
 } from '@ant-design/icons';
 import { Line, Pie } from '@ant-design/charts';
 import dayjs from 'dayjs';
-import { mockBookingHistory } from '@/mocks/booking/bookingData';
-import { useNavigate } from 'react-router-dom';
-import { BookingStatus } from '@/types/booking.type';
+import { BookingStatus, HistoryBookingStatus } from '@/types/booking.type';
 
 const { Title, Text, Paragraph } = Typography;
 const { RangePicker } = DatePicker;
@@ -32,6 +30,75 @@ interface ChartDatum {
   cancelled?: number;
 }
 
+interface BookingField {
+  name: string;
+}
+
+interface BookingSlot {
+  date: string;
+}
+
+interface MockBooking {
+  id: string;
+  field: BookingField;
+  bookingSlots: BookingSlot[];
+  startTime: string;
+  endTime: string;
+  status: BookingStatus | HistoryBookingStatus;
+}
+
+// Mocked booking history data
+const mockBookingHistory: MockBooking[] = [
+  {
+    id: '1001',
+    field: { name: 'Sân bóng đá số 1' },
+    bookingSlots: [{ date: '2023-12-15' }],
+    startTime: '18:00',
+    endTime: '19:30',
+    status: BookingStatus.COMPLETED
+  },
+  {
+    id: '1002',
+    field: { name: 'Sân cầu lông số 2' },
+    bookingSlots: [{ date: '2023-12-16' }],
+    startTime: '08:00',
+    endTime: '10:00',
+    status: HistoryBookingStatus.PENDING
+  },
+  {
+    id: '1003',
+    field: { name: 'Sân Tennis số 1' },
+    bookingSlots: [{ date: '2023-12-17' }],
+    startTime: '19:00',
+    endTime: '21:00',
+    status: HistoryBookingStatus.CANCELLED
+  },
+  {
+    id: '1004',
+    field: { name: 'Sân bóng đá số 3' },
+    bookingSlots: [{ date: '2023-12-18' }],
+    startTime: '17:00',
+    endTime: '18:30',
+    status: BookingStatus.COMPLETED
+  },
+  {
+    id: '1005',
+    field: { name: 'Sân cầu lông số 1' },
+    bookingSlots: [{ date: '2023-12-19' }],
+    startTime: '09:00',
+    endTime: '11:00',
+    status: HistoryBookingStatus.IN_PROGRESS
+  },
+  {
+    id: '1006',
+    field: { name: 'Sân bóng đá số 2' },
+    bookingSlots: [{ date: '2023-12-20' }],
+    startTime: '20:00',
+    endTime: '21:30',
+    status: HistoryBookingStatus.CANCELLED
+  }
+];
+
 // Mocked facility data
 const mockFacilities: Facility[] = [
   { id: 'facility-1', name: 'Sân bóng đá mini Thống Nhất' },
@@ -39,11 +106,9 @@ const mockFacilities: Facility[] = [
 ];
 
 const Dashboard: React.FC = () => {
-  const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState<number>(0);
   const isMobile = containerWidth < 640;
-  const isTablet = containerWidth >= 640 && containerWidth < 1024;
   const [loading, setLoading] = useState(false);
   const [selectedFacility, setSelectedFacility] = useState<string>('facility-1');
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs]>([
@@ -121,7 +186,7 @@ const Dashboard: React.FC = () => {
   });
 
   // Recent Bookings
-  const [recentBookings, setRecentBookings] = useState(mockBookingHistory.slice(0, 5));
+  const [recentBookings, setRecentBookings] = useState<MockBooking[]>(mockBookingHistory.slice(0, 5));
 
   useEffect(() => {
     const updateWidth = () => {
@@ -268,6 +333,7 @@ const Dashboard: React.FC = () => {
                 onClick={refreshData}
                 size={isMobile ? "middle" : "large"}
                 className="w-full sm:w-auto"
+                loading={loading}
               >
                 Làm mới
               </Button>
@@ -381,7 +447,7 @@ const Dashboard: React.FC = () => {
           <Card title="Đặt sân gần đây" className="h-full">
             <List
               dataSource={recentBookings}
-              renderItem={item => (
+              renderItem={(item: MockBooking) => (
                 <List.Item
                   actions={[
                     <Button type="link" icon={<EyeOutlined />} size={isMobile ? "small" : "middle"}>
@@ -401,12 +467,12 @@ const Dashboard: React.FC = () => {
                         <Badge 
                           status={
                             item.status === BookingStatus.COMPLETED ? 'success' :
-                            item.status === BookingStatus.DRAFT ? 'error' :
+                            item.status === HistoryBookingStatus.CANCELLED ? 'error' :
                             'processing'
                           }
                           text={
                             item.status === BookingStatus.COMPLETED ? 'Đã hoàn thành' :
-                            item.status === BookingStatus.DRAFT ? 'Đã hủy' :
+                            item.status === HistoryBookingStatus.CANCELLED ? 'Đã hủy' :
                             'Đang xử lý'
                           }
                         />

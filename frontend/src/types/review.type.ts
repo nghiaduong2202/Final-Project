@@ -55,5 +55,12 @@ export interface ReviewData {
 // Type cho form data khi tạo mới cơ sở - cấu trúc 4 bước
 export interface ReviewFormData {
     data: ReviewData;
-    imageUrl: File[];
+    images: File[];
+  }
+
+  export interface ReviewFormDataUpdate {
+    reviewId: number;
+    rating: number;
+    comment: string;
+    imageUrl: string[];
   }

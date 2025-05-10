@@ -83,6 +83,7 @@ interface BookingSlot {
   id: number;
   date: string;
   field: Field;
+  status: string;
 }
 
 interface Payment {
@@ -92,6 +93,8 @@ interface Payment {
   discount: number | null;
   status: string;
   updatedAt: string;
+  refundedPoint: number;
+  refund: number;
 }
 
 interface AdditionalService {
@@ -239,63 +242,49 @@ const BookingDetail: React.FC = () => {
 
   // Thêm hàm để xác định trạng thái hiển thị dựa trên thời gian thực tế
   const getBookingDisplayStatus = (booking: BookingData): string => {
-    // Nếu booking đã bị hủy hoặc hoàn tiền, luôn hiển thị là đã hủy
-    if (booking.status === 'cancelled' || booking.status === 'refunded') {
-      return 'cancelled';
+    // Nếu booking đã bị hủy, luôn hiển thị là đã hủy
+    if (booking.status === 'canceled') {
+      return 'canceled';
     }
     
     const today = dayjs();
     
     // Lấy tất cả các ngày đặt sân
-    const bookingDates = booking.bookingSlots.map(slot => dayjs(slot.date));
+    const bookingSlots = booking.bookingSlots;
     const startTime = booking.startTime;
     const endTime = booking.endTime;
     
-    // Sắp xếp các ngày theo thứ tự tăng dần
-    bookingDates.sort((a, b) => a.valueOf() - b.valueOf());
-    
-    // Ngày cuối cùng trong lịch đặt sân
-    const lastBookingDate = bookingDates[bookingDates.length - 1];
-    const lastBookingEnd = lastBookingDate
-      .hour(parseInt(endTime.split(':')[0]))
-      .minute(parseInt(endTime.split(':')[1]));
-      
-    // Nếu đã qua thời điểm kết thúc của ngày cuối cùng, xem như hoàn thành
-    if (today.isAfter(lastBookingEnd)) {
+    // Kiểm tra xem tất cả các slot đã hoàn thành chưa
+    const allSlotsDone = bookingSlots.every(slot => slot.status === 'done');
+    if (allSlotsDone) {
       return 'completed';
     }
     
-    // Ngày đầu tiên trong lịch đặt sân
-    const firstBookingDate = bookingDates[0];
-    const firstBookingStart = firstBookingDate
-      .hour(parseInt(startTime.split(':')[0]))
-      .minute(parseInt(startTime.split(':')[1]));
+    // Kiểm tra nếu có bất kỳ slot nào đang diễn ra (thời gian hiện tại nằm trong khoảng thời gian đặt sân)
+    const hasInProgressSlot = bookingSlots.some(slot => {
+      const slotDate = dayjs(slot.date);
+      const slotStartTime = slotDate
+        .hour(parseInt(startTime.split(':')[0]))
+        .minute(parseInt(startTime.split(':')[1]));
+      const slotEndTime = slotDate
+        .hour(parseInt(endTime.split(':')[0]))
+        .minute(parseInt(endTime.split(':')[1]));
       
-    // Nếu chưa đến thời điểm bắt đầu của ngày đầu tiên, xem như sắp diễn ra
-    if (today.isBefore(firstBookingStart)) {
+      return today.isAfter(slotStartTime) && today.isBefore(slotEndTime) && slot.status === 'upcoming';
+    });
+    
+    if (hasInProgressSlot) {
+      return 'in_progress';
+    }
+    
+    // Kiểm tra xem có slot nào sắp diễn ra không
+    const hasUpcomingSlot = bookingSlots.some(slot => slot.status === 'upcoming');
+    if (hasUpcomingSlot) {
       return 'upcoming';
     }
     
-    // Kiểm tra xem có đang trong một phiên đặt sân nào không
-    for (const bookingDate of bookingDates) {
-      const bookingStart = bookingDate
-        .hour(parseInt(startTime.split(':')[0]))
-        .minute(parseInt(startTime.split(':')[1]));
-      const bookingEnd = bookingDate
-        .hour(parseInt(endTime.split(':')[0]))
-        .minute(parseInt(endTime.split(':')[1]));
-        
-      if (today.isAfter(bookingStart) && today.isBefore(bookingEnd)) {
-        return 'in_progress';
-      }
-    }
-    
-    // Kiểm tra xem có phải là đang ở giữa các phiên đặt sân không
-    if (today.isAfter(firstBookingStart) && today.isBefore(lastBookingEnd)) {
-      return 'upcoming'; // Đang ở giữa các phiên định kỳ, xem như sắp diễn ra
-    }
-    
-    return 'upcoming'; // Mặc định là sắp diễn ra nếu không rơi vào các trường hợp trên
+    // Mặc định là đã hoàn thành nếu không rơi vào các trường hợp trên
+    return 'completed';
   };
 
   if (loading) {
@@ -334,14 +323,15 @@ const BookingDetail: React.FC = () => {
 
   // Kiểm tra nếu có thể hủy booking (còn ít nhất 24h trước giờ chơi)
   const canCancel = 
-    (booking.status === 'pending_payment' || booking.status === 'payment_confirmed') &&
+    booking.status !== 'canceled' &&
     dayjs(booking.bookingSlots[0]?.date + ' ' + booking.startTime).diff(dayjs(), 'hour') >= 24;
 
   // Tính tổng tiền
   const totalAmount = 
     (booking.payment.fieldPrice || 0) + 
     (booking.payment.servicePrice || 0) - 
-    (booking.payment.discount || 0);
+    (booking.payment.discount || 0) -
+    (booking.payment.refundedPoint || 0);
 
   return (
     <div className="w-full  px-4 py-6 bg-gray-50">
@@ -463,21 +453,20 @@ const BookingDetail: React.FC = () => {
                     {getBookingDisplayStatus(booking) === 'completed' && (
                       <Tag color="green">Hoàn thành</Tag>
                     )}
-                    {getBookingDisplayStatus(booking) === 'cancelled' && (
+                    {getBookingDisplayStatus(booking) === 'canceled' && (
                       <Tag color="red">Đã hủy</Tag>
                     )}
                     
-                    {booking.payment.status === 'unpaid' && (
-                      <Tag color="red">Chưa thanh toán</Tag>
+                    {booking.payment.refund > 0 && (
+                      <Tooltip title="Điểm tích lũy từ việc hoàn tiền">
+                        <Tag color="green">+{booking.payment.refund} điểm</Tag>
+                      </Tooltip>
                     )}
-                    {booking.payment.status === 'paid' && (
-                      <Tag color="green">Đã thanh toán</Tag>
-                    )}
-                    {booking.payment.status === 'released' && (
-                      <Tag color="green">Đã chuyển cho chủ sân</Tag>
-                    )}
-                    {booking.payment.status === 'refunded' && (
-                      <Tag color="purple">Đã hoàn tiền</Tag>
+                    
+                    {booking.payment.refundedPoint > 0 && (
+                      <Tooltip title="Điểm tích lũy đã sử dụng cho đơn này">
+                        <Tag color="orange">-{booking.payment.refundedPoint} điểm</Tag>
+                      </Tooltip>
                     )}
                   </Space>
                 </Descriptions.Item>
@@ -601,19 +590,20 @@ const BookingDetail: React.FC = () => {
                   </div>
                 )}
                 
+                {booking.payment.refundedPoint > 0 && (
+                  <div className="flex justify-between text-orange-500">
+                    <span>Sử dụng điểm tích lũy:</span>
+                    <span>-{formatCurrency(booking.payment.refundedPoint * 1000)}</span>
+                  </div>
+                )}
+                
                 <Divider style={{ margin: '12px 0' }} />
                 
                 <div className="flex justify-between font-bold">
                   <span>Tổng cộng:</span>
                   <span className="text-xl text-blue-600">{formatCurrency(totalAmount)}</span>
                 </div>
-                
-                <div className="pt-3">
-                  <div className="bg-gray-50 p-3 rounded">
-                    <p className="font-medium mb-1">Phương thức thanh toán:</p>
-                    <p>Chuyển khoản ngân hàng</p>
-                  </div>
-                </div>
+                             
                 
                 {booking.status === 'payment_confirmed' && booking.bookingSlots.length > 0 && (
                   <div className="pt-3">
@@ -630,15 +620,22 @@ const BookingDetail: React.FC = () => {
                     )}
                   </div>
                 )}
+
+                {booking.payment.refund > 0 && (
+                  <div className="flex justify-between mb-2 text-green-600">
+                    <span>Điểm tích lũy nhận được:</span>
+                    <span>+{booking.payment.refund} điểm</span>
+                  </div>
+                )}
               </div>
             </Card>
             
             {/* Chính sách hủy */}
             <Card title="Chính sách hủy đặt sân" className="shadow-sm rounded-lg mt-6">
               <ul className="list-disc pl-5 space-y-2">
-                <li>Hủy trước 24 giờ: Hoàn 100% thành điểm tích lũy</li>
-                <li>Hủy từ 12-24 giờ: Hoàn 50% thành điểm tích lũy</li>
-                <li>Hủy dưới 12 giờ: Không được hoàn tiền</li>
+                <li>Hủy trước 7 ngày: Hoàn 100% thành điểm tích lũy</li>
+                <li>Hủy trước 3 ngày: Hoàn 50% thành điểm tích lũy</li>
+                <li>Sau 3 ngày: Không được hoàn tiền</li>
               </ul>
               <Divider style={{ margin: '12px 0' }} />
               <div className="text-sm text-gray-500">
@@ -690,11 +687,17 @@ const BookingDetail: React.FC = () => {
               </div>
             </div>
             
-            <div className="mt-4 bg-blue-50 p-3 rounded">
-              <Text type="secondary">
-                <InfoCircleOutlined className="mr-2" />
-                Bạn sẽ nhận được hoàn tiền dưới dạng điểm tích lũy nếu hủy trước 24 giờ so với giờ đặt sân.
-              </Text>
+            <div className="mt-4 bg-gray-50 p-3 rounded">
+              <p className="font-medium mb-2">Chính sách hoàn điểm tích lũy:</p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Hủy trước 7 ngày: Hoàn 100% thành điểm tích lũy</li>
+                <li>Hủy trước 3 ngày: Hoàn 50% thành điểm tích lũy</li>
+                <li>Sau 3 ngày: Không được hoàn tiền</li>
+              </ul>
+              <div className="mt-2 text-sm text-gray-500">
+                <p>Điểm tích lũy có thể được sử dụng cho các lần đặt sân tiếp theo.</p>
+                <p>1 điểm = 1.000 VNĐ</p>
+              </div>
             </div>
           </div>
         </Modal>

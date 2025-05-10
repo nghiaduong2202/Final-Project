@@ -8,6 +8,7 @@ interface User {
   bankAccount: string;
   role: 'player' | 'owner';
   avatarUrl?: string;
+  refundedPoint: number;
 }
 
 export interface UserState {

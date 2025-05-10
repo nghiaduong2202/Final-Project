@@ -1,21 +1,22 @@
 import { Dayjs } from 'dayjs';
 
 export enum BookingStatus {
-  DRAFT = 'draft',
+  INCOMPLETE = 'incomplete',
   COMPLETED = 'completed',  
+  CANCELED = 'canceled',
 }
 
-export enum PaymentStatus {
-  UNPAID = 'unpaid',
-  PAID = 'paid',
-  CANCELLED = 'cancelled'
+export enum BookingSlotStatus {
+  UPCOMING = 'upcoming',
+  DONE = 'done',
+  CANCELED = 'canceled',
 }
 
 export enum HistoryBookingStatus {
   PENDING = 'pending',  
   IN_PROGRESS = 'in_progress',
   COMPLETED = 'completed',
-  CANCELLED = 'cancelled',  
+  CANCELLED = 'canceled',  
 }
 
 export enum RecurringType {
@@ -44,6 +45,7 @@ export interface BookingSlot {
   id: number;
   date: string;
   fieldId: number;
+  status: BookingSlotStatus;
   bookingId: string;
 }
 
@@ -52,7 +54,8 @@ export interface Payment {
   fieldPrice: number;
   servicePrice: number;
   discount: number;
-  status: PaymentStatus;
+  refundedPoint: number;
+  refund: number;
   bookingId: string;
 }
 
@@ -94,6 +97,7 @@ export interface BookingFormData {
   isRecurring: boolean;
   recurringConfig?: RecurringConfig;
   recurringOption?: string;
+  refundedPoint?: number;
 }
 
 export interface BookingSummary {

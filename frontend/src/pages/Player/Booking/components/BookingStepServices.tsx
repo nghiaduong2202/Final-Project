@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
-import { Form, Card, InputNumber, Typography, FormInstance, Row, Col, Divider, Empty, Tag, Input, Select, Badge, Button } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Form, Card, InputNumber, Typography, FormInstance, Row, Col, Empty, Tag, Input, Select, Badge, Button } from 'antd';
 import { Service } from '@/types/service.type';
 import { BookingFormData } from '@/types/booking.type';
 import { SearchOutlined, ShoppingCartOutlined, FilterOutlined } from '@ant-design/icons';
+import BookingPaymentSummary from './BookingPaymentSummary';
+import { AvailableFieldGroup } from '@/types/field.type';
+import dayjs from 'dayjs';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
@@ -11,6 +14,10 @@ interface BookingStepServicesProps {
   form: FormInstance;
   formData: Partial<BookingFormData>;
   services: Service[];
+  fieldGroups?: AvailableFieldGroup[];
+  formatCurrency: (amount: number) => string;
+  calculateTotalPrice: () => number;
+  selectedDates?: dayjs.Dayjs[];
 }
 
 interface ServiceCardProps {
@@ -129,10 +136,26 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ service, quantity, onChange, 
 const BookingStepServices: React.FC<BookingStepServicesProps> = ({
   form,
   formData,
-  services
+  services,
+  fieldGroups = [],
+  formatCurrency,
+  calculateTotalPrice,
+  selectedDates = []
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [serviceTypeFilter, setServiceTypeFilter] = useState<string>('all');
+
+  // Lấy services từ form data, nếu không có thì khởi tạo mảng rỗng
+  const [selectedServices, setSelectedServices] = useState<{ serviceId: number; quantity: number }[]>(
+    formData.services || []
+  );
+
+  // Cập nhật form khi component mount
+  useEffect(() => {
+    if (formData.services) {
+      form.setFieldsValue({ services: formData.services });
+    }
+  }, [form, formData.services]);
 
   // Các loại dịch vụ
   const serviceTypeOptions = [
@@ -154,27 +177,36 @@ const BookingStepServices: React.FC<BookingStepServicesProps> = ({
     return searchMatch && typeMatch;
   });
 
-  // Lấy số lượng đã chọn cho mỗi dịch vụ
-  const getServiceQuantity = (serviceId: number): number => {
-    if (!Array.isArray(formData.services)) return 0;
-    const service = formData.services.find(s => s.serviceId === serviceId);
-    return service ? service.quantity : 0;
-  };
-
-  // Cập nhật số lượng dịch vụ
   const handleQuantityChange = (serviceId: number, quantity: number) => {
-    const currentServices = Array.isArray(form.getFieldValue('services')) ? 
-      form.getFieldValue('services') : [];
+    // Tạo bản sao của selectedServices hiện tại
+    const updatedServices = [...selectedServices];
     
-    const updatedServices = currentServices.filter(
-      (s: { serviceId: number }) => s.serviceId !== serviceId
-    );
+    // Tìm index của service trong mảng
+    const serviceIndex = updatedServices.findIndex(s => s.serviceId === serviceId);
     
-    if (quantity > 0) {
+    if (serviceIndex >= 0) {
+      // Nếu service đã tồn tại, cập nhật quantity
+      if (quantity === 0) {
+        // Nếu quantity = 0, xóa service khỏi mảng
+        updatedServices.splice(serviceIndex, 1);
+      } else {
+        updatedServices[serviceIndex].quantity = quantity;
+      }
+    } else if (quantity > 0) {
+      // Nếu service chưa tồn tại và quantity > 0, thêm mới
       updatedServices.push({ serviceId, quantity });
     }
+
+    // Cập nhật state local
+    setSelectedServices(updatedServices);
     
+    // Cập nhật form value ngay lập tức
     form.setFieldsValue({ services: updatedServices });
+  };
+
+  const getServiceQuantity = (serviceId: number): number => {
+    const service = selectedServices.find(s => s.serviceId === serviceId);
+    return service ? service.quantity : 0;
   };
 
   // Tính tổng chi phí dịch vụ
@@ -245,14 +277,16 @@ const BookingStepServices: React.FC<BookingStepServicesProps> = ({
           </div>
         </Col>
         
-        <Col span={24}>
+        <Col xs={24} md={16}>
           <Form
             form={form}
             layout="vertical"
-            initialValues={formData}
+            initialValues={{
+              services: formData.services || []
+            }}
           >
-            <Form.Item name="services" hidden>
-              <Input />
+            <Form.Item name="services" style={{ display: 'none' }}>
+              <input type="hidden" />
             </Form.Item>
             
             {filteredServices.length === 0 ? (
@@ -260,7 +294,7 @@ const BookingStepServices: React.FC<BookingStepServicesProps> = ({
             ) : (
               <Row gutter={[16, 16]}>
                 {filteredServices.map(service => (
-                  <Col xs={24} sm={12} md={8} lg={6} key={service.id} className="flex">
+                  <Col xs={24} sm={12} md={8} key={service.id} className="flex">
                     <ServiceCard
                       service={service}
                       quantity={getServiceQuantity(service.id)}
@@ -274,27 +308,25 @@ const BookingStepServices: React.FC<BookingStepServicesProps> = ({
           </Form>
         </Col>
         
-        {selectedServiceCount > 0 && (
-          <Col span={24}>
-            <Divider />
-            <Card className="bg-blue-50 border-blue-200">
-              <div className="flex justify-between items-center">
-                <div>
-                  <Text strong>Bạn đã chọn {selectedServiceCount} dịch vụ</Text>
-                  <div className="text-gray-500 text-sm">
-                    Bạn có thể điều chỉnh số lượng bất kỳ lúc nào
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-gray-600">Tổng chi phí:</div>
-                  <div className="text-xl font-bold text-blue-600">
-                    {totalCost.toLocaleString('vi-VN')}đ
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </Col>
-        )}
+        <Col xs={24} md={8}>
+          {/* Payment Summary */}
+          <div className="mb-6">
+            <BookingPaymentSummary 
+              step={3}
+              fieldGroup={formData.fieldGroupId ? 
+                fieldGroups.find(g => String(g.id) === String(formData.fieldGroupId)) : 
+                undefined}
+              services={selectedServices}
+              allServices={services}
+              startTime={formData.timeRange?.[0]?.format('HH:mm:ss')}
+              endTime={formData.timeRange?.[1]?.format('HH:mm:ss')}
+              selectedDates={selectedDates.length > 0 ? selectedDates : (formData.date ? [formData.date] : [])}
+              formatCurrency={formatCurrency}
+              calculateTotalPrice={calculateTotalPrice}
+            />
+          </div>
+                   
+        </Col>
       </Row>
     </Card>
   );
