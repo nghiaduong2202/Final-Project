@@ -203,6 +203,22 @@ export const bookingService = {
     }
   },
 
+  /**
+   * Get bookings for facility owner
+   * @param facilityId The ID of the facility to get bookings for
+   */
+  async getBookingOwner(facilityId: string) {
+    try {
+      const response = await api.get(`/booking/owner`, {
+        params: { facility: facilityId }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching owner bookings:', error);
+      throw error;
+    }
+  },
+
   async getBookingDetail(bookingId: string) {
     try {
       const response = await api.get(`/booking/${bookingId}/detail`);

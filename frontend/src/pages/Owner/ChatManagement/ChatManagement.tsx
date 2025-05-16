@@ -118,7 +118,12 @@ const ChatManagement: React.FC = () => {
     
     // Filter by tab
     if (currentTab === 'unread') {
-      return matchesSearch && (conv.unreadMessageCount || 0) > 0;
+      // Kiểm tra tin nhắn cuối cùng
+      const lastMessage = conv.messages?.[conv.messages.length - 1];
+      // Chỉ tính tin nhắn chưa đọc nếu tin nhắn cuối cùng KHÔNG phải do người dùng hiện tại gửi
+      const isLastMessageFromCurrentUser = lastMessage && lastMessage.sender.id === user?.id;
+      const hasUnreadMessages = !isLastMessageFromCurrentUser && (conv.unreadMessageCount || 0) > 0;
+      return matchesSearch && hasUnreadMessages;
     } else if (currentTab === 'saved') {
       return matchesSearch && savedConversations.includes(conv.id);
     }
@@ -145,7 +150,8 @@ const ChatManagement: React.FC = () => {
   // Hàm an toàn để lấy thông tin người tham gia
   const getSafeOtherParticipant = (conversation: Conversation | undefined): Participant | undefined => {
     if (!conversation) return undefined;
-    return getOtherParticipant(conversation);
+    const participant = getOtherParticipant(conversation);
+    return participant || undefined;
   };
 
   return (
@@ -171,7 +177,14 @@ const ChatManagement: React.FC = () => {
                 {
                   key: 'unread',
                   label: (
-                    <Badge count={conversations.filter(c => (c.unreadMessageCount || 0) > 0).length} size="small">
+                    <Badge count={conversations.reduce((total, conv) => {
+                      // Kiểm tra tin nhắn cuối cùng
+                      const lastMessage = conv.messages?.[conv.messages.length - 1];
+                      // Chỉ tính tin nhắn chưa đọc nếu tin nhắn cuối cùng KHÔNG phải do người dùng hiện tại gửi
+                      const isLastMessageFromCurrentUser = lastMessage && lastMessage.sender.id === user?.id;
+                      const unreadCount = !isLastMessageFromCurrentUser ? (conv.unreadMessageCount || 0) : 0;
+                      return total + unreadCount;
+                    }, 0)} size="small">
                       Chưa đọc
                     </Badge>
                   ),
@@ -206,19 +219,25 @@ const ChatManagement: React.FC = () => {
                   const otherParticipant = getOtherParticipant(conversation);
                   // Lấy thông tin thời gian tin nhắn cuối
                   const lastMessage = conversation.messages?.[conversation.messages.length - 1];
+                  
+                  // Kiểm tra xem tin nhắn cuối cùng có phải do người dùng hiện tại gửi không
+                  const isLastMessageFromCurrentUser = lastMessage && lastMessage.sender.id === user?.id;
+                  
+                  // Chỉ hiển thị số tin nhắn chưa đọc nếu tin nhắn cuối cùng KHÔNG phải do người dùng hiện tại gửi
+                  const displayUnreadCount = !isLastMessageFromCurrentUser ? (conversation.unreadMessageCount || 0) : 0;
                     
                   return (
                     <div 
                       key={conversation.id} 
-                      className={`chat-item ${activeConversationId === conversation.id ? 'active' : ''} ${(conversation.unreadMessageCount || 0) > 0 ? 'unread' : ''}`}
+                      className={`chat-item ${activeConversationId === conversation.id ? 'active' : ''} ${displayUnreadCount > 0 ? 'unread' : ''}`}
                       onClick={() => handleConversationClick(conversation.id)}
                     >
-                      <Badge count={conversation.unreadMessageCount || 0} size="small" className="badge-notify">
-                        <Avatar src={otherParticipant?.person.avatarUrl || ''} size={40} icon={<UserOutlined />} />
+                      <Badge count={displayUnreadCount} size="small" className="badge-notify">
+                        <Avatar src={otherParticipant?.person?.avatarUrl || ''} size={40} icon={<UserOutlined />} />
                       </Badge>
                       <div className="chat-item-content">
                         <div className="chat-item-header">
-                          <span className="chat-item-name">{otherParticipant?.person.name || 'Không xác định'}</span>
+                          <span className="chat-item-name">{otherParticipant?.person?.name || 'Không xác định'}</span>
                           <span className="chat-item-time">
                             {lastMessage ? new Date(lastMessage.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}
                           </span>

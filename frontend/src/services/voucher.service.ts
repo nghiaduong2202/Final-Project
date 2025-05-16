@@ -1,10 +1,15 @@
 import api from './api';
-import { Voucher, VoucherFormData } from '@/types/voucher.type';
+import { Voucher, VoucherFormData, VoucherData } from '@/types/voucher.type';
 
 // API Endpoints
 export const voucherService = { 
   getVouchers: async (facilityId: string): Promise<Voucher[]> => {
     const response = await api.get(`/voucher/${facilityId}`);
+    return response.data;
+  },
+
+  getSixVouchers: async (): Promise<VoucherData[]> => {
+    const response = await api.get('/voucher/six-vouchers');
     return response.data;
   },
 

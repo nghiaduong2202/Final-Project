@@ -114,15 +114,15 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ service, quantity, onChange, 
           {service.price.toLocaleString('vi-VN')}đ/{formatUnit(service.unit)}
         </div>
         <div className="flex justify-between items-center mt-2">
-          <Text type={service.amount > 20 ? "success" : service.amount > 5 ? "warning" : "danger"}>
-            Còn lại: {service.amount}
+          <Text type={service.remain && service.remain > 20 ? "success" : service.remain && service.remain > 5 ? "warning" : "danger"}>
+            Còn lại: {service.remain}
           </Text>
           <InputNumber
             min={0}
-            max={service.amount}
+            max={service.remain}
             value={quantity}
             onChange={(value) => onChange(service.id, value || 0)}
-            disabled={disabled || service.amount <= 0}
+            disabled={disabled || (!!service.remain && service.remain <= 0)}
             addonBefore={<ShoppingCartOutlined />}
             className="w-[120px]"
             size="middle"

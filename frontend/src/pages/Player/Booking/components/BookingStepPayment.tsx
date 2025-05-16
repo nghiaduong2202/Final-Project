@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Form, Card, Radio, Space, Divider, Typography, FormInstance, Select, Spin, Empty, message, InputNumber, Button } from 'antd';
 import { 
-  BankOutlined, WalletOutlined, CreditCardOutlined, TagOutlined, InfoCircleOutlined, 
+  CreditCardOutlined, TagOutlined, InfoCircleOutlined, 
   WalletFilled
 } from '@ant-design/icons';
 import { useParams } from 'react-router-dom';
@@ -89,11 +89,15 @@ const BookingStepPayment: React.FC<BookingStepPaymentProps> = ({
 
   // Update form values when refundedPoints input changes
   useEffect(() => {
-    if (refundedPointsInput && refundedPointsInput > 0) {
+    if (refundedPointsInput !== null && refundedPointsInput > 0) {
       // Convert points to VND (1 point = 1,000 VND)
       const discount = refundedPointsInput * 1000;
       setRefundedPointsDiscount(discount);
-      form.setFieldsValue({ refundedPoint: refundedPointsInput });
+      
+      // Make sure to store the value as a number
+      form.setFieldsValue({ refundedPoint: Number(refundedPointsInput) });
+      
+      console.log('Updated refundedPoint in form:', Number(refundedPointsInput));
     } else {
       setRefundedPointsDiscount(0);
       form.setFieldsValue({ refundedPoint: 0 });
@@ -142,7 +146,7 @@ const BookingStepPayment: React.FC<BookingStepPaymentProps> = ({
         message.error(`Đơn hàng tối thiểu phải từ ${formatCurrency(voucher.minPrice)}`);
         setSelectedVoucher(null);
         setDiscountAmount(0);
-        form.setFieldsValue({ voucherId: undefined });
+        form.setFieldsValue({ voucherId: undefined, voucherDiscount: 0 });
         return;
       }
       
@@ -161,19 +165,30 @@ const BookingStepPayment: React.FC<BookingStepPaymentProps> = ({
       
       setSelectedVoucher(voucher);
       setDiscountAmount(discount);
-      form.setFieldsValue({ voucherId: voucher.id });
+      form.setFieldsValue({ 
+        voucherId: voucher.id,
+        voucherDiscount: discount // Store the discount amount in the form
+      });
       message.success(`Đã áp dụng voucher "${voucher.name}"`);
     } else {
       setSelectedVoucher(null);
       setDiscountAmount(0);
-      form.setFieldsValue({ voucherId: undefined });
+      form.setFieldsValue({ 
+        voucherId: undefined,
+        voucherDiscount: 0 // Reset the discount amount
+      });
     }
   };
 
   // Xử lý sử dụng tối đa điểm tích lũy
   const handleUseMaxPoints = () => {
-    setRefundedPointsInput(maxPointsUsable);
-    form.setFieldsValue({ refundedPoint: maxPointsUsable });
+    // Ensure maxPointsUsable is a number
+    const pointsToUse = Number(maxPointsUsable);
+    setRefundedPointsInput(pointsToUse);
+    
+    // Update form with the number value
+    form.setFieldsValue({ refundedPoint: pointsToUse });
+    console.log('Set max points:', pointsToUse);
   };
 
   // Xử lý khi người dùng thay đổi số điểm tích lũy
@@ -183,20 +198,24 @@ const BookingStepPayment: React.FC<BookingStepPaymentProps> = ({
       return;
     }
 
+    // Convert to number to ensure proper type
+    const pointValue = Number(value);
+
     // Validate against maximum limits
-    if (value > availablePoints) {
+    if (pointValue > availablePoints) {
       message.error(`Bạn chỉ có ${availablePoints} điểm tích lũy`);
-      setRefundedPointsInput(availablePoints);
+      setRefundedPointsInput(Number(availablePoints));
       return;
     }
 
-    if (value > maxPointsUsable) {
+    if (pointValue > maxPointsUsable) {
       message.error(`Bạn chỉ có thể sử dụng tối đa ${maxPointsUsable} điểm (50% giá trị đơn hàng)`);
-      setRefundedPointsInput(maxPointsUsable);
+      setRefundedPointsInput(Number(maxPointsUsable));
       return;
     }
 
-    setRefundedPointsInput(value);
+    // Store as number
+    setRefundedPointsInput(pointValue);
   };
 
   return (
@@ -204,8 +223,13 @@ const BookingStepPayment: React.FC<BookingStepPaymentProps> = ({
       <Form
         form={form}
         layout="vertical"
-        initialValues={{...formData, refundedPoint: 0}}
+        initialValues={{...formData, refundedPoint: 0, voucherDiscount: 0}}
       >
+        {/* Hidden field to store voucher discount amount */}
+        <Form.Item name="voucherDiscount" hidden>
+          <InputNumber />
+        </Form.Item>
+        
         <Form.Item
           name="paymentMethod"
           label="Phương thức thanh toán"
@@ -213,7 +237,7 @@ const BookingStepPayment: React.FC<BookingStepPaymentProps> = ({
         >
           <Radio.Group className="w-full">
             <Space direction="vertical" className="w-full">
-              <Radio value="banking" className="w-full">
+              {/* <Radio value="banking" className="w-full">
                 <Card className="w-full mb-2 cursor-pointer hover:bg-gray-50">
                   <div className="flex items-center">
                     <BankOutlined className="text-2xl mr-4 text-blue-600" />
@@ -239,7 +263,7 @@ const BookingStepPayment: React.FC<BookingStepPaymentProps> = ({
                     </div>
                   </div>
                 </Card>
-              </Radio>
+              </Radio> */}
               
               <Radio value="vnpay" className="w-full">
                 <Card className="w-full mb-2 cursor-pointer hover:bg-gray-50">
@@ -318,7 +342,7 @@ const BookingStepPayment: React.FC<BookingStepPaymentProps> = ({
           )}
         </Form.Item>
         
-        {reduxUser && reduxUser.refundedPoint > 0 && (
+        {reduxUser && reduxUser.refundedPoint >= 0 && (
           <Form.Item
             name="refundedPoint"
             label={

@@ -776,12 +776,15 @@ const BookingPage: React.FC = () => {
       
       const values = await form.validateFields(['paymentMethod', 'voucherId', 'refundedPoint']);
       
+      // Ensure refundedPoint is a number
+      const refundedPoint = Number(values.refundedPoint) || 0;
+      
       // Process payment
       const response = await bookingService.processPayment(
         paymentId,
         values.paymentMethod,
         values.voucherId,
-        values.refundedPoint || 0
+        refundedPoint
       );      
       
       // For online payment, redirect to payment URL
@@ -1545,9 +1548,12 @@ const BookingPage: React.FC = () => {
 
   const renderConfirmModal = () => {
     const totalPrice = calculateTotalPrice();
+    // Convert refundedPoint to money value (1 point = 1000 VND)
     const refundedPoint = form.getFieldValue('refundedPoint') || 0;
+    const refundedPointValue = refundedPoint * 1000;
+    // Get voucher discount from BookingStepPayment component's state
     const voucherDiscount = form.getFieldValue('voucherDiscount') || 0;
-    const finalPrice = totalPrice - refundedPoint - voucherDiscount;
+    const finalPrice = totalPrice - refundedPointValue - voucherDiscount;
     const selectedSport = uniqueSports.find((s: { id: number }) => s.id === formData.sportId);
     const selectedFieldGroup = availableFieldGroups.find((g: AvailableFieldGroup) => String(g.id) === String(formData.fieldGroupId));
 
@@ -1604,8 +1610,8 @@ const BookingPage: React.FC = () => {
               </div>
               {refundedPoint > 0 && (
                 <div className="flex justify-between text-green-600">
-                  <Text>Giảm giá từ điểm tích lũy:</Text>
-                  <Text>-{formatCurrency(refundedPoint)}</Text>
+                  <Text>Giảm giá từ điểm tích lũy ({refundedPoint} điểm):</Text>
+                  <Text>-{formatCurrency(refundedPointValue)}</Text>
                 </div>
               )}
               {voucherDiscount > 0 && (

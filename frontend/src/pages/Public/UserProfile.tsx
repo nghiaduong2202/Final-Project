@@ -506,10 +506,7 @@ const UserProfile: React.FC = () => {
           <Col xs={24} md={12}>
             <Form.Item
               name="phoneNumber"
-              label="Số Điện Thoại"
-              rules={[
-                { pattern: /^[0-9]+$/, message: 'Số điện thoại chỉ bao gồm các chữ số' }
-              ]}
+              label="Số Điện Thoại"              
             >
               <Input placeholder="Nhập số điện thoại" />
             </Form.Item>

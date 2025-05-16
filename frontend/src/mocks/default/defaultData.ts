@@ -72,9 +72,9 @@ export const SURFACE_TYPES = {
     },
     {
       id: 5,
-      name: "Sân bóng đá nhỏ đa năng",
+      name: "Sân tổng hợp nhỏ đa năng",
       sports: ["volleyball", "basketball"],
-      description: "Sân bóng đá cỡ nhỏ có thể kết hợp với bóng rổ",
+      description: "Sân bóng chuyền cỡ có thể kết hợp với bóng rổ",
       recommendedSurfaces: ["Sân chất nhựa tổng hợp", "Sân bê tông"],
       recommendedDimensions: ["25m x 16m", "28m x 15m"],
     }

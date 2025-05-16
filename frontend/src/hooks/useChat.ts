@@ -65,6 +65,23 @@ export const useChat = () => {
       const conversation = conversations.find(c => c.id === conversationId);
       
       if (conversation) {
+        // Đặt số tin nhắn chưa đọc về 0 ngay lập tức trong UI
+        // Điều này phải được thực hiện trước khi đặt active conversation
+        if (conversation.unreadMessageCount > 0) {
+          console.log('Resetting unread count for conversation:', conversationId);
+          const updatedConversations = conversations.map(conv => {
+            if (conv.id === conversationId) {
+              return {
+                ...conv,
+                unreadMessageCount: 0
+              };
+            }
+            return conv;
+          });
+          
+          dispatch(setConversations(updatedConversations));
+        }
+        
         // Set messages from conversation
         dispatch(setMessages(conversation.messages));
         
@@ -80,28 +97,14 @@ export const useChat = () => {
           
           // Mark as seen if the last message is not from current user
           if (lastMessage.sender.id !== user?.id) {
+            console.log('Marking last message as seen:', lastMessage.id);
             socketService.markAsSeen(conversationId, lastMessage.id);
-          }
-          
-          // Reset unread count for this conversation
-          if (conversation.unreadMessageCount > 0) {
-            const updatedConversations = conversations.map(conv => {
-              if (conv.id === conversationId) {
-                return {
-                  ...conv,
-                  unreadMessageCount: 0
-                };
-              }
-              return conv;
-            });
-            
-            dispatch(setConversations(updatedConversations));
           }
         }
         
         // Get the other participant and set their ID for online status checking
         const otherParticipant = getOtherParticipant(conversation);
-        if (otherParticipant) {
+        if (otherParticipant && otherParticipant.person && otherParticipant.person.id) {
           setCurrentChatParticipantId(otherParticipant.person.id);
         }
       }
@@ -116,8 +119,26 @@ export const useChat = () => {
   // Handle sending message
   const handleSendMessage = useCallback((content: string) => {
     if (!content.trim() || !activeConversationId) return;
+    
+    console.log('Sending message to conversation:', activeConversationId);
+    
+    // Gửi tin nhắn qua socket
     socketService.sendMessage(activeConversationId, content);
-  }, [activeConversationId, socketService]);
+    
+    // Đảm bảo conversation này không có tin nhắn chưa đọc đối với người gửi
+    const updatedConversations = conversations.map(conv => {
+      if (conv.id === activeConversationId) {
+        // Đặt unreadMessageCount = 0 cho conversation hiện tại
+        return {
+          ...conv,
+          unreadMessageCount: 0
+        };
+      }
+      return conv;
+    });
+    
+    dispatch(setConversations(updatedConversations));
+  }, [activeConversationId, socketService, conversations, dispatch]);
 
   // Handle chat widget toggle
   const toggleChat = useCallback(() => {
@@ -140,7 +161,8 @@ export const useChat = () => {
 
   // Get other participant
   const getOtherParticipant = useCallback((conversation: Conversation) => {
-    return conversation?.participants.find(p => p.person.id !== user?.id);
+    if (!conversation || !conversation.participants) return null;
+    return conversation.participants.find(p => p.person && p.person.id !== user?.id);
   }, [user]);
 
   // Listen for new messages
@@ -159,6 +181,26 @@ export const useChat = () => {
             if (!messageExists) {
               console.log('Adding new message to UI:', message.content);
               dispatch(addMessage(message));
+              
+              // Nếu tin nhắn mới là từ người khác và đang xem conversation này,
+              // đánh dấu là đã đọc
+              if (message.sender.id !== user?.id) {
+                console.log('Marking message as seen (from other user)');
+                socketService.markAsSeen(activeConversationId, message.id);
+                
+                // Đảm bảo unreadMessageCount = 0 cho conversation này
+                const updatedConversations = conversations.map(conv => {
+                  if (conv.id === activeConversationId) {
+                    return {
+                      ...conv,
+                      unreadMessageCount: 0
+                    };
+                  }
+                  return conv;
+                });
+                
+                dispatch(setConversations(updatedConversations));
+              }
             }
           });
         }
@@ -169,7 +211,7 @@ export const useChat = () => {
       console.log('Cleaning up message subscription');
       subscription.unsubscribe();
     };
-  }, [activeConversationId, dispatch, socketService, messages]);
+  }, [activeConversationId, dispatch, socketService, messages, user, conversations]);
 
   // Listen for online status changes for current chat participant
   useEffect(() => {

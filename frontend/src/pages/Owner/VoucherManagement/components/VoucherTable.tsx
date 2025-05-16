@@ -45,11 +45,11 @@ const VoucherTable: React.FC<VoucherTableProps> = ({
       icon: <ExclamationCircleOutlined />,
       content: (
         <div>
-          <p><strong>Tên voucher:</strong> {voucher.name}</p>
-          <p><strong>Mã voucher:</strong> {voucher.code}</p>
-          <p><strong>Loại giảm giá:</strong> {voucher.voucherType === 'percent' ? 'Giảm theo %' : 'Giảm theo số tiền'}</p>
-          <p><strong>Giá trị giảm:</strong> {formatDiscountValue(voucher.voucherType, voucher.discount)}</p>
-          <p className="mt-2 text-red-500">Lưu ý: Hành động này không thể hoàn tác.</p>
+          <p key="name"><strong>Tên voucher:</strong> {voucher.name}</p>
+          <p key="code"><strong>Mã voucher:</strong> {voucher.code}</p>
+          <p key="type"><strong>Loại giảm giá:</strong> {voucher.voucherType === 'percent' ? 'Giảm theo %' : 'Giảm theo số tiền'}</p>
+          <p key="discount"><strong>Giá trị giảm:</strong> {formatDiscountValue(voucher.voucherType, voucher.discount)}</p>
+          <p key="note" className="mt-2 text-red-500">Lưu ý: Hành động này không thể hoàn tác.</p>
         </div>
       ),
       okText: 'Xóa',
@@ -70,8 +70,8 @@ const VoucherTable: React.FC<VoucherTableProps> = ({
       ellipsis: true,
       render: (text: string, record: Voucher) => (
         <div>
-          <div className="font-medium text-nowrap overflow-hidden text-ellipsis">{text}</div>
-          <div className="text-gray-500 text-nowrap overflow-hidden text-ellipsis">{record.code}</div>
+          <div key={`name-${record.id}`} className="font-medium text-nowrap overflow-hidden text-ellipsis">{text}</div>
+          <div key={`code-${record.id}`} className="text-gray-500 text-nowrap overflow-hidden text-ellipsis">{record.code}</div>
         </div>
       ),
     },
@@ -82,8 +82,8 @@ const VoucherTable: React.FC<VoucherTableProps> = ({
       width: 150,
       render: (_: unknown, record: Voucher) => (
         <div>
-          <div>{record.voucherType === 'percent' ? 'Giảm theo %' : 'Giảm theo số tiền'}</div>
-          <div className="font-medium">{formatDiscountValue(record.voucherType, record.discount)}</div>
+          <div key={`type-${record.id}`}>{record.voucherType === 'percent' ? 'Giảm theo %' : 'Giảm theo số tiền'}</div>
+          <div key={`discount-${record.id}`} className="font-medium">{formatDiscountValue(record.voucherType, record.discount)}</div>
         </div>
       ),
     },
@@ -107,8 +107,8 @@ const VoucherTable: React.FC<VoucherTableProps> = ({
       width: 100,
       render: (_: unknown, record: Voucher) => (
         <div>
-          <div>Tổng: <span className="font-medium">{record.amount}</span></div>
-          <div>Còn lại: <span className="font-medium">{record.remain}</span></div>
+          <div key={`amount-${record.id}`}>Tổng: <span className="font-medium">{record.amount}</span></div>
+          <div key={`remain-${record.id}`}>Còn lại: <span className="font-medium">{record.remain}</span></div>
         </div>
       ),
     },
@@ -119,7 +119,7 @@ const VoucherTable: React.FC<VoucherTableProps> = ({
       render: (record: Voucher) => (
         <div>
           {renderStatus(record)}
-          <div className="text-gray-500 mt-1">
+          <div key={`date-${record.id}`} className="text-gray-500 mt-1">
             {formatDateRange(record.startDate, record.endDate)}
           </div>
         </div>
@@ -132,21 +132,21 @@ const VoucherTable: React.FC<VoucherTableProps> = ({
       width: 120,
       render: (_: unknown, record: Voucher) => (
         <Space size="middle">
-          <Tooltip title="Xem chi tiết">
+          <Tooltip key={`view-${record.id}`} title="Xem chi tiết">
             <Button 
               icon={<EyeOutlined style={{ color: '#1890ff' }} />} 
               onClick={() => onView(record)} 
               type="text"
             />
           </Tooltip>
-          <Tooltip title="Chỉnh sửa">
+          <Tooltip key={`edit-${record.id}`} title="Chỉnh sửa">
             <Button 
               icon={<EditOutlined style={{ color: '#52c41a' }} />} 
               onClick={() => onEdit(record)} 
               type="text"
             />
           </Tooltip>
-          <Tooltip title="Xóa">
+          <Tooltip key={`delete-${record.id}`} title="Xóa">
             <Button 
               icon={<DeleteOutlined style={{ color: '#ff4d4f' }} />} 
               onClick={() => showDeleteConfirm(record)} 
@@ -163,7 +163,7 @@ const VoucherTable: React.FC<VoucherTableProps> = ({
     <div className="overflow-x-auto">
       <Table
         columns={columns}
-        dataSource={vouchers}
+        dataSource={vouchers.map(voucher => ({...voucher, key: voucher.id}))}
         loading={loading}
         rowKey="id"
         pagination={{

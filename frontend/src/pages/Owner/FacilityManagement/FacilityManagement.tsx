@@ -145,8 +145,7 @@ const FacilityManagement: React.FC = () => {
     { id: 'active', label: 'Đang hoạt động' },
     { id: 'closed', label: 'Đang đóng cửa' },
     { id: 'pending', label: 'Đang chờ phê duyệt' },
-    { id: 'unactive', label: 'Đã bị từ chối' },
-    { id: 'banned', label: 'Đã bị cấm' }
+    { id: 'unactive', label: 'Đã bị từ chối' }    
   ];
   
   // Generate tab items for Tabs component
@@ -216,7 +215,6 @@ const FacilityManagement: React.FC = () => {
       case 'closed': return 'default';
       case 'pending': return 'warning';
       case 'unactive': return 'error';
-      case 'banned': return 'error';
       default: return 'default';
     }
   };
@@ -227,7 +225,6 @@ const FacilityManagement: React.FC = () => {
       case 'closed': return 'Đang đóng cửa';
       case 'pending': return 'Đang chờ phê duyệt';
       case 'unactive': return 'Đã bị từ chối';
-      case 'banned': return 'Đã bị cấm';
       default: return 'Không xác định';
     }
   };

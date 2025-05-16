@@ -742,10 +742,17 @@ const PlaymateDetail: React.FC = () => {
                                       </div>
                                     }
                                     description={
+                                      <>
+                                      <div className="text-sm text-gray-600">
+                                        <div><strong>Số điện thoại:</strong> {playerInfo?.phoneNumber}</div>
+                                        <div><strong>Email:</strong> {playerInfo?.email}</div>
+                                        <div><strong>Giới tính:</strong> {playerInfo?.gender || 'Chưa cập nhật'}</div>                                      </div> 
+
                                       <div className="text-sm text-gray-600">
                                         <div><strong>Trình độ:</strong> {getSkillLevelDisplay(participant.skillLevel)}</div>
                                         {participant.note && <div><strong>Ghi chú:</strong> {participant.note}</div>}
                                       </div>
+                                      </>
                                     }
                                   />
                                 </List.Item>

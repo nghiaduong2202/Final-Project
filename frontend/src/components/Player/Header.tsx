@@ -1,12 +1,12 @@
 import { useNavigate } from 'react-router-dom';
-import { Select, Dropdown, Button, Badge, Popover, Input, Space, Divider, Modal } from 'antd';
+import { Select, Dropdown, Button, Badge, Popover, Space, Divider, Modal } from 'antd';
 import { 
   BellOutlined, QuestionCircleOutlined, GlobalOutlined, DownOutlined, 
   SearchOutlined, LoginOutlined, TrophyOutlined, TeamOutlined
 } from '@ant-design/icons';
 import TopbarProfile from '@/components/LoginModal/TopbarProfile';
 import Logo from '@/assets/Logo.svg';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { MenuProps } from 'antd';
 import axios from 'axios';
 import { sportService } from '@/services/sport.service';
@@ -15,7 +15,6 @@ import { useAppSelector, useAppDispatch } from '@/hooks/reduxHooks';
 import { showLoginModal } from '@/store/slices/userSlice';
 
 const { Option } = Select;
-const { Search } = Input;
 
 // Interfaces cho dữ liệu tỉnh/thành phố và quận/huyện
 interface Province {
@@ -33,7 +32,7 @@ const Header = () => {
   const dispatch = useAppDispatch();
   const { isAuthenticated } = useAppSelector(state => state.user);
   const [language, setLanguage] = useState<'vi' | 'en'>('vi');
-  const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [selectedSports, setSelectedSports] = useState<string[]>([]);
   const [selectedProvince, setSelectedProvince] = useState('all');
   const [selectedDistrict, setSelectedDistrict] = useState('all');
@@ -193,29 +192,57 @@ const Header = () => {
   };
 
   const handleSearch = () => {
+    // Lấy giá trị từ input
+    const searchQuery = searchInputRef.current?.value || '';
+    
     // Tạo query params từ các filter đã chọn
     const queryParams = new URLSearchParams();
     if (searchQuery) queryParams.set('query', searchQuery);
     
-    // Chuyển đổi các ID từ string sang number và đảm bảo là mảng
+    // Xử lý sportIds - đảm bảo tất cả là số
     if (selectedSports.length > 0) {
-      const sportIdsArray = selectedSports.map(id => parseInt(id));
+      const sportIdsArray = selectedSports.map(id => 
+        typeof id === 'string' ? parseInt(id) : id
+      );
       queryParams.set('sport', JSON.stringify(sportIdsArray));
     }
     
-    if (selectedProvince !== 'all') queryParams.set('province', selectedProvince);
-    if (selectedDistrict !== 'all') queryParams.set('district', selectedDistrict);
+    // Lấy tên tỉnh/thành phố từ code đã chọn
+    if (selectedProvince !== 'all') {
+      const province = provinces.find(p => p.code === selectedProvince);
+      if (province) {
+        queryParams.set('province', province.name);
+      }
+    }
     
-    // Chuyển đến trang kết quả tìm kiếm với filter đã chọn
-    navigate(`/result-search?${queryParams.toString()}`);
+    // Lấy tên quận/huyện từ code đã chọn
+    if (selectedDistrict !== 'all') {
+      const district = districts.find(d => d.code === selectedDistrict);
+      if (district) {
+        queryParams.set('district', district.name);
+      }
+    }
+    
+    // Xây dựng URL tìm kiếm và sử dụng navigate
+    const searchUrl = `/result-search?${queryParams.toString()}`;
+    navigate(searchUrl);
   };
 
   // Reset tất cả filter
   const handleResetFilters = () => {
-    setSearchQuery('');
+    if (searchInputRef.current) {
+      searchInputRef.current.value = '';
+    }
     setSelectedSports([]);
     setSelectedProvince('all');
     setSelectedDistrict('all');
+  };
+
+  // Xử lý khi nhấn Enter ở ô tìm kiếm
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
   };
 
   // Xử lý khi nhấp vào thông báo
@@ -240,15 +267,20 @@ const Header = () => {
   // Nội dung tìm kiếm
   const searchContent = (
     <div className="w-80 md:w-96">
-      <div className="mb-4">
-        <Search
-          placeholder="Tìm kiếm sân, địa điểm, môn thể thao..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          onSearch={handleSearch}
-          enterButton
-          className="rounded-lg"
+      <div className="mb-4 flex">
+        <input
+          ref={searchInputRef}
+          type="text"
+          placeholder="Tìm kiếm cơ sở, địa điểm..."
+          className="flex-grow px-3 py-2 border border-gray-300 rounded-l-lg focus:outline-none focus:ring-1 focus:ring-blue-400"
+          onKeyPress={handleKeyPress}
         />
+        <button 
+          onClick={handleSearch}
+          className="bg-blue-500 hover:bg-blue-600 text-white px-4 rounded-r-lg flex items-center justify-center"
+        >
+          <SearchOutlined />
+        </button>
       </div>
       
       <div className="mb-3">
@@ -256,7 +288,11 @@ const Header = () => {
         <Select 
           mode="multiple"
           value={selectedSports}
-          onChange={values => setSelectedSports(values)}
+          onChange={values => {
+            // Chuyển đổi giá trị string sang number
+            const numericValues = values.map(value => value.toString());
+            setSelectedSports(numericValues);
+          }}
           style={{ width: '100%' }}
           className="rounded-lg"
           loading={loadingSports}

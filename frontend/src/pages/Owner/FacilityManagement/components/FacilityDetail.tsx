@@ -538,7 +538,9 @@ const FacilityDetail: React.FC<FacilityDetailProps> = ({ facilityId, onClose, on
                           <Text type="secondary">{service.type === 'rental' ? 'Cho thuê' : 'Dịch vụ'}</Text>
                           <Tag color="blue" className="ml-2">{service.sport?.name}</Tag>
                         </div>
-                        <Text className="text-lg font-bold text-blue-600">{service.price.toLocaleString()}đ/{service.unit}</Text>
+                        <Text className="text-lg font-bold text-blue-600">
+                          {service.price.toLocaleString()}đ/{service.unit === 'time' ? 'giờ' : service.unit === 'quantity' ? 'sản phẩm' : service.unit}
+                        </Text>
                       </div>
                       
                       <Divider style={{ margin: '12px 0' }} />

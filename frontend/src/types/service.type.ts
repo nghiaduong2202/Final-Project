@@ -15,6 +15,7 @@ export interface Service {
     price: number;
     description: string;
     amount: number;
+    remain?: number;
     sport: Sport;
     unit?: UnitEnum | string;
     type: ServiceType;

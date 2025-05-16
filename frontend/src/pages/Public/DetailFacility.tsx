@@ -310,7 +310,6 @@ const DetailFacility: React.FC = () => {
     }
 
     try {
-      
       // Lấy danh sách conversation từ API
       message.loading({ content: 'Đang kiểm tra...', key: 'chatCheck' });
       const conversationsData = await ChatService.getConversations();
@@ -318,32 +317,46 @@ const DetailFacility: React.FC = () => {
       // Kiểm tra xem đã có conversation với owner chưa
       const existingConversation = conversationsData.find(conv => 
         !conv.isGroup && 
-        conv.participants.some(p => p.person.id === facility.owner?.id)
+        conv.participants.some(p => p.person?.id === facility.owner?.id)
       );
 
       if (existingConversation) {
         // Nếu đã có conversation, chọn conversation đó
         message.success({ content: 'Đã mở cuộc trò chuyện', key: 'chatCheck' });
-        // Dispatch action với id của conversation
+        
+        // Đầu tiên mở chat widget
+        dispatch(openChatWidget());
+        
+        // Đặt active conversation sau một khoảng thời gian ngắn
         setTimeout(() => {
-          // Đầu tiên mở chat widget
-      dispatch(openChatWidget());
-      
           dispatch(setActiveConversation(existingConversation.id));
         }, 200);
       } else {
         // Nếu chưa có, tạo conversation mới
         message.loading({ content: 'Đang kết nối...', key: 'chatCheck' });
-        const conversation = await ChatService.createConversation(facility.owner.id);
-        message.success({ content: 'Đã kết nối với chủ sở hữu', key: 'chatCheck' });
-        
-        // Cập nhật lại danh sách conversations
-        await ChatService.getConversations();
-        dispatch(openChatWidget());
-        // Đặt conversation mới làm active sau một khoảng thời gian ngắn
-        setTimeout(() => {      
-          dispatch(setActiveConversation(conversation.id));
-        }, 200);
+        try {
+          const conversation = await ChatService.createConversation(facility.owner.id);
+          message.success({ content: 'Đã kết nối với chủ sở hữu', key: 'chatCheck' });
+          
+          // Cập nhật lại danh sách conversations
+          await ChatService.getConversations();
+          
+          // Mở chat widget
+          dispatch(openChatWidget());
+          
+          // Đặt conversation mới làm active sau một khoảng thời gian ngắn
+          setTimeout(() => {      
+            if (conversation && conversation.id) {
+              dispatch(setActiveConversation(conversation.id));
+            }
+          }, 200);
+        } catch (createError) {
+          console.error('Error creating conversation:', createError);
+          message.error({ 
+            content: 'Không thể tạo cuộc trò chuyện mới. Vui lòng thử lại sau.', 
+            key: 'chatCheck' 
+          });
+        }
       }
     } catch (error) {
       console.error('Error handling chat:', error);

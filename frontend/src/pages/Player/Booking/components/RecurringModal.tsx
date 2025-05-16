@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Select, InputNumber, Radio, DatePicker, Checkbox, Space, Row, Col } from 'antd';
+import { Modal, Select, InputNumber, Checkbox, Row, Col } from 'antd';
 import { RecurringType } from '@/types/booking.type';
 import type { FormInstance } from 'antd';
 import dayjs from 'dayjs';
@@ -35,16 +35,16 @@ const RecurringModal: React.FC<RecurringModalProps> = ({
   onCancel,
   recurringType,
   recurrenceFrequency,
-  recurrenceEndType,
-  recurrenceEndDate,
-  recurrenceEndOccurrences,
+  // recurrenceEndType,
+  // recurrenceEndDate,
+  // recurrenceEndOccurrences,
   additionalWeekdays,
-  selectedDates,
+  // selectedDates,
   handleRecurringTypeChange,
   handleRecurrenceFrequencyChange,
-  handleRecurrenceEndTypeChange,
-  handleRecurrenceEndDateChange,
-  handleRecurrenceEndOccurrencesChange,
+  // handleRecurrenceEndTypeChange,
+  // handleRecurrenceEndDateChange,
+  // handleRecurrenceEndOccurrencesChange,
   getWeekdayName,
   form,
   handleAdditionalWeekdaysChange,
@@ -187,57 +187,57 @@ const RecurringModal: React.FC<RecurringModalProps> = ({
   };
 
   // Update the recurrence end type handler
-  const handleEndTypeChange = (value: 'never' | 'on_date' | 'after_occurrences') => {
-    handleRecurrenceEndTypeChange(value);
+  // const handleEndTypeChange = (value: 'never' | 'on_date' | 'after_occurrences') => {
+  //   handleRecurrenceEndTypeChange(value);
     
-    // Regenerate dates with the new end type
-    const baseDate = form.getFieldValue('date');
-    if (baseDate) {
-      generateRecurringDates(baseDate, localRecurringType === 'daily' ? RecurringType.DAILY : RecurringType.WEEKLY);
-    }
-  };
+  //   // Regenerate dates with the new end type
+  //   const baseDate = form.getFieldValue('date');
+  //   if (baseDate) {
+  //     generateRecurringDates(baseDate, localRecurringType === 'daily' ? RecurringType.DAILY : RecurringType.WEEKLY);
+  //   }
+  // };
 
   // Update the recurrence end date handler
-  const handleEndDateChange = (date: dayjs.Dayjs | null) => {
-    handleRecurrenceEndDateChange(date);
+  // const handleEndDateChange = (date: dayjs.Dayjs | null) => {
+  //   handleRecurrenceEndDateChange(date);
     
-    // Regenerate dates with the new end date
-    const baseDate = form.getFieldValue('date');
-    if (baseDate && date) {
-      generateRecurringDates(baseDate, localRecurringType === 'daily' ? RecurringType.DAILY : RecurringType.WEEKLY);
-    }
-  };
+  //   // Regenerate dates with the new end date
+  //   const baseDate = form.getFieldValue('date');
+  //   if (baseDate && date) {
+  //     generateRecurringDates(baseDate, localRecurringType === 'daily' ? RecurringType.DAILY : RecurringType.WEEKLY);
+  //   }
+  // };
 
   // Update handleOccurrencesChange to handle null values
-  const handleOccurrencesChange = (value: number | null) => {
-    handleRecurrenceEndOccurrencesChange(value || 1);
+  // const handleOccurrencesChange = (value: number | null) => {
+  //   handleRecurrenceEndOccurrencesChange(value || 1);
     
-    // Regenerate dates with the new occurrences
-    const baseDate = form.getFieldValue('date');
-    if (baseDate) {
-      generateRecurringDates(baseDate, localRecurringType === 'daily' ? RecurringType.DAILY : RecurringType.WEEKLY);
-    }
-  };
+  //   // Regenerate dates with the new occurrences
+  //   const baseDate = form.getFieldValue('date');
+  //   if (baseDate) {
+  //     generateRecurringDates(baseDate, localRecurringType === 'daily' ? RecurringType.DAILY : RecurringType.WEEKLY);
+  //   }
+  // };
 
-  // Add a function to display selected dates
-  const getDatesSummary = (): JSX.Element => {
-    if (selectedDates.length === 0) {
-      return <div className="text-gray-500">Chưa có ngày nào được chọn</div>;
-    }
+  // // Add a function to display selected dates
+  // const getDatesSummary = (): JSX.Element => {
+  //   if (selectedDates.length === 0) {
+  //     return <div className="text-gray-500">Chưa có ngày nào được chọn</div>;
+  //   }
 
-    const firstDate = selectedDates[0];
-    const lastDate = selectedDates[selectedDates.length - 1];
+  //   const firstDate = selectedDates[0];
+  //   const lastDate = selectedDates[selectedDates.length - 1];
     
-    return (
-      <div className="text-gray-700">
-        <div className="mb-1"><span className="font-medium">Bắt đầu:</span> {firstDate.format('DD/MM/YYYY')} ({getWeekdayName(firstDate)})</div>
-        {selectedDates.length > 1 && (
-          <div className="mb-1"><span className="font-medium">Kết thúc:</span> {lastDate.format('DD/MM/YYYY')} ({getWeekdayName(lastDate)})</div>
-        )}
-        <div><span className="font-medium">Tổng số ngày:</span> {selectedDates.length}</div>
-      </div>
-    );
-  };
+  //   return (
+  //     <div className="text-gray-700">
+  //       <div className="mb-1"><span className="font-medium">Bắt đầu:</span> {firstDate.format('DD/MM/YYYY')} ({getWeekdayName(firstDate)})</div>
+  //       {selectedDates.length > 1 && (
+  //         <div className="mb-1"><span className="font-medium">Kết thúc:</span> {lastDate.format('DD/MM/YYYY')} ({getWeekdayName(lastDate)})</div>
+  //       )}
+  //       <div><span className="font-medium">Tổng số ngày:</span> {selectedDates.length}</div>
+  //     </div>
+  //   );
+  // };
 
   return (
     <Modal
@@ -301,7 +301,7 @@ const RecurringModal: React.FC<RecurringModalProps> = ({
             </div>
           )}
           
-          {/* Recurrence End */}
+          {/* Recurrence End
           <div className="pt-2">
             <div className="mb-2">Kết thúc</div>
             <Radio.Group 
@@ -342,7 +342,7 @@ const RecurringModal: React.FC<RecurringModalProps> = ({
                 </Radio>
               </Space>
             </Radio.Group>
-          </div>
+          </div> */}
 
           {/* Preview section */}
           <div className="pt-4 mt-4 border-t">
@@ -352,13 +352,13 @@ const RecurringModal: React.FC<RecurringModalProps> = ({
             </div>
           </div>
 
-          {/* Add a date summary section */}
+          {/* Add a date summary section
           {selectedDates.length > 0 && (
             <div className="pt-4 mt-4 border-t">
               <div className="text-sm text-gray-500 mb-2">Các ngày đã chọn:</div>
               {getDatesSummary()}
             </div>
-          )}
+          )} */}
         </div>
       </div>
     </Modal>

@@ -331,7 +331,7 @@ const BookingDetail: React.FC = () => {
     (booking.payment.fieldPrice || 0) + 
     (booking.payment.servicePrice || 0) - 
     (booking.payment.discount || 0) -
-    (booking.payment.refundedPoint || 0);
+    (booking.payment.refundedPoint*1000 || 0);
 
   return (
     <div className="w-full  px-4 py-6 bg-gray-50">

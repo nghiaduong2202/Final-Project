@@ -1,9 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Select, Card, Carousel, Tag, Empty, Input } from 'antd';
+import { useState, useEffect, useRef } from 'react';
+import { Select, Card, Carousel, Tag, Empty } from 'antd';
 import { EnvironmentOutlined, StarOutlined, DollarOutlined } from '@ant-design/icons';
 import { IMAGE } from '@/constants/user/Home/Image';
 import { useNavigate } from 'react-router-dom';
-import type { RangePickerProps } from 'antd/es/date-picker';
 import { sportService } from '@/services/sport.service';
 import { getSportNameInVietnamese } from '@/utils/translateSport';
 import { useAppSelector } from '@/hooks/reduxHooks';
@@ -13,9 +12,9 @@ import { Facility } from '@/types/facility.type';
 import { Sport } from '@/types/sport.type';
 import './Home.css'; // Import custom CSS file for carousel
 import { facilityService } from '@/services/facility.service';
+import { voucherService } from '@/services/voucher.service';
 import OperatingHoursDisplay from '@/components/shared/OperatingHoursDisplay';
-import { debounce } from 'lodash';
-
+import { VoucherData } from '@/types/voucher.type';
 const { Option } = Select;
 
 // Interface cho dữ liệu tỉnh/thành phố và quận/huyện
@@ -29,20 +28,9 @@ interface District {
   name: string;
 }
 
-// Interface cho promotion/event data
-interface PromotionData {
-  id: string;
-  title: string;
-  description: string;
-  thumbnail: string;
-  validUntil: string;
-}
-
 interface SearchParamsType {
-  sports: string[];
-  location: string;
-  timeRange: RangePickerProps['value'];
-  facilityName: string;
+  sportIds: number[];
+  query: string;
   province: string;
   district: string;
 }
@@ -50,13 +38,12 @@ interface SearchParamsType {
 const HomePage = () => {
   const navigate = useNavigate();
   const { isAuthenticated } = useAppSelector(state => state.user);
+  const queryInputRef = useRef<HTMLInputElement>(null);
   
   // States
   const [searchParams, setSearchParams] = useState<SearchParamsType>({
-    sports: [],
-    location: '',
-    timeRange: null,
-    facilityName: '',
+    sportIds: [],
+    query: '',
     province: 'all',
     district: 'all'
   });
@@ -71,28 +58,17 @@ const HomePage = () => {
   const [topRatedFacilities, setTopRatedFacilities] = useState<Facility[]>([]);
   const [recommendedFacilities, setRecommendedFacilities] = useState<Facility[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sixVouchers, setSixVouchers] = useState<VoucherData[]>([]);
+  const [loadingVouchers, setLoadingVouchers] = useState(false);
 
-  // Debounced function for updating facility name input
-  const debouncedSetFacilityName = useCallback(
-    debounce((value: string) => {
-      setSearchParams(prev => ({ ...prev, facilityName: value }));
-    }, 300),
-    []
-  );
-  
-  // Handle facility name input change
-  const handleFacilityNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Update the input value directly in the DOM for immediate feedback
-    e.persist();
-    // Use the debounced function for the state update
-    debouncedSetFacilityName(e.target.value);
-  };
+  useEffect(() => {
+    fetchSixVouchers();
+  }, []);
 
-  // Fetch dữ liệu thể thao và tỉnh/thành phố khi component được mount
   useEffect(() => {
     fetchSports();
     fetchProvinces();
-    fetchTopRatedFacilities();
+    fetchTopRatedFacilities();    
     
     // Nếu đã đăng nhập, fetch recommended facilities
     if (isAuthenticated) {
@@ -172,6 +148,21 @@ const HomePage = () => {
     }
   };
 
+  // Fetch 6 vouchers
+  const fetchSixVouchers = async () => {
+    try {
+      setLoadingVouchers(true);
+      const response = await voucherService.getSixVouchers();
+      setSixVouchers(response);
+    } catch (error) {
+      console.error('Error fetching six vouchers:', error);
+      // Use empty array in case of error
+      setSixVouchers([]);
+    } finally {
+      setLoadingVouchers(false);
+    }
+  };
+
   // Fetch cơ sở thể thao được đề xuất cho người dùng đã đăng nhập
   const fetchRecommendedFacilities = async () => {
     try {
@@ -189,70 +180,26 @@ const HomePage = () => {
     }
   };
 
-  // Mock data - sau này sẽ được thay thế bằng API calls
-  const promotions: PromotionData[] = [
-    {
-      id: '1',
-      title: 'Giảm 30% giờ vàng',
-      description: 'Áp dụng cho tất cả các môn thể thao từ 13h-16h hàng ngày',
-      thumbnail: IMAGE.THUMBNAIL_2,
-      validUntil: '2024-04-30',
-    },
-    {
-      id: '2',
-      title: 'Mã giảm 50K cho người mới',
-      description: 'Dành cho người dùng đăng ký mới trong tháng 4/2024',
-      thumbnail: IMAGE.THUMBNAIL_2,
-      validUntil: '2024-04-30',
-    },
-    {
-      id: '3',
-      title: 'Đặt 3 giờ giảm 15%',
-      description: 'Áp dụng khi đặt liên tiếp 3 giờ trở lên cho tất cả các môn',
-      thumbnail: IMAGE.THUMBNAIL_2,
-      validUntil: '2024-04-30',
-    },
-    {
-      id: '4',
-      title: 'Flash Sale cuối tuần',
-      description: 'Giảm 20% tất cả các sân vào thứ 7, chủ nhật hàng tuần',
-      thumbnail: IMAGE.THUMBNAIL_2,
-      validUntil: '2024-04-30',
-    },
-    {
-      id: '5',
-      title: 'Ưu đãi thanh toán VNPay',
-      description: 'Giảm thêm 5% khi thanh toán qua VNPay-QR',
-      thumbnail: IMAGE.THUMBNAIL_2,
-      validUntil: '2024-04-30',
-    },
-    {
-      id: '6',
-      title: 'Tích điểm đổi ưu đãi',
-      description: 'Tích 1000 điểm nhận voucher giảm 100K cho lần đặt tiếp theo',
-      thumbnail: IMAGE.THUMBNAIL_2,
-      validUntil: '2024-04-30',
-    },
-  ];
-
   // Handle search
   const handleSearch = () => {
+    // Lấy giá trị từ input ref
+    const queryValue = queryInputRef.current?.value || '';
+    
     // Tạo query params từ các filter đã chọn
     const queryParams = new URLSearchParams();
-    if (searchParams.facilityName) queryParams.set('query', searchParams.facilityName);
+    if (queryValue) queryParams.set('query', queryValue);
     
-    // Chuyển đổi các ID từ string sang number và đảm bảo là mảng
-    if (searchParams.sports.length > 0) {
-      const sportIdsArray = searchParams.sports.map(id => parseInt(id));
+    // Xử lý sportIds - có thể cần xử lý đặc biệt nếu có cả string và number
+    if (searchParams.sportIds.length > 0) {
+      // Đảm bảo tất cả đều là số
+      const sportIdsArray = searchParams.sportIds.map(id => 
+        typeof id === 'string' ? parseInt(id) : id
+      );
       queryParams.set('sport', JSON.stringify(sportIdsArray));
     }
     
     if (searchParams.province !== 'all') queryParams.set('province', searchParams.province);
     if (searchParams.district !== 'all') queryParams.set('district', searchParams.district);
-    if (searchParams.timeRange && searchParams.timeRange[0] && searchParams.timeRange[1]) {
-      queryParams.set('startTime', searchParams.timeRange[0].format('YYYY-MM-DD HH:mm'));
-      queryParams.set('endTime', searchParams.timeRange[1].format('YYYY-MM-DD HH:mm'));
-    }
     
     // Chuyển đến trang kết quả tìm kiếm với filter đã chọn
     navigate(`/result-search?${queryParams.toString()}`);
@@ -261,13 +208,23 @@ const HomePage = () => {
   // Reset tất cả filter - giữ lại để sử dụng trong tương lai
   const handleResetFilters = () => {
     setSearchParams({
-      facilityName: '',
-      sports: [],
-      location: '',
-      timeRange: null,
+      query: '',
+      sportIds: [],
       province: 'all',
       district: 'all'
     });
+    
+    // Reset input value
+    if (queryInputRef.current) {
+      queryInputRef.current.value = '';
+    }
+  };
+
+  // Handle key press for search input
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
   };
 
   // Search section component
@@ -287,14 +244,13 @@ const HomePage = () => {
       {/* Hàng 1: Input tìm kiếm tên/địa chỉ */}
       <div className="mb-4">
         <div className="mb-1 text-sm font-medium">Tên cơ sở/Địa chỉ</div>
-        <Input
+        <input
+          ref={queryInputRef}
+          type="text"
           placeholder="Nhập tên cơ sở hoặc địa chỉ"
-          defaultValue={searchParams.facilityName}
-          onChange={handleFacilityNameChange}
-          allowClear
-          className="w-full"
-          size="large"
-          onPressEnter={handleSearch}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400"
+          defaultValue={searchParams.query}
+          onKeyPress={handleKeyPress}
         />
       </div>
       
@@ -308,8 +264,12 @@ const HomePage = () => {
               mode="multiple"
               placeholder="Chọn môn thể thao"
               style={{ width: '100%' }}
-              onChange={(values) => setSearchParams(prev => ({ ...prev, sports: values }))}
-              value={searchParams.sports}
+              onChange={(values) => {
+                // Chuyển đổi giá trị string sang number
+                const numericValues = values.map(value => parseInt(value.toString()));
+                setSearchParams(prev => ({ ...prev, sportIds: numericValues }));
+              }}
+              value={searchParams.sportIds.map(id => id.toString())}
               loading={loadingSports}
               showSearch
               optionFilterProp="children"
@@ -535,68 +495,83 @@ const HomePage = () => {
         <SearchSection />
       </div>
 
-      {/* Promotions Section */}
+      {/* Vouchers Section */}
       <section className="w-full px-4 py-14">
         <div className="max-w-7xl mx-auto">
           <div className="mb-6">
             <h2 className="text-xl md:text-2xl font-bold text-gray-800">
-              Ưu đãi nổi bật
+              Mã giảm giá đang diễn ra
             </h2>
-            <p className="text-gray-600 mt-2">Khám phá các chương trình khuyến mãi đặc biệt và mã giảm giá mới nhất từ hệ thống</p>
+            <p className="text-gray-600 mt-2">Các mã giảm giá đang diễn ra gần nhất trong tháng 5/2025</p>
           </div>
-          <Carousel 
-            arrows
-            slidesToShow={4}
-            responsive={[
-              {
-                breakpoint: 1280,
-                settings: {
-                  slidesToShow: 3,
-                }
-              },
-              {
-                breakpoint: 1024,
-                settings: {
-                  slidesToShow: 2,
-                }
-              },
-              {
-                breakpoint: 640,
-                settings: {
-                  slidesToShow: 1,
-                }
-              }
-            ]}
-            className="custom-carousel"
-          >
-            {promotions.map(promo => (
-              <div key={promo.id} className="px-2">
-                <Card 
-                  hoverable
-                  className="w-full h-full shadow-md hover:shadow-lg transition-shadow border border-gray-200"
-                  cover={
-                    <div className="h-36 sm:h-48 overflow-hidden">
-                      <img 
-                        alt={promo.title} 
-                        src={promo.thumbnail}
-                        className="w-full h-full object-cover" 
-                      />
-                    </div>
-                  }
-                >
-                  <div className="h-full flex flex-col">
-                    <Card.Meta
-                      title={<div className="text-base font-semibold line-clamp-1">{promo.title}</div>}
-                      description={<div className="text-sm line-clamp-1">{promo.description}</div>}
-                    />
-                    <p className="mt-2 text-red-500 text-xs">
-                      Có hiệu lực đến: {new Date(promo.validUntil).toLocaleDateString()}
-                    </p>
-                  </div>
-                </Card>
+          {loadingVouchers ? (
+            <div className="flex justify-center items-center p-12">
+              <div className="spinner-border" role="status">
+                <span className="sr-only">Loading...</span>
               </div>
-            ))}
-          </Carousel>
+            </div>
+          ) : sixVouchers.length > 0 ? (
+            <Carousel 
+              arrows
+              slidesToShow={4}
+              responsive={[
+                {
+                  breakpoint: 1280,
+                  settings: {
+                    slidesToShow: 3,
+                  }
+                },
+                {
+                  breakpoint: 1024,
+                  settings: {
+                    slidesToShow: 2,
+                  }
+                },
+                {
+                  breakpoint: 640,
+                  settings: {
+                    slidesToShow: 1,
+                  }
+                }
+              ]}
+              className="custom-carousel"
+            >
+              {sixVouchers.map(voucher => (
+                <div key={voucher.id} className="px-2">
+                  <Card 
+                    hoverable
+                    className="w-full h-full shadow-md hover:shadow-lg transition-shadow border border-gray-200"
+                    cover={
+                      <div className="h-36 sm:h-48 overflow-hidden">
+                        <img 
+                          alt={voucher.name} 
+                          src={voucher.facility.imagesUrl[0]}
+                          className="w-full h-full object-cover" 
+                        />
+                      </div>
+                    }
+                  >
+                    <div className="h-full flex flex-col">
+                      <Card.Meta
+                        title={<div className="text-base font-semibold line-clamp-1">{voucher.name}</div>}
+                        description={<div className="text-sm line-clamp-1">
+                          {voucher.voucherType === 'cash' 
+                            ? `Giảm ${voucher.discount.toLocaleString('vi-VN')}đ` 
+                            : `Giảm ${voucher.discount}%`}
+                          {' - '}{voucher.facility.name}
+                        </div>}
+                      />
+                      <p className="mt-2 text-red-500 text-xs">
+                        Có hiệu lực: {new Date(voucher.startDate).toLocaleDateString()} - {new Date(voucher.endDate).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </Card>
+                </div>
+              ))}
+            </Carousel>
+          ) : (
+            <Empty description="Không có mã giảm giá nào" />
+          )}
         </div>
       </section>
 

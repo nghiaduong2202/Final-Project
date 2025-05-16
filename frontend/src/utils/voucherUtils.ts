@@ -59,7 +59,10 @@ export const formatDateRange = (startDate: string, endDate: string): string => {
  * @param value - Numeric value
  * @returns Formatted currency string
  */
-export const formatCurrency = (value: number): string => {
+export const formatCurrency = (value: number | undefined | null): string => {
+  if (value === undefined || value === null) {
+    return '0đ';
+  }
   return `${value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')}đ`;
 };
 

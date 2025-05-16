@@ -78,6 +78,13 @@ const BookingStepInfo: React.FC<BookingStepInfoProps> = ({
     }
   }, [formData.timeRange]);
   
+  // Auto-select the first sport option if no sport is selected
+  useEffect(() => {
+    if (sports.length > 0 && !form.getFieldValue('sportId')) {
+      form.setFieldsValue({ sportId: sports[0].id });
+    }
+  }, [sports, form]);
+  
   // Ensure dates are shown immediately after selection
   useEffect(() => {
     // When navigating back to this step or when form data changes

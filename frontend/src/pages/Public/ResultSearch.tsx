@@ -71,29 +71,73 @@ const ResultSearch: React.FC = () => {
     sports: [] as string[],
     priceRange: [0, 1000000] as [number, number],
     rating: 0,
-    hasPromotion: false,
-    hasEvent: false,
-    openNow: false,
-    facilities: [] as string[],
   });
 
-  const [sortBy, setSortBy] = useState<string>('relevance');
+  const [sortBy, setSortBy] = useState<string>('rating'); // UI hiển thị "rating" nhưng API sẽ dùng avgRating
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(12);
   const [totalResults, setTotalResults] = useState(0);
+  const [maxPrice, setMaxPrice] = useState(1000000); // Giá cao nhất từ dữ liệu
   
   // States for data and API data
   const [facilities, setFacilities] = useState<FacilityData[]>([]);
+  const [allFacilities, setAllFacilities] = useState<FacilityData[]>([]); // Lưu tất cả dữ liệu gốc
   const [sports, setSports] = useState<{id: number, name: string}[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingSports, setLoadingSports] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch facilities on component mount and when search params change
+  // Lắng nghe sự thay đổi trong URL khi location thay đổi
+  useEffect(() => {
+    // Lấy các tham số mới từ URL
+    const newQueryParams = new URLSearchParams(location.search);
+    const newQuery = newQueryParams.get('query') || '';
+    const newProvince = newQueryParams.get('province') || undefined;
+    const newDistrict = newQueryParams.get('district') || undefined;
+    
+    // Xử lý sportIds từ URL params
+    let newSportIdsArray: number[] = [];
+    const newSportParam = newQueryParams.get('sport') || '';
+    
+    try {
+      if (newSportParam) {
+        newSportIdsArray = JSON.parse(newSportParam);
+        if (!Array.isArray(newSportIdsArray)) {
+          newSportIdsArray = [];
+        }
+      }
+    } catch (e) {
+      console.error('Lỗi khi parse sportIds từ URL mới:', e);
+      newSportIdsArray = [];
+    }
+    
+    // Cập nhật searchParams với giá trị mới từ URL
+    setSearchParams({
+      query: newQuery,
+      sportIds: newSportIdsArray.length > 0 ? newSportIdsArray : undefined,
+      province: newProvince,
+      district: newDistrict,
+      page: 1, // Reset về trang 1 khi có tìm kiếm mới
+    });
+    
+    // Set UI sortBy luôn giữ giá trị 'rating'
+    setSortBy('rating');
+    
+    // Reset currentPage khi params thay đổi
+    setCurrentPage(1);
+  }, [location.search]);
+
+  // Fetch facilities khi searchParams thay đổi
   useEffect(() => {
     fetchFacilities();
     fetchSports();
-  }, [searchParams]); // Thêm searchParams vào dependency array
+  }, [searchParams]);
+
+  // Sắp xếp dữ liệu khi component mount lần đầu
+  useEffect(() => {
+    // Mặc định sắp xếp theo rating khi component mount
+    setSortBy('rating');
+  }, []);
 
   // Fetch facilities using search API with potential override params
   const fetchFacilities = async (overrideParams?: SearchParams) => {
@@ -133,14 +177,52 @@ const ResultSearch: React.FC = () => {
         numberOfRatings: facility.numberOfRating
       }));
       
-      setFacilities(mappedFacilities);
-      setTotalResults(mappedFacilities.length); // Cập nhật tổng số kết quả
+      // Tìm giá cao nhất từ dữ liệu
+      const highestPrice = Math.max(...mappedFacilities.map(f => f.maxPrice || 0));
+      setMaxPrice(highestPrice > 0 ? highestPrice : 1000000);
+      
+      // Cập nhật filters.priceRange.max nếu cần
+      if (filters.priceRange[1] > highestPrice && highestPrice > 0) {
+        setFilters(prev => ({
+          ...prev,
+          priceRange: [prev.priceRange[0], highestPrice]
+        }));
+      }
+      
+      // Lưu tất cả dữ liệu gốc
+      setAllFacilities(mappedFacilities);
+      
+      // Sắp xếp dữ liệu phía client dựa trên sortBy
+      const sortedFacilities = sortFacilities(mappedFacilities, sortBy);
+      
+      setFacilities(sortedFacilities);
+      setTotalResults(sortedFacilities.length); // Cập nhật tổng số kết quả
       setError(null);
     } catch (err) {
       console.error('Error fetching facilities:', err);
       setError('Không thể tải dữ liệu cơ sở thể thao. Vui lòng thử lại sau.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Hàm sắp xếp facilities dựa trên sortBy
+  const sortFacilities = (data: FacilityData[], sortType: string): FacilityData[] => {
+    const sortedData = [...data]; // Tạo bản sao để tránh thay đổi dữ liệu gốc
+    
+    switch (sortType) {
+      case 'rating':
+        // Sắp xếp theo avgRating giảm dần
+        return sortedData.sort((a, b) => b.avgRating - a.avgRating);
+      case 'priceAsc':
+        // Sắp xếp theo minPrice tăng dần
+        return sortedData.sort((a, b) => (a.minPrice || 0) - (b.minPrice || 0));
+      case 'priceDesc':
+        // Sắp xếp theo minPrice giảm dần
+        return sortedData.sort((a, b) => (b.minPrice || 0) - (a.minPrice || 0));
+      default:
+        // Mặc định sắp xếp theo avgRating giảm dần
+        return sortedData.sort((a, b) => b.avgRating - a.avgRating);
     }
   };
 
@@ -165,15 +247,6 @@ const ResultSearch: React.FC = () => {
     }));
   };
 
-  // Danh sách các tiện ích để filter
-  const facilityOptions = [
-    { label: 'Có chỗ đậu xe', value: 'parking' },
-    { label: 'Có phòng thay đồ', value: 'changingRoom' },
-    { label: 'Có phòng tắm', value: 'shower' },
-    { label: 'Có quầy đồ uống', value: 'beverages' },
-    { label: 'Cho thuê dụng cụ', value: 'equipment' },
-  ];
-
   // Xử lý thay đổi filter
   const handleFilterChange = (filterName: string, value: string[] | [number, number] | number | boolean | string | number[]) => {
     setFilters(prev => ({
@@ -190,6 +263,13 @@ const ResultSearch: React.FC = () => {
         ...prev,
         minRating: value > 0 ? value : undefined,
       }));
+      
+      // Gọi API khi thay đổi rating
+      fetchFacilities({
+        ...searchParams,
+        minRating: value > 0 ? value : undefined,
+        page: 1
+      });
     } else if (filterName === 'sports' && Array.isArray(value)) {
       // Khi filter sports thay đổi
       const sportIdsArray = value.map(sportName => {
@@ -197,20 +277,31 @@ const ResultSearch: React.FC = () => {
         return sport ? sport.id : undefined;
       }).filter((id): id is number => id !== undefined);
       
+      // Cập nhật searchParams
       setSearchParams(prev => ({
         ...prev,
         sportIds: sportIdsArray.length > 0 ? sportIdsArray : undefined,
       }));
       
-      // Cập nhật lại API ngay khi thay đổi filter
-      const apiParams: SearchParams = {
+      // Gọi API với tham số mới
+      fetchFacilities({
         ...searchParams,
         sportIds: sportIdsArray.length > 0 ? sportIdsArray : undefined,
-        page: currentPage,
-        limit: pageSize,
-      };
-      
-      fetchFacilities(apiParams);
+        page: 1
+      });
+    } else if (filterName === 'priceRange' && Array.isArray(value) && value.length === 2) {
+      // Khi thay đổi khoảng giá, chỉ áp dụng filter phía client
+      if (allFacilities.length > 0) {
+        // Lọc theo giá
+        const filteredByPrice = allFacilities.filter(facility => {
+          const facilityMinPrice = facility.minPrice || 0;
+          return facilityMinPrice >= (value[0] as number) && facilityMinPrice <= (value[1] as number);
+        });
+        
+        const sortedData = sortFacilities(filteredByPrice, sortBy);
+        setFacilities(sortedData);
+        setTotalResults(filteredByPrice.length);
+      }
     }
   };
 
@@ -218,34 +309,9 @@ const ResultSearch: React.FC = () => {
   const handleSortChange = (value: string) => {
     setSortBy(value);
     
-    // Cập nhật tham số sortBy và sortOrder cho API
-    let apiSortBy = 'relevance';
-    let apiSortOrder: 'asc' | 'desc' = 'desc';
-    
-    switch (value) {
-      case 'rating':
-        apiSortBy = 'avgRating';
-        apiSortOrder = 'desc';
-        break;
-      case 'priceAsc':
-        apiSortBy = 'minPrice';
-        apiSortOrder = 'asc';
-        break;
-      case 'priceDesc':
-        apiSortBy = 'minPrice';
-        apiSortOrder = 'desc';
-        break;
-      default:
-        // Default sorting (relevance)
-        apiSortBy = 'relevance';
-        apiSortOrder = 'desc';
-    }
-    
-    setSearchParams(prev => ({
-      ...prev,
-      sortBy: apiSortBy,
-      sortOrder: apiSortOrder,
-    }));
+    // Sắp xếp lại dữ liệu hiện tại mà không cần gọi lại API
+    const sortedFacilities = sortFacilities(facilities, value);
+    setFacilities(sortedFacilities);
   };
 
   // Xử lý thay đổi trang
@@ -253,11 +319,12 @@ const ResultSearch: React.FC = () => {
     setCurrentPage(page);
     if (pageSize) setPageSize(pageSize);
     
-    setSearchParams(prev => ({
-      ...prev,
+    // Gọi API với trang mới
+    fetchFacilities({
+      ...searchParams,
       page,
-      limit: pageSize || prev.limit,
-    }));
+      limit: pageSize || 12
+    });
   };
 
   // Xử lý click vào facility
@@ -279,27 +346,24 @@ const ResultSearch: React.FC = () => {
   const handleResetFilters = () => {
     setFilters({
       sports: [],
-      priceRange: [0, 1000000],
+      priceRange: [0, maxPrice],
       rating: 0,
-      hasPromotion: false,
-      hasEvent: false,
-      openNow: false,
-      facilities: [],
     });
     
     // Reset search params về mặc định nhưng giữ lại query từ URL
-    setSearchParams({
+    const resetParams = {
       query: queryParams.get('query') || '',
       sportIds: undefined,
       province: queryParams.get('province') || undefined,
       district: queryParams.get('district') || undefined,
       page: 1,
-      limit: 12,
-      sortBy: 'relevance',
-      sortOrder: 'desc',
-    });
+    };
     
-    setSortBy('relevance');
+    setSearchParams(resetParams);
+    
+    // Gọi API với tham số đã reset
+    fetchFacilities(resetParams);
+    
     setCurrentPage(1);
   };
 
@@ -488,7 +552,7 @@ const ResultSearch: React.FC = () => {
                 <Slider
                   range
                   min={0}
-                  max={1000000}
+                  max={maxPrice}
                   step={50000}
                   value={filters.priceRange}
                   onChange={(value) => handleFilterChange('priceRange', value)}
@@ -512,32 +576,6 @@ const ResultSearch: React.FC = () => {
                   onChange={(value) => handleFilterChange('rating', value)} 
                 />
               </div>
-
-              <Divider className="my-4" />
-
-              {/* Thời gian */}
-              <div className="mb-6">
-                <Title level={5} className="text-base font-semibold mb-3">Thời gian</Title>
-                <Checkbox 
-                  checked={filters.openNow}
-                  onChange={(e) => handleFilterChange('openNow', e.target.checked)}
-                >
-                  Đang mở cửa
-                </Checkbox>
-              </div>
-
-              <Divider className="my-4" />
-
-              {/* Tiện ích */}
-              <div className="mb-6">
-                <Title level={5} className="text-base font-semibold mb-3">Tiện ích</Title>
-                <Checkbox.Group
-                  options={facilityOptions}
-                  value={filters.facilities}
-                  onChange={(values) => handleFilterChange('facilities', values)}
-                  className="flex flex-col gap-2"
-                />
-              </div>
             </div> 
           </Col>
           
@@ -553,8 +591,7 @@ const ResultSearch: React.FC = () => {
                   style={{ width: 170 }}
                   onChange={handleSortChange}
                   size="middle"
-                  options={[
-                    { value: 'relevance', label: 'Liên quan nhất' },
+                  options={[                    
                     { value: 'rating', label: 'Đánh giá cao nhất' },
                     { value: 'priceAsc', label: 'Giá: Thấp đến cao' },
                     { value: 'priceDesc', label: 'Giá: Cao đến thấp' },

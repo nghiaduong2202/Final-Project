@@ -34,6 +34,11 @@ export class SocketService {
         this.reconnect();
       }
     });
+    
+    // Đồng bộ số tin nhắn chưa đọc mỗi khi khởi tạo
+    setTimeout(() => {
+      this.syncUnreadCounts();
+    }, 1000);
   }
 
   private getToken(): string {
@@ -103,12 +108,21 @@ export class SocketService {
       });
 
       this.socket.on('receive-message', (message: SocketMessage) => {
-        // console.log('Received message:', message);
-        // Cập nhật messages trong conversation tương ứng
-        const conversationId = message.conversation.id;
-        const currentMessages = this.messages.value;
+        console.log('Received message:', message);
+        // Lấy ID người dùng hiện tại
         const currentUserId = this.getCurrentUserId();
+        const conversationId = message.conversation.id;
         
+        // Kiểm tra xem tin nhắn có phải từ người dùng hiện tại không
+        const isFromCurrentUser = message.sender.id === currentUserId;
+        console.log('Is message from current user?', isFromCurrentUser, 'Current user ID:', currentUserId, 'Sender ID:', message.sender.id);
+        
+        // Kiểm tra xem conversation có phải là conversation đang active không
+        const isActiveConversation = conversationId === this.activeConversation;
+        console.log('Is active conversation?', isActiveConversation);
+        
+        // Cập nhật messages trong conversation tương ứng
+        const currentMessages = this.messages.value;
         if (!currentMessages[conversationId]) {
           currentMessages[conversationId] = [];
         }
@@ -133,6 +147,7 @@ export class SocketService {
         const convoIndex = convos.findIndex(c => c.id === conversationId);
         
         if (convoIndex !== -1) {
+          // Tạo bản sao để tránh mutation trực tiếp
           const updatedConvos = [...convos];
           const convo = updatedConvos[convoIndex];
           
@@ -142,7 +157,8 @@ export class SocketService {
           }
           
           // Kiểm tra xem tin nhắn đã tồn tại chưa
-          if (!convo.messages.some(m => m.id === message.id)) {
+          const messageExistsInConvo = convo.messages.some(m => m.id === message.id);
+          if (!messageExistsInConvo) {
             // Chuyển đổi SocketMessage thành Message trước khi lưu
             const regularMessage: Message = {
               id: message.id,
@@ -153,20 +169,38 @@ export class SocketService {
             };
             convo.messages.push(regularMessage);
             
+            // QUAN TRỌNG: Thay đổi cách tính số tin nhắn chưa đọc
             // Chỉ tăng số tin chưa đọc khi:
-            // 1. Tin nhắn đến từ người khác (không phải người dùng hiện tại)
-            // 2. Conversation hiện tại không phải là conversation đang active (người dùng không đang xem)
-            if (message.sender.id !== currentUserId && conversationId !== this.activeConversation) {
-              convo.unreadMessageCount = (convo.unreadMessageCount || 0) + 1;
+            // 1. Tin nhắn KHÔNG phải từ người dùng hiện tại
+            // 2. Conversation KHÔNG phải là conversation đang active
+            if (!isFromCurrentUser && !isActiveConversation) {
+              // Thay vì tăng dần, hãy đếm số lượng tin nhắn chưa đọc từ đầu
+              // Đếm tất cả tin nhắn từ người khác mà chưa được đánh dấu là đã đọc
+              
+              // Đặt giá trị mặc định là 1 cho tin nhắn đầu tiên
+              convo.unreadMessageCount = 1;
+              
+              console.log('Setting unread count to 1 for new message');
+            } else if (isFromCurrentUser) {
+              // Nếu tin nhắn từ người dùng hiện tại, đảm bảo số tin nhắn chưa đọc không tăng
+              console.log('Message from current user, not increasing unread count');
+            } else if (isActiveConversation) {
+              // Nếu conversation đang active, đánh dấu tin nhắn là đã đọc
+              console.log('Active conversation, marking message as seen');
+              setTimeout(() => {
+                this.markAsSeen(conversationId, message.id);
+              }, 100);
             }
             
             this.conversations.next([...updatedConvos]);
+          } else {
+            console.log('Message already exists in conversation, not adding duplicate');
           }
         }
       });
 
       this.socket.on('seen-message', (participant: Participant) => {
-        // console.log('Received seen-message event:', participant);
+        console.log('Received seen-message event for conversation:', participant.conversationId);
         const currentUserId = this.getCurrentUserId();
         
         // Cập nhật seen status trong conversations
@@ -174,6 +208,7 @@ export class SocketService {
         const convoIndex = convos.findIndex(c => c.id === participant.conversationId);
         
         if (convoIndex !== -1) {
+          // Tạo bản sao để tránh mutation trực tiếp
           const updatedConvos = [...convos];
           const convo = updatedConvos[convoIndex];
           
@@ -185,8 +220,11 @@ export class SocketService {
             // Cập nhật participant
             convo.participants[participantIndex] = participant;
             
-            // Nếu người dùng hiện tại đọc tin nhắn, xóa số tin nhắn chưa đọc
-            if (participant.personId === currentUserId) {
+            // Nếu người dùng hiện tại đọc tin nhắn hoặc người xem là người dùng hiện tại,
+            // xóa số tin nhắn chưa đọc
+            if (participant.personId === currentUserId || 
+                convo.participants.some(p => p.personId === currentUserId && p.personId === participant.personId)) {
+              console.log('Current user marked messages as seen, resetting unread count');
               convo.unreadMessageCount = 0;
             }
             
@@ -207,10 +245,10 @@ export class SocketService {
                 }
                 
                 convo.messages = updatedMessages;
-                this.conversations.next([...updatedConvos]);
               }
             }
             
+            // Cập nhật conversations
             this.conversations.next([...updatedConvos]);
           }
         }
@@ -235,6 +273,7 @@ export class SocketService {
                 }
               }
               
+              // Cập nhật messages
               allMessages[participant.conversationId] = updatedMessages;
               this.messages.next({...allMessages});
             }
@@ -265,6 +304,26 @@ export class SocketService {
         if (reason === 'io server disconnect' || reason === 'transport close') {
           this.handleTokenError();
         }
+      });
+
+      this.socket.on('unread-counts', (unreadCounts: { [conversationId: string]: number }) => {
+        console.log('Received unread counts from server:', unreadCounts);
+        
+        // Cập nhật số tin nhắn chưa đọc cho mỗi conversation
+        const convos = this.conversations.value;
+        const updatedConvos = convos.map(convo => {
+          const unreadCount = unreadCounts[convo.id];
+          if (unreadCount !== undefined) {
+            return {
+              ...convo,
+              unreadMessageCount: unreadCount
+            };
+          }
+          return convo;
+        });
+        
+        // Cập nhật conversations
+        this.conversations.next(updatedConvos);
       });
 
     } catch (error) {
@@ -323,12 +382,19 @@ export class SocketService {
     if (userStr) {
       try {
         const user = JSON.parse(userStr);
-        return user.id;
+        console.log('Current user from localStorage:', user);
+        if (user && user.id) {
+          return user.id;
+        } else {
+          console.error('User object does not have an id property:', user);
+          return null;
+        }
       } catch (e) {
-        console.error('Error parsing user:', e);
+        console.error('Error parsing user from localStorage:', e);
         return null;
       }
     }
+    console.warn('No user found in localStorage');
     return null;
   }
 
@@ -425,20 +491,42 @@ export class SocketService {
   markAsSeen(conversationId: string, messageId: string): void {
     console.log('Marking message as seen:', { conversationId, messageId });
     
-    // Similar approach to sendMessage
+    // Đặt số tin nhắn chưa đọc về 0 ngay lập tức trong state local
+    const convos = this.conversations.value;
+    const convoIndex = convos.findIndex(c => c.id === conversationId);
+    
+    if (convoIndex !== -1) {
+      // Tạo bản sao để tránh mutation trực tiếp
+      const updatedConvos = [...convos];
+      const convo = updatedConvos[convoIndex];
+      
+      // Đặt unreadMessageCount = 0
+      const updatedConvo = {
+        ...convo,
+        unreadMessageCount: 0 // Reset hoàn toàn về 0
+      };
+      
+      updatedConvos[convoIndex] = updatedConvo;
+      
+      // Cập nhật conversation
+      this.conversations.next(updatedConvos);
+      console.log('Reset unread count for conversation:', conversationId);
+    }
+    
+    // Kiểm tra xem socket có kết nối không
     if (!this.socket || !this.socket.connected) {
       console.log('Socket not connected for marking as seen. Connecting...');
       
-      // Force start a new connection if needed
+      // Ngắt kết nối cũ nếu có
       if (this.socket) {
         this.socket.disconnect();
       }
       
-      // Always try to reconnect with fresh socket
+      // Kết nối lại
       this.isConnecting = false;
       this.connect();
       
-      // Queue the seen message to be sent after connection
+      // Đợi kết nối trước khi gửi seen-message
       setTimeout(() => {
         if (this.socket && this.socket.connected) {
           console.log('Connected now. Marking message as seen.');
@@ -448,10 +536,9 @@ export class SocketService {
           });
         } else {
           console.error('Failed to connect socket for marking as seen.');
-          // Try once more
+          // Thử lại
           setTimeout(() => {
             if (this.socket && this.socket.connected) {
-              // console.log('Connected on second attempt. Marking message as seen.');
               this.socket.emit('seen-message', {
                 conversationId,
                 messageId
@@ -558,6 +645,21 @@ export class SocketService {
       
       return () => subscription.unsubscribe();
     });
+  }
+
+  // Thêm phương thức mới để đồng bộ số tin nhắn chưa đọc
+  syncUnreadCounts(): void {
+    console.log('Synchronizing unread counts with server');
+    
+    if (!this.socket || !this.socket.connected) {
+      console.log('Socket not connected for syncing unread counts. Connecting...');
+      this.connect();
+    }
+    
+    // Gửi yêu cầu đồng bộ số tin nhắn chưa đọc
+    if (this.socket && this.socket.connected) {
+      this.socket.emit('sync-unread-counts');
+    }
   }
 }
 

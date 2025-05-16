@@ -131,7 +131,7 @@ export const OwnerLayout: React.FC = () => {
           {/* Main content with scrolling */}
           <div className="flex-1 overflow-auto">
             <main className="p-3 sm:p-4">
-              <div className="overflow-x-auto">
+              <div className="min-h-[calc(100vh-160px)] overflow-x-auto">
                 <Outlet />
               </div>
             </main>
