@@ -1,0 +1,122 @@
+version: '3.8'
+
+services:
+  backend:
+    container_name: backend-api
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3001"
+    environment:
+      - PORT=3001
+      - NODE_ENV=production
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_USERNAME=postgres
+      - DATABASE_PASSWORD=260708102001
+      - DATABASE_NAME=sport-booking
+      - DATABASE_AUTOLOAD=true
+      - DATABASE_SYNC=true
+      - ELASTICSEARCH_NODE=http://elasticsearch:9200
+      - JWT_SECRET=Z7Ne80XZ8UCJ8eZ3FZTmKH7+KqO31y3XD1BIoPXq6b15EWH2xDJw0d5jSOz3PRy6
+      - JWT_TOKEN_AUDIENCE=localhost:3001
+      - JWT_TOKEN_ISSUER=localhost:3001
+      - JWT_EXPIRE=10h
+      - JWT_SECRET_REFRESH=fMqrIGpYGN5aeyjM1woxxMbKwEr+/bkpolWVyvDaJ+g/PsJSTYyrnTRo4x/FWQsz
+      - JWT_EXPIRE_REFRESH=15d
+
+      - CLOUDINARY_NAME=db3dx1dos
+      - CLOUDINARY_API_KEY=245765724114412
+      - CLOUDINARY_API_SECRET=-SLrHYVV_40p5GEZk6xT2xzjKp0
+
+      - TMN_CODE=IWI63R4W
+      - SECURE_SECRET=T6PE9FUTZCB8VT2XPYDYO0LWH8FWZJET
+
+      - VNPAY_RETURN_URL=https://capstoneprojectclient.vercel.app/user/booking/result-booking-vnpay
+
+      - TZ=Asia/Ho_Chi_Minh
+    depends_on:
+      postgres:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    volumes:
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - app_network
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx_ssl
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - /etc/letsencrypt:/etc/letsencrypt
+    depends_on:
+      - backend
+    networks:
+      - app_network
+    restart: unless-stopped
+  postgres:
+    container_name: postgres-db
+    image: postgres:latest
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 260708102001
+      POSTGRES_DB: sport-booking
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  elasticsearch:
+    container_name: elasticsearch
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.2
+    environment:
+      - node.name=es01
+      - cluster.name=es-docker-cluster
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+
+networks:
+  app_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  elasticsearch_data:
+    driver: local

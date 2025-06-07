@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  elasticsearch:
+    environment:
+      - logger.level=WARN
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3" 

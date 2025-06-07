@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: backend-api
+    env: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_HOST
+        sync: false
+      - key: DATABASE_PORT
+        value: 5432
+      - key: DATABASE_USERNAME
+        sync: false
+      - key: DATABASE_PASSWORD
+        sync: false
+      - key: DATABASE_NAME
+        sync: false
+      - key: ELASTICSEARCH_NODE
+        sync: false
+    healthCheckPath: /api 
