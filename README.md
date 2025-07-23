@@ -166,7 +166,7 @@ Final-Project/
 ## 📞 Liên hệ
 
 - **Nhóm phát triển**: Team TAN (Nguyễn Tuấn Anh, Dương Văn Nghĩa)
-- **Email**: anh.nguyenanh564@hcmut.edu.vn, nghia.duong2022@hcmut.edu.vn
+- **Email**: anh.nguyenanh564@hcmut.edu.vn, nghia.duong22022002@hcmut.edu.vn
 
 ---
 
